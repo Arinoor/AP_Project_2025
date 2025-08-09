@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.canvas.Canvas?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<BorderPane xmlns:fx="http://javafx.com/fxml/1" fx:controller="play.ui.MainController">
+    <top>
+        <HBox spacing="12" style="-fx-padding:8; -fx-background-color: #f1f1f1;">
+            <Label text="Conduit Garden" style="-fx-font-weight:bold;"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label fx:id="entitiesLabel" text="Entities: 0"/>
+            <Label fx:id="seedsLabel" text="Seeds: 0"/>
+            <Label fx:id="coinsLabel" text="Coins: 0"/>
+            <Button fx:id="shopButton" text="Shop"/>
+            <Button fx:id="startButton" text="Start"/>
+        </HBox>
+    </top>
+    <center>
+        <AnchorPane fx:id="canvasContainer">
+            <Canvas fx:id="gameCanvas" width="900" height="560" />
+        </AnchorPane>
+    </center>
+</BorderPane>
