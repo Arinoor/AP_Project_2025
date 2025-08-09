@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<VBox xmlns:fx="http://javafx.com/fxml/1" fx:controller="play.ui.ShopController" spacing="12" style="-fx-padding:12;">
+    <Label text="Shop" style="-fx-font-size:16; -fx-font-weight:bold;"/>
+    <HBox spacing="8">
+        <Button fx:id="btnAtar" text="Atar - 3 coins (Disable lateral 10s)"/>
+        <Label fx:id="lblAtarMsg" text=""/>
+    </HBox>
+    <HBox spacing="8">
+        <Button fx:id="btnAiryaman" text="Airyaman - 4 coins (Disable collisions 5s)"/>
+        <Label fx:id="lblAiryMsg" text=""/>
+    </HBox>
+    <HBox spacing="8">
+        <Button fx:id="btnAnahita" text="Anahita - 5 coins (Reset collisions)"/>
+        <Label fx:id="lblAnaMsg" text=""/>
+    </HBox>
+    <HBox spacing="8">
+        <Label fx:id="coinsInfo" text="Your coins: 0"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button fx:id="closeBtn" text="Close"/>
+    </HBox>
+</VBox>
