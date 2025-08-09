@@ -5,75 +5,107 @@ import play.events.DeliveryListener;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 public class GameEngine {
-        private final List<Entity> entities = new ArrayList<>();
-        private final List<System> systems = new ArrayList<>();
-        private final CopyOnWriteArrayList<DeliveryListener> deliveryListeners = new CopyOnWriteArrayList<>();
-        private Consumer<Double> onTick;
 
-        // stats
+        private final List<Entity> entities = new ArrayList<>();
+        private final List<Consumer<Double>> systems = new ArrayList<>();
+        private final List<DeliveryListener> deliveryListeners = new ArrayList<>();
+
+        // Game stats
         private int producedCount = 0;
         private int lostCount = 0;
         private int reachedReferenceCount = 0;
 
-        // wire accounting
+        // Wire accounting
         private double totalWire = 5000.0;
         private double remainingWire = 5000.0;
 
-        public Entity createEntity() { Entity e = new Entity(); entities.add(e); return e; }
-        public List<Entity> entities() { return entities; }
-        public void addSystem(System s) { systems.add(s); }
-        public void setTickCallback(Consumer<Double> cb) { this.onTick = cb; }
+        // Optional tick callback
+        private Consumer<Double> tickCallback;
 
-        public void tick(double dt) {
-                for (System s : systems) s.update(dt);
-                if (onTick != null) onTick.accept(dt);
+        public List<Entity> entities() {
+                return entities;
         }
 
-        // Delivery listeners
-        public void addDeliveryListener(DeliveryListener l) { deliveryListeners.addIfAbsent(l); }
-        public void removeDeliveryListener(DeliveryListener l) { deliveryListeners.remove(l); }
-
-        public void fireDeliveredEvent(play.components.Seed seed) {
-                for (DeliveryListener l : deliveryListeners) l.onSeedDelivered(seed);
+        public void addSystem(Consumer<Double> system) {
+                systems.add(system);
         }
 
-        // Stats API
-        public void incrementProduced() { producedCount++; }
-        public void incrementLost() { lostCount++; }
-        public void incrementReachedReference() { reachedReferenceCount++; }
+        public void addDeliveryListener(DeliveryListener listener) {
+                deliveryListeners.add(listener);
+        }
 
-        public int producedCount() { return producedCount; }
-        public int lostCount() { return lostCount; }
-        public int reachedReferenceCount() { return reachedReferenceCount; }
+        public void tick(double deltaTime) {
+                for (Consumer<Double> system : systems) {
+                        system.accept(deltaTime);
+                }
+                if (tickCallback != null) {
+                        tickCallback.accept(deltaTime);
+                }
+        }
 
-        public void resetStats() { producedCount = 0; lostCount = 0; reachedReferenceCount = 0; }
+        public void setTickCallback(Consumer<Double> callback) {
+                this.tickCallback = callback;
+        }
+
+        public void notifySeedDelivered(play.components.Seed seed) {
+                producedCount++;
+                for (DeliveryListener listener : deliveryListeners) {
+                        listener.onSeedDelivered(seed);
+                }
+        }
+
+        public void incrementLost() {
+                lostCount++;
+        }
+
+        public void incrementProduced() {
+                producedCount++;
+        }
+
+        public void incrementReachedReference() {
+                reachedReferenceCount++;
+        }
+
+        public int producedCount() {
+                return producedCount;
+        }
+
+        public int lostCount() {
+                return lostCount;
+        }
+
+        public int reachedReferenceCount() {
+                return reachedReferenceCount;
+        }
+
+        public void resetStats() {
+                producedCount = 0;
+                lostCount = 0;
+                reachedReferenceCount = 0;
+                remainingWire = totalWire;
+        }
 
         // Wire accounting
-        public void setTotalWire(double total) {
-                if (total < 0) total = 0;
-                this.totalWire = total;
-                this.remainingWire = total;
+        public double getTotalWire() {
+                return totalWire;
         }
-        public double getTotalWire() { return totalWire; }
-        public double getRemainingWire() { return remainingWire; }
-        /**
-         * Consume `length` of wire. Returns true if enough wire existed and consumption succeeded.
-         */
+
+        public double getRemainingWire() {
+                return remainingWire;
+        }
+
         public boolean consumeWire(double length) {
-                if (length < 0) return false;
-                if (length <= remainingWire) {
+                if (remainingWire >= length) {
                         remainingWire -= length;
                         return true;
                 }
                 return false;
         }
-        public void refundWire(double length) {
-                if (length < 0) return;
-                remainingWire += length;
-                if (remainingWire > totalWire) remainingWire = totalWire;
+
+        public void addEntity(Entity e) {
+                entities.add(e);
         }
 }

@@ -1,8 +1,10 @@
-package play.components;
+        package play.components;
 
-/**
- * Marker component - attaches to a port entity to mark it as a reference sink.
- */
-public class Reference {
-        // empty by design; presence = reference sink
-}
+        import play.core.Component;
+
+        /**
+         * Marker component - indicates this port is a reference sink.
+         */
+        public class Reference implements Component {
+                // no fields needed
+        }

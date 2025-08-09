@@ -1,96 +1,87 @@
 package play.level;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import play.components.Link;
+import play.components.PortInfo;
+import play.components.Reference;
+import play.components.Transform;
 import play.core.Entity;
 import play.system.GameEngine;
-import play.components.*;
 
 import java.io.InputStream;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
 
-/**
- * Loads JSON level files into the engine.
- * Expected JSON schema (example provided later).
- */
-public final class LevelLoader {
+public class LevelLoader {
 
-        public static void loadFromResource(String resourcePath, GameEngine engine) throws Exception {
+        public static void loadFromResource(String resource, GameEngine engine) throws Exception {
+                InputStream in = LevelLoader.class.getResourceAsStream(resource);
+                if (in == null) throw new IllegalArgumentException("Missing level: " + resource);
+
                 ObjectMapper mapper = new ObjectMapper();
-                try (InputStream is = LevelLoader.class.getResourceAsStream(resourcePath)) {
-                        if (is == null) throw new IllegalArgumentException("Resource not found: " + resourcePath);
-                        LevelSpec spec = mapper.readValue(is, LevelSpec.class);
+                JsonNode root = mapper.readTree(in);
 
-                        // maps for quick lookup
-                        Map<String, Entity> conduitMap = new HashMap<>();
-                        Map<String, Entity> portMap = new HashMap<>();
-                        List<Entity> linkList = new ArrayList<>();
+                // optional totalWire
+                if (root.has("totalWire")) {
+                        engine.setTotalWire(root.get("totalWire").asDouble());
+                }
 
-                        // create conduits and ports
-                        if (spec.conduits != null) {
-                                for (LevelSpec.Conduit c : spec.conduits) {
-                                        Entity ce = engine.createEntity();
-                                        ce.add(new Transform(c.x, c.y));
-                                        conduitMap.put(c.id, ce);
+                Map<String, Entity> portsById = new HashMap<>();
 
-                                        // create default ports: id-in and id-out
-                                        Entity in = engine.createEntity();
-                                        in.add(new Transform(c.x - 40, c.y));
-                                        in.add(new PortInfo(PortInfo.IO.IN, PortInfo.Shape.SQUARE)); // default; can extend JSON later
-                                        portMap.put(c.id + "-in", in);
+                // Ports
+                if (root.has("ports")) {
+                        for (JsonNode portJson : root.get("ports")) {
+                                double x = portJson.get("x").asDouble();
+                                double y = portJson.get("y").asDouble();
+                                PortInfo.Shape shape = PortInfo.Shape.valueOf(portJson.get("shape").asText().toUpperCase());
 
-                                        Entity out = engine.createEntity();
-                                        out.add(new Transform(c.x + 40, c.y));
-                                        out.add(new PortInfo(PortInfo.IO.OUT, PortInfo.Shape.SQUARE));
-                                        portMap.put(c.id + "-out", out);
+                                // Default IO if not in JSON
+                                PortInfo.IO io = PortInfo.IO.IN;
+                                if (portJson.has("io")) {
+                                        io = PortInfo.IO.valueOf(portJson.get("io").asText().toUpperCase());
                                 }
-                        }
 
-                        // create links
-                        if (spec.links != null) {
-                                for (LevelSpec.Link l : spec.links) {
-                                        Entity from = portMap.get(l.from);
-                                        Entity to = portMap.get(l.to);
-                                        if (from == null || to == null) continue;
-                                        Entity linkE = engine.createEntity();
+                                Entity portEntity = engine.createEntity();
+                                portEntity.add(new Transform(x, y));
+                                portEntity.add(new PortInfo(io, shape));
 
-                                        Transform ta = from.get(Transform.class);
-                                        Transform tb = to.get(Transform.class);
-                                        double dx = tb.x - ta.x, dy = tb.y - ta.y;
-                                        double len = Math.hypot(dx, dy);
-                                        linkE.add(new Link(from, to, len));
-                                        linkList.add(linkE);
+                                // Reference flag from JSON
+                                if (portJson.has("reference") && portJson.get("reference").asBoolean()) {
+                                        portEntity.add(new Reference());
                                 }
-                        }
 
-                        // create initial seeds
-                        if (spec.initialSeeds != null) {
-                                for (LevelSpec.SeedSpec s : spec.initialSeeds) {
-                                        Entity seedE = engine.createEntity();
-                                        seedE.add(new Transform(0, 0));
-                                        Seed.Type type = "TRIANGLE".equalsIgnoreCase(s.type) ? Seed.Type.TRIANGLE : Seed.Type.SQUARE;
-                                        Seed sd = new Seed(type);
-                                        // attach to link index (safe check)
-                                        int idx = Math.max(0, Math.min(s.onLink, linkList.size() - 1));
-                                        if (!linkList.isEmpty()) {
-                                                sd.currentLink = linkList.get(idx);
-                                                sd.progress = s.progress;
-                                                // position will be set by movement system on next tick
-                                        }
-                                        seedE.add(sd);
-                                }
+                                String id = portJson.get("id").asText();
+                                portsById.put(id, portEntity);
                         }
                 }
-        }
 
-        // simple holder classes for Jackson
-        public static class LevelSpec {
-                public String name;
-                public List<Conduit> conduits;
-                public List<Link> links;
-                public List<SeedSpec> initialSeeds;
+                // Links
+                if (root.has("links")) {
+                        for (JsonNode linkJson : root.get("links")) {
+                                String fromId = linkJson.get("from").asText();
+                                String toId = linkJson.get("to").asText();
+                                Entity fromPort = portsById.get(fromId);
+                                Entity toPort = portsById.get(toId);
 
-                public static class Conduit { public String id; public double x; public double y; }
-                public static class Link { public String from; public String to; }
-                public static class SeedSpec { public String type; public int onLink; public double progress; }
+                                if (fromPort == null || toPort == null) continue;
+
+                                Transform ta = fromPort.get(Transform.class);
+                                Transform tb = toPort.get(Transform.class);
+                                double dx = tb.x - ta.x;
+                                double dy = tb.y - ta.y;
+                                double length = Math.hypot(dx, dy);
+
+                                // Wire consumption
+                                boolean ok = engine.consumeWire(length);
+                                if (!ok) {
+                                        System.err.println("Not enough wire for link: " + fromId + " -> " + toId);
+                                        continue;
+                                }
+
+                                Entity linkEntity = engine.createEntity();
+                                linkEntity.add(new Link(fromPort, toPort, length));
+                        }
+                }
         }
 }

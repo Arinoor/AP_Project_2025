@@ -1,16 +1,10 @@
 {
-  "name": "Demo",
-  "conduits": [
-    {"id":"A","x":80,"y":120},
-    {"id":"B","x":320,"y":120},
-    {"id":"C","x":560,"y":120}
+  "totalWire": 5000,
+  "ports": [
+    { "id": "p1", "x": 100, "y": 200, "shape": "square", "reference": true },
+    { "id": "p2", "x": 300, "y": 200, "shape": "triangle" }
   ],
   "links": [
-    {"from":"A-out","to":"B-in"},
-    {"from":"B-out","to":"C-in"}
-  ],
-  "initialSeeds": [
-    {"type":"SQUARE","onLink":0,"progress":0.05},
-    {"type":"TRIANGLE","onLink":0,"progress":0.0}
+    { "from": "p1", "to": "p2" }
   ]
 }
