@@ -13,13 +13,16 @@ import java.util.List;
  * This version fixes the stray 'InfoHolder' error.
  */
 public class SeedMovementSystem implements System {
+        private final GameEngine engine;
         private final List<Entity> entities;
         private final ShopSystem shop; // nullable, for checking shop flags
 
-        public SeedMovementSystem(List<Entity> entities, ShopSystem shop){
+        public SeedMovementSystem(GameEngine engine, List<Entity> entities, ShopSystem shop){
+                this.engine = engine;
                 this.entities = entities;
                 this.shop = shop;
         }
+
 
         @Override
         public void update(double dt) {
@@ -68,10 +71,13 @@ public class SeedMovementSystem implements System {
                         t.y = py;
 
                         if (s.progress >= 1.0) {
-                                // arrived
+                                // mark arrived and fire event
                                 s.currentLink = null;
                                 s.progress = 0;
                                 s.lateral = 0;
+
+                                // notify engine: this will be listened by UI/controller
+                                engine.fireDeliveredEvent(s);
                         }
                 }
         }
