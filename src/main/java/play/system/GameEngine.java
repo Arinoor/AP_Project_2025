@@ -2,11 +2,16 @@ package play.system;
 
 import play.core.Entity;
 import play.events.DeliveryListener;
+import play.components.Seed;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
+/**
+ * Central engine: stores entities, systems and stats.
+ * Added: createEntity(), setTotalWire(), fireDeliveredEvent(Seed) (alias), notifySeedDelivered(Seed).
+ */
 public class GameEngine {
 
         private final List<Entity> entities = new ArrayList<>();
@@ -50,11 +55,37 @@ public class GameEngine {
                 this.tickCallback = callback;
         }
 
+        /**
+         * Convenience factory so callers don't directly new Entity() when engine should own it.
+         */
+        public Entity createEntity() {
+                Entity e = new Entity();
+                entities.add(e);
+                return e;
+        }
+
+        /**
+         * Backwards-compat alias used in some code paths.
+         */
+        public void addEntity(Entity e) {
+                if (!entities.contains(e)) entities.add(e);
+        }
+
+        /**
+         * Notify listeners that a seed was delivered.
+         */
         public void notifySeedDelivered(play.components.Seed seed) {
                 producedCount++;
                 for (DeliveryListener listener : deliveryListeners) {
                         listener.onSeedDelivered(seed);
                 }
+        }
+
+        /**
+         * Alias for older callsites.
+         */
+        public void fireDeliveredEvent(play.components.Seed seed) {
+                notifySeedDelivered(seed);
         }
 
         public void incrementLost() {
@@ -97,6 +128,9 @@ public class GameEngine {
                 return remainingWire;
         }
 
+        /**
+         * Attempt to consume wire. Returns true if enough remaining.
+         */
         public boolean consumeWire(double length) {
                 if (remainingWire >= length) {
                         remainingWire -= length;
@@ -105,7 +139,11 @@ public class GameEngine {
                 return false;
         }
 
-        public void addEntity(Entity e) {
-                entities.add(e);
+        /**
+         * Set total wire (e.g. loaded from level). Also resets remainingWire to that value.
+         */
+        public void setTotalWire(double total) {
+                this.totalWire = total;
+                this.remainingWire = total;
         }
 }

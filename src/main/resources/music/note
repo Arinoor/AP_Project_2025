@@ -7,3 +7,15 @@ AudioManager.getInstance().playBackground("/music/background.mp3", true);
 AudioManager.getInstance().playSfx("/sfx/deliver.wav");
 
 (You already mostly used leading / in the controller; if not, the getResourceUrl helper tries both.)
+
+
+
+// what is different between LevelFactory and LevelLoader. what are the roles of them
+// why refrence is a class and not just a attribute
+// why the name of Transform is transform
+// why collision checking is just for packets in same link?
+
+                                        double push = (14.0 - d) * 0.2;
+                                        sa.lateral += (dx == 0 && dy == 0) ? push : (dx / d) * push;
+                                        sb.lateral += (dx == 0 && dy == 0) ? -push : (-dx / d) * push;
+                                        // explain this

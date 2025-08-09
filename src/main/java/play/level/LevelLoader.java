@@ -13,6 +13,12 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Loads a simple JSON level then adds entities to the engine.
+ * - honors "totalWire" top-level numeric
+ * - ports can have "reference": true
+ * - consumes wire when creating links
+ */
 public class LevelLoader {
 
         public static void loadFromResource(String resource, GameEngine engine) throws Exception {
@@ -72,7 +78,7 @@ public class LevelLoader {
                                 double dy = tb.y - ta.y;
                                 double length = Math.hypot(dx, dy);
 
-                                // Wire consumption
+                                // Wire consumption - skip link creation if not enough wire
                                 boolean ok = engine.consumeWire(length);
                                 if (!ok) {
                                         System.err.println("Not enough wire for link: " + fromId + " -> " + toId);

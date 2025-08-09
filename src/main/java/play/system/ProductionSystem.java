@@ -8,8 +8,7 @@ import java.util.List;
 import java.util.Random;
 
 /**
- * Simple producer: periodically spawns a Seed attached to a Link (if present).
- * Uses engine.incrementProduced() so the engine knows total produced packets.
+ * Producer: spawns seeds periodically from an OUT port if that port has a link.
  */
 public class ProductionSystem implements System {
         private final List<Entity> allEntities;
@@ -56,18 +55,17 @@ public class ProductionSystem implements System {
                 }
                 if (link == null) return;
 
-                // spawn seed
-                Entity seed = new Entity();
+                // spawn seed (engine-owned)
+                Entity seed = engine.createEntity();
                 seed.add(new Transform(spawnFrom.get(Transform.class).x, spawnFrom.get(Transform.class).y));
-                // randomize type a little
                 Random r = new Random();
                 Seed.Type t = r.nextBoolean() ? Seed.Type.SQUARE : Seed.Type.TRIANGLE;
                 Seed s = new Seed(t);
                 s.currentLink = link;
                 s.progress = 0.0;
                 seed.add(s);
-                allEntities.add(seed);
 
+                // Inform engine stats
                 engine.incrementProduced();
         }
 }
