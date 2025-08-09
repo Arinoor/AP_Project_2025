@@ -5,25 +5,24 @@
                              http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
     <modelVersion>4.0.0</modelVersion>
-    <groupId>com.example</groupId>
-    <artifactId>blueprint-hell</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <groupId>com.blueprinthell</groupId>
+    <artifactId>conduit-garden</artifactId>
+    <version>1.0.0</version>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
-        <javafx.version>20</javafx.version>
+        <maven.compiler.release>17</maven.compiler.release>
+        <javafx.version>20.0.2</javafx.version>
         <jackson.version>2.15.2</jackson.version>
         <main.class>play.ui.GameApp</main.class>
     </properties>
 
     <dependencies>
-        <!-- JavaFX modules -->
+        <!-- JavaFX -->
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
-            <version>17</version>
+            <version>${javafx.version}</version>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
@@ -31,41 +30,30 @@
             <version>17</version>
         </dependency>
 
-        <!-- Jackson for JSON level loader -->
+        <!-- Jackson for JSON level loading -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
             <version>${jackson.version}</version>
         </dependency>
-
-        <!-- Optional, for logging during development -->
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-simple</artifactId>
-            <version>2.0.7</version>
-            <scope>runtime</scope>
-        </dependency>
     </dependencies>
 
     <build>
         <plugins>
-            <!-- Compiler plugin -->
-            <plugin>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.11.0</version>
-                <configuration>
-                    <release>17</release>
-                </configuration>
-            </plugin>
-
-            <!-- JavaFX maven plugin -->
             <plugin>
                 <groupId>org.openjfx</groupId>
                 <artifactId>javafx-maven-plugin</artifactId>
                 <version>0.0.8</version>
                 <configuration>
                     <mainClass>${main.class}</mainClass>
-                    <jlinkZipName>blueprint-hell-runtime</jlinkZipName>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+                <configuration>
+                    <release>17</release>
                 </configuration>
             </plugin>
         </plugins>

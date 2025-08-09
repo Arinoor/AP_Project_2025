@@ -8,22 +8,22 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * CollisionSystem compares seeds on the same Link, increments collisions,
- * applies lateral drift and marks seeds lost when thresholds exceeded.
- * It will skip processing when Shop disables collisions.
+ * Pairwise collision detection on same link. Increases collisions and lateral drift.
+ * When a seed becomes lost, it marks engine.incrementLost() so packetLoss increments.
  */
 public class CollisionSystem implements System {
         private final List<Entity> entities;
-        private final ShopSystem shop; // nullable
+        private final GameEngine engine;
+        private final ShopSystem shop;
 
-        public CollisionSystem(List<Entity> entities, ShopSystem shop){
+        public CollisionSystem(GameEngine engine, List<Entity> entities, ShopSystem shop) {
                 this.entities = entities;
+                this.engine = engine;
                 this.shop = shop;
         }
 
         @Override
         public void update(double dt) {
-                // If the shop disables collisions, do nothing
                 if (shop != null && shop.getState().disableCollisions) return;
 
                 List<Entity> toRemove = new ArrayList<>();
@@ -40,7 +40,6 @@ public class CollisionSystem implements System {
                                 Seed sb = b.get(Seed.class);
                                 Transform tb = b.get(Transform.class);
 
-                                // only compare seeds that are on the same link
                                 if (sa.currentLink == null || sb.currentLink == null) continue;
                                 if (!sa.currentLink.equals(sb.currentLink)) continue;
 
@@ -56,12 +55,15 @@ public class CollisionSystem implements System {
 
                         // loss conditions
                         if (Math.abs(sa.lateral) > 24 || sa.collisions >= sa.capacity) {
-                                sa.speed = -1; // mark lost
+                                sa.speed = -1;
                                 toRemove.add(a);
+                                engine.incrementLost();
+                                // sfx call via AudioManager (keep non-blocking)
+                                play.audio.AudioManager.getInstance().playSfx("sfx/packetloss.wav");
                         }
                 }
 
-                // remove lost seeds from engine entity list
+                // remove lost seeds
                 entities.removeAll(toRemove);
         }
 }
