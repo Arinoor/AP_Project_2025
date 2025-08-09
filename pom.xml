@@ -29,6 +29,12 @@
             <artifactId>javafx-fxml</artifactId>
             <version>17</version>
         </dependency>
+        <!-- THIS IS THE NEW LINE THAT FIXES Media IMPORTS -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-media</artifactId>
+            <version>17</version>
+        </dependency>
 
         <!-- Jackson for JSON level loading -->
         <dependency>

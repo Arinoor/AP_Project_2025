@@ -1,1 +1,9 @@
 SFX / Music: Put small files under src/main/resources/sfx/ and src/main/resources/music/ with names used above (deliver.wav, packetloss.wav, gameend.wav, gamewin.wav, background.mp3). If you don't have these, audio calls will fail silently — nothing catastrophic; I included try/catch in the audio manager.
+
+Important: Calls to playSfx / playBackground should pass paths that start with /, e.g.:
+
+AudioManager.getInstance().playBackground("/music/background.mp3", true);
+
+AudioManager.getInstance().playSfx("/sfx/deliver.wav");
+
+(You already mostly used leading / in the controller; if not, the getResourceUrl helper tries both.)

@@ -8,22 +8,22 @@ import java.net.URL;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/**
- * Lightweight audio manager. Keep it simple: background MediaPlayer (looping) + short AudioClip SFX.
- */
 public class AudioManager {
         private static final AudioManager INSTANCE = new AudioManager();
         private MediaPlayer background;
         private double bgVolume = 0.25;
-        private final ExecutorService pool = Executors.newSingleThreadExecutor();
+        private final ExecutorService pool = Executors.newCachedThreadPool();
 
         private AudioManager() {}
 
         public static AudioManager getInstance() { return INSTANCE; }
 
+        /**
+         * resourcePath should start with a '/', e.g. "/music/background.mp3"
+         */
         public void playBackground(String resourcePath, boolean loop) {
                 try {
-                        URL url = getClass().getResource(resourcePath);
+                        URL url = getResourceUrl(resourcePath);
                         if (url == null) return;
                         if (background != null) background.stop();
                         Media m = new Media(url.toExternalForm());
@@ -45,17 +45,27 @@ public class AudioManager {
                 if (background != null) background.setVolume(bgVolume);
         }
 
+        /**
+         * resourcePath should start with '/', for example "/sfx/deliver.wav"
+         */
         public void playSfx(String resourcePath) {
                 pool.submit(() -> {
                         try {
-                                URL url = getClass().getResource("/" + resourcePath);
+                                URL url = getResourceUrl(resourcePath);
                                 if (url == null) return;
                                 AudioClip clip = new AudioClip(url.toExternalForm());
                                 clip.play();
                         } catch (Exception e) {
-                                // nonfatal
+                                e.printStackTrace();
                         }
                 });
+        }
+
+        private URL getResourceUrl(String resourcePath) {
+                // try given path then try with leading slash
+                URL url = getClass().getResource(resourcePath);
+                if (url == null) url = getClass().getResource("/" + resourcePath.replaceFirst("^/", ""));
+                return url;
         }
 
         public void shutdown() {

@@ -152,21 +152,27 @@ public class MainController {
         }
 
         private void updateHud() {
+                // Do UI updates on FX thread
                 Platform.runLater(() -> {
                         entitiesLabel.setText("Entities: " + engine.entities().size());
-                        long seeds = engine.entities().stream().filter(e -> e.has(Seed.class)).count();
+                        long seeds = engine.entities().stream().filter(e -> e.has(play.components.Seed.class)).count();
                         seedsLabel.setText("Seeds: " + seeds);
                         coinsLabel.setText("Coins: " + coins);
-                        remainingWireLabel.setText(String.format("Wire Left: %.1f / %.1f", remainingWire, totalWire));
+
+                        // wire values come from engine now
+                        remainingWireLabel.setText(String.format("Wire Left: %.1f / %.1f",
+                                engine.getRemainingWire(), engine.getTotalWire()));
+
                         int produced = engine.producedCount();
                         int lost = engine.lostCount();
                         String pct = produced == 0 ? "0%" : String.format("%d%%", (int) ((lost * 100.0) / produced));
                         packetLossLabel.setText(String.format("P.Loss/Total: %d/%d (%s)", lost, produced, pct));
-                        // time
+
+                        // time display
                         int minutes = (int) (gameTimeSeconds / 60);
                         int seconds = (int) (gameTimeSeconds % 60);
                         timeLabel.setText(String.format("Time: %02d:%02d", minutes, seconds));
-                        // slider max adjust if needed
+
                         if (timeSlider.getMax() < 300) timeSlider.setMax(300);
                         if (!isJumpingToTime && !timeSlider.isValueChanging()) {
                                 timeSlider.setValue(gameTimeSeconds);
@@ -278,7 +284,6 @@ public class MainController {
         }
         public void addCoins(int n) { coins += n; updateHud(); }
 
-        private void updateHud() { updateHud(true); }
         private void updateHud(boolean immediate) {
                 if (immediate) updateHud();
         }
