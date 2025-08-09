@@ -1,5 +1,7 @@
 package play.system;
 
+import play.components.Link;
+import play.components.PortInfo;
 import play.core.Entity;
 import play.components.Seed;
 import play.components.Transform;
@@ -31,10 +33,10 @@ public class ProductionSystem implements System {
                 // find an OUT port to spawn from (heuristic: Transform.x < mid)
                 Entity spawnFrom = null;
                 for (Entity e : allEntities) {
-                        if (e.has(play.components.PortInfo.class) && e.has(Transform.class)) {
+                        if (e.has(PortInfo.class) && e.has(Transform.class)) {
                                 play.components.PortInfo p = e.get(play.components.PortInfo.class);
                                 Transform t = e.get(Transform.class);
-                                if (p.io == play.components.PortInfo.IO.OUT && t.x < 200) {
+                                if (p.io == PortInfo.IO.OUT && t.x < 200) {
                                         spawnFrom = e;
                                         break;
                                 }
@@ -45,8 +47,8 @@ public class ProductionSystem implements System {
                 // find a link entity which uses this port as fromPort
                 Entity link = null;
                 for (Entity e : allEntities) {
-                        if (e.has(play.components.Link.class)) {
-                                play.components.Link l = e.get(play.components.Link.class);
+                        if (e.has(Link.class)) {
+                                Link l = e.get(Link.class);
                                 if (l.fromPort.equals(spawnFrom)) {
                                         link = e;
                                         break;

@@ -74,7 +74,7 @@ public class GameEngine {
         /**
          * Notify listeners that a seed was delivered.
          */
-        public void notifySeedDelivered(play.components.Seed seed) {
+        public void notifySeedDelivered(Seed seed) {
                 producedCount++;
                 for (DeliveryListener listener : deliveryListeners) {
                         listener.onSeedDelivered(seed);
@@ -84,7 +84,7 @@ public class GameEngine {
         /**
          * Alias for older callsites.
          */
-        public void fireDeliveredEvent(play.components.Seed seed) {
+        public void fireDeliveredEvent(Seed seed) {
                 notifySeedDelivered(seed);
         }
 

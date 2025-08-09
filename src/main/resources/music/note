@@ -19,3 +19,59 @@ AudioManager.getInstance().playSfx("/sfx/deliver.wav");
                                         sa.lateral += (dx == 0 && dy == 0) ? push : (dx / d) * push;
                                         sb.lateral += (dx == 0 && dy == 0) ? -push : (-dx / d) * push;
                                         // explain this
+
+
+
+                                                                if (Math.abs(sa.lateral) > 24 || sa.collisions >= sa.capacity) {
+                                                                        sa.speed = -1; // why?
+                                                                        toRemove.add(a);
+                                                                        engine.incrementLost();
+                                                                        // sfx call via AudioManager (keep non-blocking)
+                                                                        play.audio.AudioManager.getInstance().playSfx("sfx/packetloss.wav");
+                                                                }
+
+
+
+        public void notifySeedDelivered(Seed seed) {
+                producedCount++;
+                for (DeliveryListener listener : deliveryListeners) {
+                        listener.onSeedDelivered(seed);
+                }
+        }
+        // where the onSeedDelivered method is implemented?
+
+
+
+                        for (Entity e : allEntities) {
+                                if (e.has(PortInfo.class) && e.has(Transform.class)) {
+                                        play.components.PortInfo p = e.get(play.components.PortInfo.class);
+                                        Transform t = e.get(Transform.class);
+                                        if (p.io == PortInfo.IO.OUT && t.x < 200) { // why is t.x < 200 for?
+                                                spawnFrom = e;
+                                                break;
+                                        }
+                                }
+                        }
+
+
+
+                        if (dist < 1.0) {
+                                // detach from link
+                                s.currentLink = null;
+
+                                // notify engine / listeners
+                                engine.notifySeedDelivered(s);
+
+                                // increment reached reference if destination is a reference sink
+                                if (l.toPort.has(Reference.class)) {
+                                        engine.incrementReachedReference();
+                                }
+
+                                // Optionally the seed entity may be removed / marked done. We'll leave removal to higher-level systems (collision/system)
+                                continue;
+                        }
+
+                        // when the seed arrive to a non refrence system, does it get out of that system?
+
+
+                        // explain GameMain
