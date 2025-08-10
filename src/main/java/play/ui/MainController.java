@@ -152,12 +152,15 @@ public class MainController {
                                 else                                   timeScale = 1.0;
 
                                 if (running) {
-                                        double step = 1.0 / 60.0;
+                                        double step = 1.0 / 120.0;        // 120 Hz simulation
                                         double acc = dt * timeScale;
-                                        while (acc >= step) {
+                                        int maxSubSteps = 8;               // safety to avoid spiral-of-death on hiccups
+                                        int sub = 0;
+                                        while (acc >= step && sub < maxSubSteps) {
                                                 engine.tick(step);
                                                 elapsed += step;
                                                 acc -= step;
+                                                sub++;
                                         }
                                 }
 

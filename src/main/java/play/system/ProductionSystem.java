@@ -3,8 +3,21 @@ package play.system;
 import play.core.Entity;
 import play.components.*;
 
+import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Produces packets from EVERY OUT port of each system that has a Producer component.
+ * This ensures mixed shapes are generated when a system exposes multiple OUT ports
+ * (e.g., one SQUARE and one TRIANGLE).
+ *
+ * Notes:
+ * - We iterate over a snapshot of entities to avoid ConcurrentModification while
+ *   adding new seed entities to the engine list.
+ * - For each OUT port, we spawn at most one packet per "interval" if there is
+ *   a free link leaving that port.
+ * - Seed type is determined by the port's shape.
+ */
 public class ProductionSystem implements System {
         private final GameEngine engine;
         private final List<Entity> entities;
@@ -20,11 +33,10 @@ public class ProductionSystem implements System {
         public void update(double dt) {
                 if (dt > dtCap) dt = dtCap;
 
-                // Buffer new seeds; apply after the iteration
-                java.util.List<Entity> toAdd = new java.util.ArrayList<>();
+                // Snapshot to avoid ConcurrentModification when we add seeds below.
+                List<Entity> snapshot = new ArrayList<>(entities);
 
-                // Iterate over a snapshot to avoid CME
-                for (Entity sysE : new java.util.ArrayList<>(entities)) {
+                for (Entity sysE : snapshot) {
                         if (!sysE.has(Producer.class)) continue;
                         Producer prod = sysE.get(Producer.class);
 
@@ -32,58 +44,61 @@ public class ProductionSystem implements System {
                         if (prod.timer < prod.interval) continue;
                         prod.timer = 0.0;
 
-                        // find an OUT port
-                        Entity outPort = findFirstOutPort(sysE);
-                        if (outPort == null) continue;
+                        // Find ALL OUT ports of this system.
+                        List<Entity> outPorts = findOutPorts(sysE);
+                        if (outPorts.isEmpty()) continue;
 
-                        // pick a free link leaving this port
-                        Entity freeLink = findFreeLinkFrom(outPort);
-                        if (freeLink == null) continue;
+                        // Try to produce one seed for each OUT port that has a free link.
+                        for (Entity outPort : outPorts) {
+                                Entity freeLink = findFreeLinkFrom(outPort);
+                                if (freeLink == null) continue;
 
-                        PortInfo pinfo = outPort.get(PortInfo.class);
-                        Seed.Type type = (pinfo.shape == PortInfo.Shape.SQUARE) ? Seed.Type.SQUARE : Seed.Type.TRIANGLE;
+                                PortInfo pinfo = outPort.get(PortInfo.class);
+                                Seed.Type type = (pinfo.shape == PortInfo.Shape.SQUARE) ? Seed.Type.SQUARE : Seed.Type.TRIANGLE;
 
-                        Entity seedE = new Entity();
-                        Seed s = new Seed(type);
+                                Entity seedE = new Entity();
+                                Seed s = new Seed(type);
 
-                        boolean compatibleStart = (type == Seed.Type.SQUARE && pinfo.shape == PortInfo.Shape.SQUARE)
-                                || (type == Seed.Type.TRIANGLE && pinfo.shape == PortInfo.Shape.TRIANGLE);
+                                // Speed/accel rules per doc:
+                                // - Square: constant speed per port; from compatible start is half incompatible start.
+                                // - Triangle: constant speed from compatible; accelerates when passing incompatible.
+                                boolean compatibleStart = (type == Seed.Type.SQUARE && pinfo.shape == PortInfo.Shape.SQUARE)
+                                        || (type == Seed.Type.TRIANGLE && pinfo.shape == PortInfo.Shape.TRIANGLE);
 
-                        if (type == Seed.Type.SQUARE) {
-                                double base = 120.0;
-                                s.speed = compatibleStart ? base * 1.1 : base * 0.9;
-                                s.accel = 0.0;
-                        } else {
-                                double base = 140.0;
-                                s.speed = compatibleStart ? base * 1.05 : base * 0.9;
-                                s.accel = compatibleStart ? 0.0 : 220.0;
+                                if (type == Seed.Type.SQUARE) {
+                                        double base = 120.0;
+                                        s.speed = compatibleStart ? base * 0.5 : base; // half speed if compatible
+                                        s.accel = 0.0;
+                                } else {
+                                        s.speed = 140.0;
+                                        s.accel = compatibleStart ? 0.0 : 220.0; // accelerate on incompatible (will matter later)
+                                }
+
+                                // Place at the OUT port position
+                                Transform pt = outPort.get(Transform.class);
+                                seedE.add(new Transform(pt.x, pt.y));
+                                seedE.add(s);
+
+                                // Attach to the chosen link
+                                s.currentLink = freeLink.get(Link.class);
+                                s.progress = 0.0;
+
+                                engine.entities().add(seedE);
+                                engine.incrementProduced();
                         }
-
-                        Transform pt = outPort.get(Transform.class);
-                        seedE.add(new Transform(pt.x, pt.y));
-                        seedE.add(s);
-
-                        s.currentLink = freeLink.get(Link.class);
-                        s.progress = 0.0;
-
-                        toAdd.add(seedE);
-                        engine.incrementProduced();
-                }
-
-                // Apply spawns after the loop (no CME)
-                if (!toAdd.isEmpty()) {
-                        entities.addAll(toAdd);          // entities == engine.entities()
                 }
         }
 
-
-        private Entity findFirstOutPort(Entity systemE) {
+        private List<Entity> findOutPorts(Entity systemE) {
+                List<Entity> result = new ArrayList<>();
                 for (Entity e : entities) {
                         if (!e.has(PortInfo.class)) continue;
                         PortInfo p = e.get(PortInfo.class);
-                        if (p.parentSystem == systemE && p.io == PortInfo.IO.OUT) return e;
+                        if (p.parentSystem == systemE && p.io == PortInfo.IO.OUT) {
+                                result.add(e);
+                        }
                 }
-                return null;
+                return result;
         }
 
         private Entity findFreeLinkFrom(Entity outPort) {
