@@ -1,13 +1,21 @@
 {
   "totalWire": 5000,
+  "devices": [
+    { "id": "REF-A", "capacity": 5 },
+    { "id": "MID-1", "capacity": 5 },
+    { "id": "REF-B", "capacity": 5 }
+  ],
   "ports": [
-    { "id": "outA", "x": 100, "y": 200, "shape": "square",   "io": "out", "producer": true, "interval": 0.6 },
-    { "id": "midIn", "x": 300, "y": 200, "shape": "square",   "io": "in"  },
-    { "id": "midOut","x": 340, "y": 200, "shape": "triangle", "io": "out" },
-    { "id": "sink",  "x": 560, "y": 200, "shape": "triangle", "io": "in",  "reference": true }
+    { "id": "A:outS", "device": "REF-A", "x": 120, "y": 220, "shape": "square",   "io": "out", "producer": true, "interval": 0.5 },
+    { "id": "A:outT", "device": "REF-A", "x": 120, "y": 260, "shape": "triangle", "io": "out", "producer": true, "interval": 0.7 },
+
+    { "id": "M:in",   "device": "MID-1", "x": 320, "y": 240, "shape": "square",   "io": "in"  },
+    { "id": "M:out",  "device": "MID-1", "x": 360, "y": 240, "shape": "triangle", "io": "out" },
+
+    { "id": "B:in",   "device": "REF-B", "x": 560, "y": 240, "shape": "triangle", "io": "in", "reference": true }
   ],
   "links": [
-    { "from": "outA",  "to": "midIn" },
-    { "from": "midOut","to": "sink"  }
+    { "from": "A:outS", "to": "M:in"  },
+    { "from": "M:out",  "to": "B:in"  }
   ]
 }

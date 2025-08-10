@@ -1,64 +1,84 @@
 package play.system;
 
+import java.util.List;
+
 import play.core.Entity;
 import play.components.Seed;
 
-import java.util.List;
-
 /**
- * Manages shop effects (Atar, Airyaman, Anahita).
- * Effects are applied by toggling flags and timers; other systems read those flags via ShopState.
+ * Shop flags & timers. Other systems read State to gate behavior.
+ * Atar  -> disableImpactWaves (10s)
+ * Airyaman -> disableCollisions (5s)
+ * Anahita -> reset all seed "noise" (collision count) once
  */
-public class ShopSystem implements System {
+public class ShopSystem {
 
-        public static class ShopState {
-                public boolean disableLateral = false;
-                public double disableLateralUntil = 0;
+        private final GameEngine engine;
+
+        public static class State {
                 public boolean disableCollisions = false;
-                public double disableCollisionsUntil = 0;
+                public boolean disableLateral    = false;
+                public boolean disableImpactWaves = false; // <-- needed by CollisionSystem
         }
 
-        private final ShopState state = new ShopState();
-        private final List<Entity> entities;
-        private double gameTime = 0;
+        private final State state = new State();
 
-        public ShopSystem(List<Entity> engineEntities){
-                this.entities = engineEntities;
+        private double impactOffTimer   = 0.0;
+        private double collideOffTimer  = 0.0;
+        private boolean anahitaRequested = false;
+
+        public ShopSystem(GameEngine engine) {
+                this.engine = engine;
         }
 
-        @Override
-        public void update(double dt) {
-                gameTime += dt;
-                if(state.disableLateral && gameTime >= state.disableLateralUntil) state.disableLateral = false;
-                if(state.disableCollisions && gameTime >= state.disableCollisionsUntil) state.disableCollisions = false;
+        public State getState() {
+                return state;
         }
 
-        // API for shop purchases
-        public boolean purchaseAtar(int coins, double now){
-                // Atar: disable lateral drift (impact) for 10s
-                if(coins < 3) return false;
-                state.disableLateral = true;
-                state.disableLateralUntil = now + 10.0;
-                return true;
+        /** Call when user buys "O' Atar". */
+        public void activateAtar(double seconds) {
+                state.disableImpactWaves = true;
+                impactOffTimer = Math.max(impactOffTimer, seconds);
         }
-        public boolean purchaseAiryaman(int coins, double now){
-                // Airyaman: disable collisions for 5s
-                if(coins < 4) return false;
+
+        /** Call when user buys "O’ Airyaman". */
+        public void activateAiryaman(double seconds) {
                 state.disableCollisions = true;
-                state.disableCollisionsUntil = now + 5.0;
-                return true;
+                collideOffTimer = Math.max(collideOffTimer, seconds);
         }
-        public boolean purchaseAnahita(int coins){
-                // Anahita: reset collision counters on active seeds
-                if(coins < 5) return false;
-                for(Entity e : entities){
-                        if(e.has(Seed.class)) {
-                                e.get(Seed.class).collisions = 0;
-                                e.get(Seed.class).lateral = 0;
+
+        /** Call when user buys "O' Anahita". */
+        public void activateAnahita() {
+                anahitaRequested = true;
+        }
+
+        /** Advance timers & apply one-shot effects. */
+        public void update(double dt) {
+                // timers
+                if (state.disableImpactWaves) {
+                        impactOffTimer -= dt;
+                        if (impactOffTimer <= 0) {
+                                impactOffTimer = 0;
+                                state.disableImpactWaves = false;
                         }
                 }
-                return true;
-        }
+                if (state.disableCollisions) {
+                        collideOffTimer -= dt;
+                        if (collideOffTimer <= 0) {
+                                collideOffTimer = 0;
+                                state.disableCollisions = false;
+                        }
+                }
 
-        public ShopState getState(){ return state; }
+                // one-shot: reset noise/collisions on all active seeds
+                if (anahitaRequested) {
+                        List<Entity> all = engine.entities();
+                        for (Entity e : all) {
+                                if (e.has(Seed.class)) {
+                                        e.get(Seed.class).collisions = 0;
+                                }
+                        }
+                        anahitaRequested = false;
+                }
+        }
 }

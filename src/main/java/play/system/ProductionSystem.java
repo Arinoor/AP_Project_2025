@@ -3,17 +3,15 @@ package play.system;
 import play.components.*;
 import play.core.Entity;
 
-import java.util.List;
+import java.util.Objects;
 
 public class ProductionSystem implements System {
         private final GameEngine engine;
-        private final List<Entity> world;
-        private final RoutingSystem router;
+        private final java.util.List<Entity> world;
 
-        public ProductionSystem(GameEngine engine, List<Entity> world) {
+        public ProductionSystem(GameEngine engine, java.util.List<Entity> world) {
                 this.engine = engine;
                 this.world = world;
-                this.router = new RoutingSystem(world);
         }
 
         @Override
@@ -23,27 +21,51 @@ public class ProductionSystem implements System {
                         Producer prod = port.get(Producer.class);
                         prod.timer += dt;
                         if (prod.timer < prod.intervalSec) continue;
-                        prod.timer = 0.0;
 
-                        // choose seed type from this output port's shape
-                        PortInfo portInfo = port.get(PortInfo.class);
-                        Seed.Type type = (portInfo.shape == PortInfo.Shape.SQUARE) ? Seed.Type.SQUARE : Seed.Type.TRIANGLE;
+                        // find a free link from this port
+                        Entity freeLink = null;
+                        for (Entity e : world) {
+                                if (!e.has(Link.class)) continue;
+                                Link L = e.get(Link.class);
+                                if (!Objects.equals(L.fromPort, port)) continue;
+                                if (isFree(e)) { freeLink = e; break; }
+                        }
+                        if (freeLink == null) continue; // block; do not reset timer
 
-                        // Create seed entity at port position
-                        Entity seed = new Entity();
+                        // spawn a seed
+                        PortInfo pinfo = port.get(PortInfo.class);
+                        Seed.Type type = (pinfo.shape == PortInfo.Shape.SQUARE) ? Seed.Type.SQUARE : Seed.Type.TRIANGLE;
+
+                        Entity seed = engine.createEntity();
                         Transform pt = port.get(Transform.class);
                         seed.add(new Transform(pt.x, pt.y));
-                        Seed s = new Seed(type);
-                        seed.add(s);
-                        world.add(seed);
 
-                        // Immediately route to an outgoing link of this port (if any)
-                        boolean routed = router.route(s, port);
-                        if (!routed) {
-                                // no outgoing link; seed will sit here
+                        Seed s = new Seed(type);
+                        boolean compatibleStart = (type == Seed.Type.SQUARE && pinfo.shape == PortInfo.Shape.SQUARE)
+                                || (type == Seed.Type.TRIANGLE && pinfo.shape == PortInfo.Shape.TRIANGLE);
+                        if (type == Seed.Type.SQUARE) {
+                                double base = 120.0;
+                                s.speed = compatibleStart ? base * 0.5 : base;
+                                s.accel = 0.0;
                         } else {
-                                engine.incrementProduced();
+                                s.speed = 140.0;
+                                s.accel = compatibleStart ? 0.0 : 220.0;
                         }
+                        seed.add(s);
+
+                        s.currentLink = freeLink;
+                        s.progress = 0.0;
+
+                        engine.incrementProduced();
+                        prod.timer = 0.0; // consume one interval
                 }
+        }
+
+        private boolean isFree(Entity link) {
+                for (Entity e : world) {
+                        if (!e.has(Seed.class)) continue;
+                        if (e.get(Seed.class).currentLink == link) return false;
+                }
+                return true;
         }
 }

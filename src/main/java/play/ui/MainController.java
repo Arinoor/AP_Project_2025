@@ -56,16 +56,17 @@ public class MainController {
 
                 // Systems
                 shopSystem = new ShopSystem(engine.entities());
-                ProductionSystem prod = new ProductionSystem(engine, engine.entities()); // ⬅ no interval here
-                SeedMovementSystem move = new SeedMovementSystem(engine, engine.entities(), shopSystem);
-                CollisionSystem collision = new CollisionSystem(engine, engine.entities(), shopSystem);
+                var prod  = new ProductionSystem(engine, engine.entities());
+                var move  = new SeedMovementSystem(engine, engine.entities(), shopSystem);
+                var collide = new CollisionSystem(engine, engine.entities(), shopSystem);
+                var queue = new QueueSystem(engine.entities());
 
-                // Engine orchestrator (keeps system order explicit)
                 engine.addSystem(dt -> {
+                        prod.update(dt);     // spawn only if free
+                        queue.update(dt);    // push queued seeds when outputs free
+                        move.update(dt);     // move + coins + enqueue on arrival
+                        collide.update(dt);  // detect collisions + AoE + losses
                         shopSystem.update(dt);
-                        prod.update(dt);
-                        move.update(dt);
-                        collision.update(dt);
                 });
 
                 // Delivery listener: award coins and play sfx
