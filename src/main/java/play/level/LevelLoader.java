@@ -2,10 +2,7 @@ package play.level;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import play.components.Link;
-import play.components.PortInfo;
-import play.components.Reference;
-import play.components.Transform;
+import play.components.*;
 import play.core.Entity;
 import play.system.GameEngine;
 
@@ -13,12 +10,6 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Loads a simple JSON level then adds entities to the engine.
- * - honors "totalWire" top-level numeric
- * - ports can have "reference": true
- * - consumes wire when creating links
- */
 public class LevelLoader {
 
         public static void loadFromResource(String resource, GameEngine engine) throws Exception {
@@ -30,7 +21,8 @@ public class LevelLoader {
 
                 // optional totalWire
                 if (root.has("totalWire")) {
-                        engine.setTotalWire(root.get("totalWire").asDouble());
+                        double tw = root.get("totalWire").asDouble();
+                        engine.setTotalWire(tw);
                 }
 
                 Map<String, Entity> portsById = new HashMap<>();
@@ -52,9 +44,18 @@ public class LevelLoader {
                                 portEntity.add(new Transform(x, y));
                                 portEntity.add(new PortInfo(io, shape));
 
-                                // Reference flag from JSON
+                                // Reference flag
                                 if (portJson.has("reference") && portJson.get("reference").asBoolean()) {
                                         portEntity.add(new Reference());
+                                }
+
+                                // Producer flag + optional interval (seconds)
+                                if (portJson.has("producer") && portJson.get("producer").asBoolean()) {
+                                        double interval = 0.6; // default
+                                        if (portJson.has("interval")) {
+                                                interval = Math.max(0.05, portJson.get("interval").asDouble());
+                                        }
+                                        portEntity.add(new Producer(interval));
                                 }
 
                                 String id = portJson.get("id").asText();
@@ -78,7 +79,7 @@ public class LevelLoader {
                                 double dy = tb.y - ta.y;
                                 double length = Math.hypot(dx, dy);
 
-                                // Wire consumption - skip link creation if not enough wire
+                                // Wire consumption
                                 boolean ok = engine.consumeWire(length);
                                 if (!ok) {
                                         System.err.println("Not enough wire for link: " + fromId + " -> " + toId);

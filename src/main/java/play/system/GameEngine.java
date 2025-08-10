@@ -58,9 +58,9 @@ public class GameEngine {
         /**
          * Convenience factory so callers don't directly new Entity() when engine should own it.
          */
-        public Entity createEntity() {
-                Entity e = new Entity();
-                entities.add(e);
+        public play.core.Entity createEntity() {
+                play.core.Entity e = new play.core.Entity();
+                this.entities.add(e);
                 return e;
         }
 
@@ -74,8 +74,8 @@ public class GameEngine {
         /**
          * Notify listeners that a seed was delivered.
          */
-        public void notifySeedDelivered(Seed seed) {
-                producedCount++;
+        public void notifySeedDelivered(play.components.Seed seed) {
+                // producedCount++;  // <-- remove this line
                 for (DeliveryListener listener : deliveryListeners) {
                         listener.onSeedDelivered(seed);
                 }

@@ -56,7 +56,7 @@ public class MainController {
 
                 // Systems
                 shopSystem = new ShopSystem(engine.entities());
-                ProductionSystem prod = new ProductionSystem(engine, engine.entities(), 0.6); // spawn every 0.6s
+                ProductionSystem prod = new ProductionSystem(engine, engine.entities()); // ⬅ no interval here
                 SeedMovementSystem move = new SeedMovementSystem(engine, engine.entities(), shopSystem);
                 CollisionSystem collision = new CollisionSystem(engine, engine.entities(), shopSystem);
 

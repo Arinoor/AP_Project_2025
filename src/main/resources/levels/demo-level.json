@@ -1,10 +1,13 @@
 {
   "totalWire": 5000,
   "ports": [
-    { "id": "p1", "x": 100, "y": 200, "shape": "square", "reference": true },
-    { "id": "p2", "x": 300, "y": 200, "shape": "triangle" }
+    { "id": "outA", "x": 100, "y": 200, "shape": "square",   "io": "out", "producer": true, "interval": 0.6 },
+    { "id": "midIn", "x": 300, "y": 200, "shape": "square",   "io": "in"  },
+    { "id": "midOut","x": 340, "y": 200, "shape": "triangle", "io": "out" },
+    { "id": "sink",  "x": 560, "y": 200, "shape": "triangle", "io": "in",  "reference": true }
   ],
   "links": [
-    { "from": "p1", "to": "p2" }
+    { "from": "outA",  "to": "midIn" },
+    { "from": "midOut","to": "sink"  }
   ]
 }

@@ -1,29 +1,24 @@
 package play.ui;
 
-import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
-import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
+
 import play.level.LevelFactory;
 import play.system.*;
 import play.core.Entity;
 import play.components.Transform;
 import play.components.Seed;
-import play.system.System;
 
-import java.util.List;
 import java.util.stream.Collectors;
+import java.util.List;
 
-/**
- * Main JavaFX app — builds engine, registers systems, provides a minimal HUD & shop UI.
- */
 public class GameMain extends Application {
 
         private final GameEngine engine = new GameEngine();
@@ -34,54 +29,51 @@ public class GameMain extends Application {
                 Canvas canvas = new Canvas(900, 600);
                 GraphicsContext g = canvas.getGraphicsContext2D();
 
-                // layout
                 BorderPane root = new BorderPane();
-                StackPane center = new StackPane(canvas);
-                root.setCenter(center);
+                root.setCenter(new StackPane(canvas));
                 HBox topHud = new HBox(12);
                 topHud.setStyle("-fx-background-color: rgba(240,240,240,0.85); -fx-padding: 8px;");
-                Button shopBtn = new Button("Shop");
+                Button shopBtn = new Button("Shop (demo)");
                 topHud.getChildren().addAll(shopBtn);
                 root.setTop(topHud);
 
-                Scene scene = new Scene(root);
-                stage.setScene(scene);
-                stage.setTitle("Conduit Garden - Blueprint Hell (ECS)");
+                stage.setScene(new Scene(root));
+                stage.setTitle("Conduit Garden - Sandbox");
                 stage.setResizable(false);
                 stage.show();
 
-                // build demo level
+                // demo level
                 LevelFactory.buildDemo(engine);
 
-                // create systems
+                // systems with up-to-date signatures
                 shopSystem = new ShopSystem(engine.entities());
-                var prodSys = new ProductionSystem(engine.entities());
-                var moveSys = new SeedMovementSystem(engine.entities());
-                var colSys = new CollisionSystem(engine.entities());
+                ProductionSystem prodSys = new ProductionSystem(engine, engine.entities(), 0.8);
+                SeedMovementSystem moveSys = new SeedMovementSystem(engine, engine.entities(), shopSystem);
+                CollisionSystem colSys = new CollisionSystem(engine, engine.entities(), shopSystem);
 
-                // wrap collision & movement to honor shop effects
-                // We'll add a small adapter system to check shop flags each tick.
-                engine.addSystem(new System() {
-                        @Override public void update(double dt) {
-                                // If collisions disabled -> skip collision processing
-                                if(!shopSystem.getState().disableCollisions) colSys.update(dt);
-                                // If lateral disabled -> zero lateral before movement
-                                if(shopSystem.getState().disableLateral) {
-                                        for(Entity e : engine.entities()){
-                                                if(e.has(Seed.class)) e.get(Seed.class).lateral = 0;
-                                        }
-                                }
-                                // movement & production always run
-                                moveSys.update(dt);
-                                prodSys.update(dt);
-                                shopSystem.update(dt);
-                        }
+                // add a single orchestrator (Consumer<Double>)
+                engine.addSystem(dt -> {
+                        // apply shop toggles
+                        shopSystem.update(dt);
+                        // run gameplay systems
+                        prodSys.update(dt);
+                        moveSys.update(dt);
+                        colSys.update(dt);
+                        // render
+                        render(g);
                 });
 
-                engine.setTickCallback(dt -> render(g));
+                // demo shop click
+                shopBtn.setOnAction(e -> {
+                        int coins = 10;
+                        double now = java.lang.System.currentTimeMillis()/1000.0;
+                        shopSystem.purchaseAtar(coins, now);
+                        shopSystem.purchaseAiryaman(coins, now);
+                        shopSystem.purchaseAnahita(coins);
+                });
 
-                // animation loop
-                new AnimationTimer(){
+                // simple animation/ticker
+                new javafx.animation.AnimationTimer(){
                         private long last = 0;
                         @Override public void handle(long now){
                                 if(last==0) { last=now; return; }
@@ -91,33 +83,27 @@ public class GameMain extends Application {
                         }
                 }.start();
 
-                // shop interaction (simple toggles to demonstrate)
-                shopBtn.setOnAction(e -> {
-                        // demo purchase flow with local simple coin count
-                        int coins = 10; // in real game: dynamic value from HUD/score service
-                        double now = java.lang.System.currentTimeMillis()/1000.0;
-                        // For demo we apply all three sequentially to show effects:
-                        shopSystem.purchaseAtar(coins, now);
-                        shopSystem.purchaseAiryaman(coins, now);
-                        shopSystem.purchaseAnahita(coins);
-                });
-
-                // spawn seed with SPACE (debug)
-                scene.setOnKeyPressed(ev -> {
-                        if(ev.getCode() == KeyCode.SPACE){
-                                Entity seed = engine.createEntity();
-                                seed.add(new Transform(120,140));
-                                Seed s = new Seed(Seed.Type.TRIANGLE);
-                                // attach to first link found:
-                                List<Entity> links = engine.entities().stream().filter(x -> x.has(play.components.Link.class)).collect(Collectors.toList());
-                                if(!links.isEmpty()) s.currentLink = links.get(0);
-                                seed.add(s);
+                // debug: space spawns a seed on the first link
+                root.setOnKeyPressed(ev -> {
+                        switch (ev.getCode()){
+                                case SPACE -> {
+                                        Entity seed = engine.createEntity();
+                                        seed.add(new Transform(120,140));
+                                        List<Entity> links = engine.entities().stream()
+                                                .filter(x -> x.has(play.components.Link.class))
+                                                .collect(Collectors.toList());
+                                        if(!links.isEmpty()){
+                                                Seed s = new Seed(Seed.Type.TRIANGLE);
+                                                s.currentLink = links.get(0);
+                                                seed.add(s);
+                                        }
+                                }
                         }
                 });
+                root.requestFocus();
         }
 
         private void render(GraphicsContext g){
-                // simple render: background + draw transforms + seeds + ports
                 g.setFill(Color.web("#0d0d1a"));
                 g.fillRect(0,0,900,600);
 
@@ -138,18 +124,15 @@ public class GameMain extends Application {
                                         g.fillPolygon(new double[]{t.x,t.x+6,t.x-6}, new double[]{t.y+6,t.y-6,t.y-6}, 3);
                                 }
                         } else {
-                                // conduit boxes (just to mark conduits)
                                 g.setFill(Color.DARKGRAY);
                                 g.fillRect(t.x-18, t.y-12, 36, 24);
                         }
                 }
 
-                // HUD simple: in top-left show entity counts & small instructions
                 g.setFill(Color.WHITE);
                 g.setFont(Font.font(14));
                 g.fillText("Entities: " + engine.entities().size(), 12, 18);
                 g.fillText("Seeds: " + engine.entities().stream().filter(x->x.has(Seed.class)).count(), 12, 36);
-                g.fillText("SPACE: spawn seed | Shop: demo apply items", 12, 54);
         }
 
         public static void main(String[] args){ launch(args); }

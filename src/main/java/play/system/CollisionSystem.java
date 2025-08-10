@@ -8,8 +8,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Pairwise collision detection on same link. Increases collisions and lateral drift.
- * When a seed becomes lost, it marks engine.incrementLost() so packetLoss increments.
+ * GLOBAL pairwise collision detection. Any two seeds that overlap will
+ * bump each other laterally and increment collision counters.
+ * Seeds are lost if |lateral| > threshold or collision count >= capacity.
  */
 public class CollisionSystem implements System {
         private final List<Entity> entities;
@@ -28,6 +29,7 @@ public class CollisionSystem implements System {
 
                 List<Entity> toRemove = new ArrayList<>();
 
+                // pairwise over ALL seeds (not restricted to same link)
                 for (int i = 0; i < entities.size(); i++) {
                         Entity a = entities.get(i);
                         if (!a.has(Seed.class) || !a.has(Transform.class)) continue;
@@ -40,26 +42,33 @@ public class CollisionSystem implements System {
                                 Seed sb = b.get(Seed.class);
                                 Transform tb = b.get(Transform.class);
 
-                                if (sa.currentLink == null || sb.currentLink == null) continue;
-                                if (!sa.currentLink.equals(sb.currentLink)) continue;
-
                                 double dx = ta.x - tb.x, dy = ta.y - tb.y;
                                 double d = Math.hypot(dx, dy);
+
+                                // 12–14 px is a good approximate “touch” radius for our 12 px seeds
                                 if (d < 14.0) {
-                                        sa.collisions++; sb.collisions++;
+                                        sa.collisions++;
+                                        sb.collisions++;
+
+                                        // separation impulse along the line joining the centers
                                         double push = (14.0 - d) * 0.2;
-                                        sa.lateral += (dx == 0 && dy == 0) ? push : (dx / d) * push;
-                                        sb.lateral += (dx == 0 && dy == 0) ? -push : (-dx / d) * push;
+                                        if (d == 0) {
+                                                sa.lateral +=  push;
+                                                sb.lateral += -push;
+                                        } else {
+                                                double ux = dx / d;
+                                                sa.lateral +=  ux * push;
+                                                sb.lateral += -ux * push;
+                                        }
                                 }
                         }
 
                         // loss conditions
                         if (Math.abs(sa.lateral) > 24 || sa.collisions >= sa.capacity) {
-                                sa.speed = -1;
+                                sa.speed = -1; // sentinel so it won't move if it somehow survives one more tick
                                 toRemove.add(a);
                                 engine.incrementLost();
-                                // sfx call via AudioManager (keep non-blocking)
-                                play.audio.AudioManager.getInstance().playSfx("sfx/packetloss.wav");
+                                play.audio.AudioManager.getInstance().playSfx("/sfx/packetloss.wav");
                         }
                 }
 
