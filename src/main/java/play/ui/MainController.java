@@ -18,11 +18,9 @@ import play.components.PortInfo;
 import play.components.Reference;
 import play.events.DeliveryListener;
 import play.level.LevelLoader;
-import play.level.LevelFactory;
 import play.system.*;
 
 import java.io.IOException;
-import java.util.List;
 
 import play.core.Entity;
 
