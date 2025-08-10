@@ -20,7 +20,11 @@ public class ProductionSystem implements System {
         public void update(double dt) {
                 if (dt > dtCap) dt = dtCap;
 
-                for (Entity sysE : entities) {
+                // Buffer new seeds; apply after the iteration
+                java.util.List<Entity> toAdd = new java.util.ArrayList<>();
+
+                // Iterate over a snapshot to avoid CME
+                for (Entity sysE : new java.util.ArrayList<>(entities)) {
                         if (!sysE.has(Producer.class)) continue;
                         Producer prod = sysE.get(Producer.class);
 
@@ -45,7 +49,6 @@ public class ProductionSystem implements System {
                         boolean compatibleStart = (type == Seed.Type.SQUARE && pinfo.shape == PortInfo.Shape.SQUARE)
                                 || (type == Seed.Type.TRIANGLE && pinfo.shape == PortInfo.Shape.TRIANGLE);
 
-                        // make compatible starts slightly faster, incompatible slightly slower
                         if (type == Seed.Type.SQUARE) {
                                 double base = 120.0;
                                 s.speed = compatibleStart ? base * 1.1 : base * 0.9;
@@ -63,10 +66,16 @@ public class ProductionSystem implements System {
                         s.currentLink = freeLink.get(Link.class);
                         s.progress = 0.0;
 
-                        engine.entities().add(seedE);
+                        toAdd.add(seedE);
                         engine.incrementProduced();
                 }
+
+                // Apply spawns after the loop (no CME)
+                if (!toAdd.isEmpty()) {
+                        entities.addAll(toAdd);          // entities == engine.entities()
+                }
         }
+
 
         private Entity findFirstOutPort(Entity systemE) {
                 for (Entity e : entities) {
