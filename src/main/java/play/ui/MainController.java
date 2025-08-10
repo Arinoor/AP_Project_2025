@@ -33,7 +33,7 @@ public class MainController {
         @FXML private Slider timeSlider;
         @FXML private Canvas gameCanvas;
 
-        // Core engine & systems
+        // Engine & systems
         private final GameEngine engine = new GameEngine();
         private ShopSystem shopSystem;
         private ProductionSystem productionSystem;
@@ -42,15 +42,15 @@ public class MainController {
         private SeedMovementSystem movementSystem;
         private CollisionSystem collisionSystem;
 
-        // Wiring state
-        private boolean wiringMode = false;   // hold W to wire
-        private Entity dragStartPort = null;  // OUT port entity
+        // Wiring interaction (hold W and drag from OUT to IN)
+        private boolean wiringMode = false;
+        private Entity dragStartPort = null;
         private double dragX, dragY;
 
-        // Time control state
+        // Time control
         private boolean forwardPressed = false;
         private boolean backwardPressed = false;
-        private double timeScale = 1.0;       // 1.0 normal, >1 faster, <1 slower
+        private double timeScale = 1.0;
         private static final double FAST = 3.0;
         private static final double SLOW = 0.25;
 
@@ -64,10 +64,9 @@ public class MainController {
         private double elapsed = 0.0;
         private boolean running = false;
 
-        /**
-         * Called by GameNavigator when entering the game scene.
-         * If levelPath is null, defaults to /levels/level1.json
-         */
+        // System visual size (independent from packet size)
+        private static final double SYSTEM_SIZE = UiConstants.SYSTEM_SIZE;
+
         public void initLevel(String levelPath) {
                 LevelLoaderV2.Loaded loaded = LevelLoaderV2.loadFromResource(
                         engine,
@@ -75,13 +74,18 @@ public class MainController {
                 );
                 totalWire = loaded.totalWire;
 
+                // Ensure there are NO links initially
+                engine.entities().removeIf(e -> e.has(Link.class));
+                usedWire = 0;
+
                 // Systems
                 shopSystem = new ShopSystem(engine);
                 productionSystem = new ProductionSystem(engine, engine.entities(), 0.2);
                 queueSystem = new QueueSystem(engine, engine.entities());
                 routingSystem = new RoutingSystem(engine, engine.entities());
                 movementSystem = new SeedMovementSystem(engine, engine.entities(), shopSystem);
-                collisionSystem = new CollisionSystem(engine, engine.entities(), shopSystem);
+                // Pass packet visual size so radii match visuals
+                collisionSystem = new CollisionSystem(engine, engine.entities(), shopSystem, UiConstants.PACKET_SIZE);
 
                 engine.addSystem(shopSystem);
                 engine.addSystem(productionSystem);
@@ -96,7 +100,7 @@ public class MainController {
 
         @FXML
         private void initialize() {
-                // Key handlers after Scene is ready; remove listener once installed
+                // Install key handlers once the Scene is available
                 ChangeListener<Object> sceneReady = new ChangeListener<>() {
                         @Override public void changed(javafx.beans.value.ObservableValue<?> obs, Object o, Object n) {
                                 if (gameCanvas.getScene() == null) return;
@@ -115,7 +119,6 @@ public class MainController {
                                         if (c == KeyCode.W)     wiringMode = false;
                                 });
 
-                                // remove this listener; we’re wired up
                                 gameCanvas.sceneProperty().removeListener(this);
                         }
                 };
@@ -130,7 +133,7 @@ public class MainController {
                         timeSlider.setValue(0);
                 });
 
-                // Wiring mouse handlers (active only when wiringMode == true)
+                // Mouse wiring (only while holding W)
                 gameCanvas.addEventHandler(MouseEvent.MOUSE_PRESSED, this::onMousePressed);
                 gameCanvas.addEventHandler(MouseEvent.MOUSE_DRAGGED, this::onMouseDragged);
                 gameCanvas.addEventHandler(MouseEvent.MOUSE_RELEASED, this::onMouseReleased);
@@ -143,7 +146,6 @@ public class MainController {
                                 double dt = (now - prevNanos) / 1_000_000_000.0;
                                 prevNanos = now;
 
-                                // "Both cancel" rule
                                 if (forwardPressed && backwardPressed) timeScale = 1.0;
                                 else if (forwardPressed)               timeScale = FAST;
                                 else if (backwardPressed)              timeScale = SLOW;
@@ -167,11 +169,12 @@ public class MainController {
                 loop.start();
         }
 
+        // ----- Shop / Start -----
         private void openShop() {
-                boolean wasRunning = running;
-                running = false; // pause sim
+                boolean was = running;
+                running = false;
                 ShopViewHelper.showShop(engine, shopSystem);
-                running = wasRunning; // resume
+                running = was;
                 gameCanvas.requestFocus();
         }
 
@@ -182,7 +185,6 @@ public class MainController {
         }
 
         private void fastForward(double seconds) {
-                // forward-only jump (engine isn’t reversible)
                 double step = 1.0 / 120.0;
                 double t = Math.max(0, seconds);
                 while (t > 0) {
@@ -193,13 +195,13 @@ public class MainController {
                 }
         }
 
-        // ========= Wiring (mouse) =========
+        // ----- Wiring mouse handlers -----
         private void onMousePressed(MouseEvent e) {
                 if (!wiringMode) return;
                 Entity port = findPortAt(e.getX(), e.getY());
                 if (port == null) return;
                 PortInfo p = port.get(PortInfo.class);
-                if (p.io != PortInfo.IO.OUT) return; // start from OUT only
+                if (p.io != PortInfo.IO.OUT) return; // must start from OUT
                 dragStartPort = port;
                 dragX = e.getX();
                 dragY = e.getY();
@@ -253,15 +255,25 @@ public class MainController {
         }
 
         private Entity findPortAt(double x, double y) {
+                final double half = UiConstants.PORT_SIZE / 2.0;
+                final double pad  = 2.0; // small tolerance
                 for (Entity e : engine.entities()) {
                         if (!e.has(PortInfo.class) || !e.has(Transform.class)) continue;
                         Transform t = e.get(Transform.class);
-                        if (Math.abs(x - t.x) <= 10 && Math.abs(y - t.y) <= 10) return e;
+                        if (Math.abs(x - t.x) <= half + pad && Math.abs(y - t.y) <= half + pad) return e;
                 }
                 return null;
         }
 
-        // ========= HUD / gating =========
+        private boolean isSystemEntity(Entity e) {
+                // system = has Transform, but is NOT a port, NOT a packet, NOT a link
+                return e.has(Transform.class)
+                        && !e.has(PortInfo.class)
+                        && !e.has(Seed.class)
+                        && !e.has(Link.class);
+        }
+
+        // ----- HUD / gating -----
         private void updateHud() {
                 remainingWireLabel.setText(String.format("Wire Left: %.0f", Math.max(0, totalWire - usedWire)));
                 entitiesLabel.setText("Entities: " + engine.entities().size());
@@ -306,7 +318,6 @@ public class MainController {
         }
 
         private boolean isGraphConnected() {
-                // Nodes = systems (entities with Transform but no PortInfo)
                 List<Entity> systems = engine.entities().stream()
                         .filter(e -> e.has(Transform.class) && !e.has(PortInfo.class))
                         .collect(Collectors.toList());
@@ -334,9 +345,11 @@ public class MainController {
                 return seen.size() == systems.size();
         }
 
-        // ========= Rendering =========
+        // ----- Rendering -----
         private void draw() {
                 GraphicsContext g = gameCanvas.getGraphicsContext2D();
+
+                // background
                 g.setFill(Color.web("#12161c"));
                 g.fillRect(0, 0, gameCanvas.getWidth(), gameCanvas.getHeight());
 
@@ -359,19 +372,20 @@ public class MainController {
                         g.strokeLine(a.x, a.y, b.x, b.y);
                 }
 
-                // wiring preview (only when holding W)
+                // wiring preview (hold W)
                 if (wiringMode && dragStartPort != null) {
                         Transform a = dragStartPort.get(Transform.class);
                         g.setStroke(Color.YELLOWGREEN);
+                        g.setLineWidth(2.0);
                         g.strokeLine(a.x, a.y, dragX, dragY);
                 }
 
-                // systems (rectangle + indicator)
+                // systems (rectangle + indicator; Reference ring)
                 for (Entity e : engine.entities()) {
-                        if (e.has(PortInfo.class)) continue;
-                        if (!e.has(Transform.class)) continue;
+                        if (!isSystemEntity(e)) continue;
+
                         Transform t = e.get(Transform.class);
-                        double w = 80, h = 80;
+                        double w = SYSTEM_SIZE, h = SYSTEM_SIZE;
 
                         g.setFill(Color.web("#2a2f3a"));
                         g.fillRoundRect(t.x - w/2, t.y - h/2, w, h, 8, 8);
@@ -384,11 +398,12 @@ public class MainController {
 
                         if (e.has(Reference.class)) {
                                 g.setStroke(Color.LIGHTGREEN);
-                                g.strokeOval(t.x - 20, t.y - 20, 40, 40);
+                                g.strokeOval(t.x - 22, t.y - 22, 44, 44);
                         }
                 }
 
                 // ports
+                final double ps = UiConstants.PORT_SIZE;
                 for (Entity e : engine.entities()) {
                         if (!e.has(PortInfo.class) || !e.has(Transform.class)) continue;
                         PortInfo p = e.get(PortInfo.class);
@@ -397,33 +412,25 @@ public class MainController {
 
                         if (p.shape == PortInfo.Shape.SQUARE) {
                                 g.setFill(wired ? Color.web("#5dc2ff") : Color.web("#9ad9ff"));
-                                g.fillRect(t.x - 6, t.y - 6, 12, 12);
+                                g.fillRect(t.x - ps/2, t.y - ps/2, ps, ps);
                                 g.setStroke(Color.web("#1f6aa5"));
-                                g.strokeRect(t.x - 6, t.y - 6, 12, 12);
+                                g.strokeRect(t.x - ps/2, t.y - ps/2, ps, ps);
                         } else {
                                 g.setFill(wired ? Color.web("#ff86a5") : Color.web("#ffc1d0"));
-                                double[] xs = {t.x - 6, t.x + 6, t.x};
-                                double[] ys = {t.y + 6, t.y + 6, t.y - 6};
+                                double[] xs = {t.x - ps/2, t.x + ps/2, t.x};
+                                double[] ys = {t.y + ps/2, t.y + ps/2, t.y - ps/2};
                                 g.fillPolygon(xs, ys, 3);
                                 g.setStroke(Color.web("#a53d4e"));
                                 g.strokePolygon(xs, ys, 3);
                         }
                 }
 
-                // seeds
+                // packets: draw like ports (slightly larger)
                 for (Entity e : engine.entities()) {
                         if (!e.has(Seed.class) || !e.has(Transform.class)) continue;
                         Seed s = e.get(Seed.class);
                         Transform t = e.get(Transform.class);
-                        if (s.type == Seed.Type.SQUARE) {
-                                g.setFill(Color.BLUEVIOLET);
-                                g.fillRect(t.x - 10, t.y - 10, 20, 20);
-                        } else {
-                                g.setFill(Color.HOTPINK);
-                                double[] xs = {t.x - 10, t.x + 10, t.x};
-                                double[] ys = {t.y + 10, t.y + 10, t.y - 10};
-                                g.fillPolygon(xs, ys, 3);
-                        }
+                        PacketView.render(g, s, t.x, t.y);
                 }
         }
 
