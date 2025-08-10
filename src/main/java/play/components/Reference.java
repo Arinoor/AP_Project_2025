@@ -1,10 +1,4 @@
-        package play.components;
+package play.components;
 
-        import play.core.Component;
-
-        /**
-         * Marker component - indicates this port is a reference sink.
-         */
-        public class Reference implements Component {
-                // no fields needed
-        }
+// marker component: a system is a "reference" when it holds this
+public class Reference { }

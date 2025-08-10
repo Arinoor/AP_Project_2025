@@ -4,20 +4,20 @@
 <VBox xmlns:fx="http://javafx.com/fxml/1" fx:controller="play.ui.ShopController" spacing="12" style="-fx-padding:12;">
     <Label text="Shop" style="-fx-font-size:16; -fx-font-weight:bold;"/>
     <HBox spacing="8">
-        <Button fx:id="btnAtar" text="Atar - 3 coins (Disable lateral 10s)"/>
+        <Button fx:id="btnAtar" text="Atar - 3 coins (Disable impact waves 10s)" onAction="#onAtar"/>
         <Label fx:id="lblAtarMsg" text=""/>
     </HBox>
     <HBox spacing="8">
-        <Button fx:id="btnAiryaman" text="Airyaman - 4 coins (Disable collisions 5s)"/>
+        <Button fx:id="btnAiryaman" text="Airyaman - 4 coins (Disable collisions 5s)" onAction="#onAiryaman"/>
         <Label fx:id="lblAiryMsg" text=""/>
     </HBox>
     <HBox spacing="8">
-        <Button fx:id="btnAnahita" text="Anahita - 5 coins (Reset collisions)"/>
+        <Button fx:id="btnAnahita" text="Anahita - 5 coins (Reset collisions)" onAction="#onAnahita"/>
         <Label fx:id="lblAnaMsg" text=""/>
     </HBox>
     <HBox spacing="8">
         <Label fx:id="coinsInfo" text="Your coins: 0"/>
         <Region HBox.hgrow="ALWAYS"/>
-        <Button fx:id="closeBtn" text="Close"/>
+        <Button fx:id="closeBtn" text="Close" onAction="#onClose"/>
     </HBox>
 </VBox>

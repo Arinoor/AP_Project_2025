@@ -1,84 +1,55 @@
 package play.system;
 
-import java.util.List;
+public class ShopSystem implements System {
+        public static class ShopState {
+                public boolean disableImpactWaves = false;
+                public boolean disableCollisions  = false;
+                public boolean disableLateral     = false;
 
-import play.core.Entity;
-import play.components.Seed;
-
-/**
- * Shop flags & timers. Other systems read State to gate behavior.
- * Atar  -> disableImpactWaves (10s)
- * Airyaman -> disableCollisions (5s)
- * Anahita -> reset all seed "noise" (collision count) once
- */
-public class ShopSystem {
-
-        private final GameEngine engine;
-
-        public static class State {
-                public boolean disableCollisions = false;
-                public boolean disableLateral    = false;
-                public boolean disableImpactWaves = false; // <-- needed by CollisionSystem
+                double impactOffUntil = 0.0;
+                double collOffUntil   = 0.0;
+                double latOffUntil    = 0.0;
         }
 
-        private final State state = new State();
-
-        private double impactOffTimer   = 0.0;
-        private double collideOffTimer  = 0.0;
-        private boolean anahitaRequested = false;
+        private final GameEngine engine;
+        private final ShopState state = new ShopState();
+        private double time = 0.0;
 
         public ShopSystem(GameEngine engine) {
                 this.engine = engine;
         }
 
-        public State getState() {
-                return state;
-        }
+        public ShopState getState() { return state; }
 
-        /** Call when user buys "O' Atar". */
-        public void activateAtar(double seconds) {
-                state.disableImpactWaves = true;
-                impactOffTimer = Math.max(impactOffTimer, seconds);
-        }
-
-        /** Call when user buys "O’ Airyaman". */
-        public void activateAiryaman(double seconds) {
-                state.disableCollisions = true;
-                collideOffTimer = Math.max(collideOffTimer, seconds);
-        }
-
-        /** Call when user buys "O' Anahita". */
-        public void activateAnahita() {
-                anahitaRequested = true;
-        }
-
-        /** Advance timers & apply one-shot effects. */
+        @Override
         public void update(double dt) {
-                // timers
-                if (state.disableImpactWaves) {
-                        impactOffTimer -= dt;
-                        if (impactOffTimer <= 0) {
-                                impactOffTimer = 0;
-                                state.disableImpactWaves = false;
-                        }
-                }
-                if (state.disableCollisions) {
-                        collideOffTimer -= dt;
-                        if (collideOffTimer <= 0) {
-                                collideOffTimer = 0;
-                                state.disableCollisions = false;
-                        }
-                }
+                time += dt;
+                if (state.disableImpactWaves && time >= state.impactOffUntil) state.disableImpactWaves = false;
+                if (state.disableCollisions  && time >= state.collOffUntil)   state.disableCollisions  = false;
+                if (state.disableLateral     && time >= state.latOffUntil)    state.disableLateral     = false;
+        }
 
-                // one-shot: reset noise/collisions on all active seeds
-                if (anahitaRequested) {
-                        List<Entity> all = engine.entities();
-                        for (Entity e : all) {
-                                if (e.has(Seed.class)) {
-                                        e.get(Seed.class).collisions = 0;
-                                }
-                        }
-                        anahitaRequested = false;
-                }
+        // shop actions per project doc
+        public boolean buyAtar() { // disable Impact waves 10s, cost 3
+                if (engine.getCoins() < 3) return false;
+                engine.incrementCoins(-3);
+                state.disableImpactWaves = true;
+                state.impactOffUntil = time + 10.0;
+                return true;
+        }
+
+        public boolean buyAiryaman() { // disable collisions 5s, cost 4
+                if (engine.getCoins() < 4) return false;
+                engine.incrementCoins(-4);
+                state.disableCollisions = true;
+                state.collOffUntil = time + 5.0;
+                return true;
+        }
+
+        public boolean buyAnahita() { // reset packet "noise" (collisions) now, cost 5
+                if (engine.getCoins() < 5) return false;
+                engine.incrementCoins(-5);
+                // handled in UI or a small sweep system that zeroes all Seeds' collisions
+                return true;
         }
 }

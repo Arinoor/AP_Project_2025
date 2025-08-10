@@ -3,50 +3,91 @@ package play.ui;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.stage.Stage;
+import play.core.Entity;
+import play.components.Seed;
+import play.system.GameEngine;
 import play.system.ShopSystem;
 
 public class ShopController {
 
-        @FXML private Button btnAtar, btnAiryaman, btnAnahita, closeBtn;
-        @FXML private Label coinsInfo, lblAtarMsg, lblAiryMsg, lblAnaMsg;
+        // --- match Shop.fxml ids
+        @FXML private Button btnAtar;
+        @FXML private Button btnAiryaman;
+        @FXML private Button btnAnahita;
+        @FXML private Button closeBtn;
+        @FXML private Label  lblAtarMsg;
+        @FXML private Label  lblAiryMsg;
+        @FXML private Label  lblAnaMsg;
+        @FXML private Label  coinsInfo;
 
+        // --- Core refs injected by caller ---
+        private GameEngine engine;
         private ShopSystem shop;
-        private MainController main;
 
-        public void setDependencies(ShopSystem shopSystem, MainController mainController) {
-                this.shop = shopSystem;
-                this.main = mainController;
-                coinsInfo.setText("Your coins: 0"); // we can request actual coins from main if you expose getter
+        public void init(GameEngine engine, ShopSystem shop) {
+                this.engine = engine;
+                this.shop = shop;
+                refreshCoins();
+                clearStatus();
         }
 
-        @FXML private void initialize() {
-                btnAtar.setOnAction(e -> buyAtar());
-                btnAiryaman.setOnAction(e -> buyAiryaman());
-                btnAnahita.setOnAction(e -> buyAnahita());
-                closeBtn.setOnAction(e -> ((Stage) closeBtn.getScene().getWindow()).close());
+        @FXML
+        private void initialize() {
+                // engine/shop arrive via init()
         }
 
-        private void buyAtar() {
-                if (main.chargeCoins(3)) {
-                        double now = System.currentTimeMillis() / 1000.0;
-                        shop.purchaseAtar(3, now);
-                        lblAtarMsg.setText("Activated for 10s");
-                } else lblAtarMsg.setText("Not enough coins");
+        @FXML
+        private void onAtar() {
+                if (shop.buyAtar()) {
+                        lblAtarMsg.setText("Impact waves disabled for 10s.");
+                } else {
+                        lblAtarMsg.setText("Not enough coins (need 3).");
+                }
+                refreshCoins();
         }
 
-        private void buyAiryaman() {
-                if (main.chargeCoins(4)) {
-                        double now = System.currentTimeMillis() / 1000.0;
-                        shop.purchaseAiryaman(4, now);
-                        lblAiryMsg.setText("Activated for 5s");
-                } else lblAiryMsg.setText("Not enough coins");
+        @FXML
+        private void onAiryaman() {
+                if (shop.buyAiryaman()) {
+                        lblAiryMsg.setText("Collisions disabled for 5s.");
+                } else {
+                        lblAiryMsg.setText("Not enough coins (need 4).");
+                }
+                refreshCoins();
         }
 
-        private void buyAnahita() {
-                if (main.chargeCoins(5)) {
-                        shop.purchaseAnahita(5);
-                        lblAnaMsg.setText("Collision counters reset");
-                } else lblAnaMsg.setText("Not enough coins");
+        @FXML
+        private void onAnahita() {
+                if (shop.buyAnahita()) {
+                        // Immediately zero packet "noise" (collision counters) per project doc
+                        for (Entity e : engine.entities()) {
+                                if (e.has(Seed.class)) {
+                                        e.get(Seed.class).collisions = 0;
+                                        e.get(Seed.class).lateral = 0.0; // optional: wipe lateral noise
+                                }
+                        }
+                        lblAnaMsg.setText("All packet noise reset.");
+                } else {
+                        lblAnaMsg.setText("Not enough coins (need 5).");
+                }
+                refreshCoins();
+        }
+
+        @FXML
+        private void onClose() {
+                clearStatus();
+                // The actual stage closing is handled by whoever opened the shop modal.
+        }
+
+        private void refreshCoins() {
+                if (coinsInfo != null && engine != null) {
+                        coinsInfo.setText("Your coins: " + engine.getCoins());
+                }
+        }
+
+        private void clearStatus() {
+                if (lblAtarMsg != null) lblAtarMsg.setText("");
+                if (lblAiryMsg != null) lblAiryMsg.setText("");
+                if (lblAnaMsg != null) lblAnaMsg.setText("");
         }
 }

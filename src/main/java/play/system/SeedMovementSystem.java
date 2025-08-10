@@ -1,75 +1,78 @@
 package play.system;
 
+import play.core.Entity;
+import play.components.*;
+
+import java.util.ArrayList;
 import java.util.List;
 
-import play.core.Entity;
-import play.components.Seed;
-import play.components.Link;
-import play.components.Reference;
-
-/**
- * Moves seeds along their current link.
- * - Applies forward accel (triangles on incompatible starts, set by ProductionSystem).
- * - Arrivals: detach & notify engine. Reference sinks bump reached counter.
- *   (Coins should be awarded by DeliveryListeners wired to notifySeedDelivered.)
- */
-public class SeedMovementSystem {
-
+public class SeedMovementSystem implements System {
         private final GameEngine engine;
-        private final List<Entity> world;
-        @SuppressWarnings("unused")
-        private final ShopSystem shop; // reserved if we add movement-affecting toggles
+        private final List<Entity> entities;
+        private final ShopSystem.ShopState shop;
+        private static final double MAX_LATERAL = 24.0;
+        private static final double LATERAL_DAMP = 0.98;       // gentle drift decay
+        private static final double IMPACT_COOLDOWN_OFF = 0.15; // when impactEnergy decays below this, collisions re-enable
+        private static final double MIN_LINK_LEN = 1e-3;
 
-        public SeedMovementSystem(GameEngine engine, List<Entity> world, ShopSystem shop) {
+        public SeedMovementSystem(GameEngine engine, List<Entity> entities, ShopSystem shopSystem) {
                 this.engine = engine;
-                this.world = world;
-                this.shop = shop;
+                this.entities = entities;
+                this.shop = (shopSystem != null) ? shopSystem.getState() : null;
         }
 
+        @Override
         public void update(double dt) {
-                for (Entity e : world) {
-                        if (!e.has(Seed.class)) continue;
+                List<Entity> toRemove = new ArrayList<>();
 
+                for (Entity e : entities) {
+                        if (!e.has(Seed.class) || !e.has(Transform.class)) continue;
                         Seed s = e.get(Seed.class);
-                        if (!s.alive || s.currentLink == null) continue;
-
-                        // forward accel (set in ProductionSystem based on compatibility)
-                        if (s.accel != 0.0) {
-                                s.speed += s.accel * dt;
-                        }
-                        double v = Math.max(0.0, s.speed);
+                        if (s.currentLink == null) continue;
 
                         Link l = s.currentLink;
-                        if (l.length <= 1e-6) {
-                                // degenerate link: deliver immediately to avoid NaN
-                                onArrive(s, l);
+                        l.updateLength();
+                        double length = Math.max(MIN_LINK_LEN, l.length);
+
+                        // progress advance with simple kinematics
+                        double dist = s.speed * dt + 0.5 * s.accel * dt * dt;
+                        double dp = dist / length;
+                        s.progress += dp;
+
+                        // decay impact energy and auto-clear collision guard
+                        s.impactEnergy *= Math.pow(0.6, dt * 60.0);
+                        if (s.impactEnergy < IMPACT_COOLDOWN_OFF) {
+                                s.justCollided = false;
+                        }
+
+                        // shop: disable lateral on demand
+                        if (shop != null && shop.disableLateral) s.lateral = 0.0;
+
+                        // light lateral damping so drift slowly fades
+                        s.lateral *= LATERAL_DAMP;
+
+                        // death conditions
+                        if (Math.abs(s.lateral) > MAX_LATERAL || s.collisions >= s.capacity) {
+                                s.currentLink = null;
+                                toRemove.add(e);
+                                engine.incrementLost();
                                 continue;
                         }
 
-                        // Advance param by distance/length
-                        double dp = (v / l.length) * dt;
-                        s.progress += dp;
+                        // arrival clamp (RoutingSystem will handle handoff this frame)
+                        if (s.progress >= 1.0) s.progress = 1.0;
 
-                        if (s.progress >= 1.0) {
-                                onArrive(s, l);
-                        }
-                }
-        }
-
-        private void onArrive(Seed s, Link l) {
-                // Detach from link
-                s.currentLink = null;
-                s.progress = 0.0;
-
-                // Notify delivery (coins via listeners)
-                engine.notifySeedDelivered(s);
-
-                // Reference sink reached?
-                if (l.toPort != null && l.toPort.has(Reference.class)) {
-                        engine.incrementReachedReference();
+                        // place Transform on the line (renderers can add a lateral offset if desired)
+                        Transform st = e.get(Transform.class);
+                        Transform a = l.fromPort.get(Transform.class);
+                        Transform b = l.toPort.get(Transform.class);
+                        double nx = a.x + (b.x - a.x) * s.progress;
+                        double ny = a.y + (b.y - a.y) * s.progress;
+                        st.x = nx;
+                        st.y = ny;
                 }
 
-                // Further routing (auto-hop) is handled by a dedicated routing system or production step.
-                // We keep movement single-responsibility here.
+                // remove any "lost" seeds
+                for (Entity e : toRemove) entities.remove(e);
         }
 }

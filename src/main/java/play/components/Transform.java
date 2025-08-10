@@ -1,9 +1,10 @@
 package play.components;
 
-import play.core.Component;
-
-/** Position data for rendering/movement */
-public class Transform implements Component {
+public class Transform {
         public double x, y;
-        public Transform(double x, double y){ this.x = x; this.y = y; }
+
+        public Transform() { this(0,0); }
+        public Transform(double x, double y) {
+                this.x = x; this.y = y;
+        }
 }
