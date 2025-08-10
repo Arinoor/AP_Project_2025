@@ -5,10 +5,12 @@ import play.components.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 public class QueueSystem implements System {
         private final GameEngine engine;
         private final List<Entity> entities;
+        private final Random rng = new Random(); // for random empty port choice
 
         public QueueSystem(GameEngine engine, List<Entity> entities) {
                 this.engine = engine;
@@ -28,13 +30,12 @@ public class QueueSystem implements System {
                         Entity systemE = pinfo.parentSystem;
                         if (systemE == null) continue;
 
-                        // gather candidate outgoing links
+                        // collect empty (free) outgoing links of this system
                         List<Entity> candidates = new ArrayList<>();
                         for (Entity linkE : entities) {
                                 if (!linkE.has(Link.class)) continue;
                                 Link l = linkE.get(Link.class);
-                                if (l.fromPort == null) continue;
-                                if (!l.fromPort.has(PortInfo.class)) continue;
+                                if (l.fromPort == null || !l.fromPort.has(PortInfo.class)) continue;
                                 if (l.fromPort.get(PortInfo.class).parentSystem != systemE) continue;
                                 if (isLinkFree(l)) candidates.add(linkE);
                         }
@@ -48,10 +49,10 @@ public class QueueSystem implements System {
                         if (best != null) {
                                 q.pop();
                                 Link l = best.get(Link.class);
-                                s.currentLink = l; // NOTE: component-to-component
+                                s.currentLink = l; // attach component-to-component
                                 s.progress = 0.0;
 
-                                // position at fromPort
+                                // place at fromPort position
                                 if (seedE.has(Transform.class) && l.fromPort.has(Transform.class)) {
                                         Transform st = seedE.get(Transform.class);
                                         Transform ft = l.fromPort.get(Transform.class);
@@ -69,12 +70,21 @@ public class QueueSystem implements System {
                 return true;
         }
 
+        /**
+         * Priority:
+         * 1) Any compatible & empty outgoing link (random among them)
+         * 2) Otherwise, random empty outgoing link
+         */
         private Entity pickBest(List<Entity> links, Seed s) {
+                List<Entity> compatible = new ArrayList<>();
                 for (Entity linkE : links) {
                         PortInfo.Shape toShape = linkE.get(Link.class).toPort.get(PortInfo.class).shape;
-                        if (matches(s, toShape)) return linkE;
+                        if (matches(s, toShape)) compatible.add(linkE);
                 }
-                return links.get(0);
+                if (!compatible.isEmpty()) {
+                        return compatible.get(rng.nextInt(compatible.size()));
+                }
+                return links.get(rng.nextInt(links.size()));
         }
 
         private boolean matches(Seed s, PortInfo.Shape shape) {

@@ -1,21 +1,27 @@
 {
   "totalWire": 5000,
+
   "devices": [
-    { "id": "REF-A", "capacity": 5, "reference": false, "x": 120, "y": 220 },
-    { "id": "MID-1", "capacity": 5, "x": 320, "y": 240 },
-    { "id": "REF-B", "capacity": 5, "reference": true, "x": 560, "y": 240 }
+    { "id": "SRC-1", "capacity": 5, "x": 150, "y": 240, "producer": { "interval": 0.6 } },
+
+    { "id": "MID-1", "capacity": 5, "x": 420, "y": 180 },
+    { "id": "MID-2", "capacity": 5, "x": 420, "y": 380 },
+
+    { "id": "REF-1", "capacity": 5, "x": 700, "y": 280, "reference": true }
   ],
+
   "ports": [
-    { "id": "A:outS", "device": "REF-A", "x": 160, "y": 220, "shape": "square",   "io": "out", "producer": true, "interval": 0.5 },
-    { "id": "A:outT", "device": "REF-A", "x": 160, "y": 260, "shape": "triangle", "io": "out", "producer": true, "interval": 0.7 },
+    { "id": "S1:outS", "device": "SRC-1", "x": 200, "y": 240, "shape": "square",   "io": "out" },
+    { "id": "S1:outT", "device": "SRC-1", "x": 200, "y": 280, "shape": "triangle", "io": "out" },
 
-    { "id": "M:in",   "device": "MID-1", "x": 290, "y": 240, "shape": "square",   "io": "in"  },
-    { "id": "M:out",  "device": "MID-1", "x": 350, "y": 240, "shape": "triangle", "io": "out" },
+    { "id": "M1:inS",  "device": "MID-1", "x": 390, "y": 180, "shape": "square",   "io": "in"  },
+    { "id": "M1:outT", "device": "MID-1", "x": 450, "y": 180, "shape": "triangle", "io": "out" },
 
-    { "id": "B:in",   "device": "REF-B", "x": 530, "y": 240, "shape": "triangle", "io": "in" }
-  ],
-  "links": [
-    { "from": "A:outS", "to": "M:in"  },
-    { "from": "M:out",  "to": "B:in"  }
+    { "id": "M2:inT",  "device": "MID-2", "x": 390, "y": 380, "shape": "triangle", "io": "in"  },
+    { "id": "M2:outS", "device": "MID-2", "x": 450, "y": 380, "shape": "square",   "io": "out" },
+
+    { "id": "R1:inS",  "device": "REF-1", "x": 670, "y": 260, "shape": "square",   "io": "in"  },
+    { "id": "R1:inT",  "device": "REF-1", "x": 670, "y": 300, "shape": "triangle", "io": "in"  }
   ]
+
 }

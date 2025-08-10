@@ -1,0 +1,25 @@
+{
+  "totalWire": 7000,
+  "devices": [
+    { "id": "SRC-1", "capacity": 5, "x": 120, "y": 180, "producer": { "interval": 0.5 } },
+    { "id": "SRC-2", "capacity": 5, "x": 120, "y": 360, "producer": { "interval": 0.8 } },
+    { "id": "MID-1", "capacity": 5, "x": 400, "y": 140 },
+    { "id": "MID-2", "capacity": 5, "x": 400, "y": 320 },
+    { "id": "REF-1", "capacity": 5, "x": 680, "y": 240, "reference": true }
+  ],
+  "ports": [
+    { "id": "S1:outS", "device": "SRC-1", "x": 170, "y": 180, "shape": "square",   "io": "out" },
+    { "id": "S1:outT", "device": "SRC-1", "x": 170, "y": 220, "shape": "triangle", "io": "out" },
+    { "id": "S2:outS", "device": "SRC-2", "x": 170, "y": 360, "shape": "square",   "io": "out" },
+    { "id": "S2:outT", "device": "SRC-2", "x": 170, "y": 400, "shape": "triangle", "io": "out" },
+
+    { "id": "M1:inS",  "device": "MID-1", "x": 370, "y": 140, "shape": "square",   "io": "in"  },
+    { "id": "M1:outT", "device": "MID-1", "x": 430, "y": 140, "shape": "triangle", "io": "out" },
+
+    { "id": "M2:inT",  "device": "MID-2", "x": 370, "y": 320, "shape": "triangle", "io": "in"  },
+    { "id": "M2:outS", "device": "MID-2", "x": 430, "y": 320, "shape": "square",   "io": "out" },
+
+    { "id": "R1:inS",  "device": "REF-1", "x": 650, "y": 220, "shape": "square",   "io": "in"  },
+    { "id": "R1:inT",  "device": "REF-1", "x": 650, "y": 260, "shape": "triangle", "io": "in"  }
+  ]
+}
