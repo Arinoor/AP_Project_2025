@@ -2,16 +2,16 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <BorderPane xmlns:fx="http://javafx.com/fxml/1" fx:controller="play.ui.MainMenuController"
-            style="-fx-background-color:#12161c; -fx-padding:24;">
+            fx:id="menuRoot" style="-fx-padding:24;">
     <center>
         <VBox spacing="16" alignment="CENTER">
-            <Label text="Conduit Garden" style="-fx-text-fill:#e6edf3; -fx-font-size:28; -fx-font-weight:bold;"/>
-            <Label text="Blueprint Hell" style="-fx-text-fill:#9da8b3; -fx-font-size:14;"/>
+            <Label fx:id="gameTitle" text="Conduit Garden"/>
+            <Label fx:id="gameSubtitle" text="Blueprint Hell"/>
             <Separator/>
-            <Button fx:id="startBtn"   text="Start Game (Continue)"  prefWidth="260"/>
-            <Button fx:id="stagesBtn"  text="Game Stages"            prefWidth="260"/>
-            <Button fx:id="settingsBtn" text="Game Settings"          prefWidth="260"/>
-            <Button fx:id="exitBtn"    text="Exit Game"              prefWidth="260"/>
+            <Button fx:id="startBtn"   text="New Game"   styleClass="primary"/>
+            <Button fx:id="stagesBtn"  text="Levels"/>
+            <Button fx:id="settingsBtn" text="Settings"/>
+            <Button fx:id="exitBtn"    text="Exit"/>
         </VBox>
     </center>
 </BorderPane>

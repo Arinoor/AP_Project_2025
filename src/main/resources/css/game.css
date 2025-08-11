@@ -1,0 +1,21 @@
+#hudBar {
+    -fx-background-color: -color-surface;
+    -fx-padding: 8;
+    -fx-effect: -shadow-1;
+}
+#hudBar .label { -fx-text-fill: -color-muted; }
+#coinsLabel, #timeLabel { -fx-text-fill: -color-text; }
+
+#startButton { -fx-font-weight: 700; }
+#startButton.resume {
+    -fx-background-color: linear-gradient(to bottom, -accent, -accent-strong);
+    -fx-text-fill: #0b1415;
+}
+
+#bottomStrip { -fx-background-color: transparent; -fx-padding: 8 12 12 12; }
+
+#canvasContainer {
+    -fx-background-color: -color-surface-2;
+    -fx-background-radius: -radius-lg;
+    -fx-effect: -shadow-1;
+}

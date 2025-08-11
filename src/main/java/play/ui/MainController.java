@@ -8,23 +8,12 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.AnchorPane;
 import javafx.stage.Stage;
-import play.components.PortInfo;
-import play.components.Producer;
-import play.components.Queue;
-import play.components.Reference;
-import play.components.Seed;
-import play.components.Transform;
+import play.components.*;
 import play.core.Entity;
 import play.level.LevelLoaderV2;
-import play.system.CollisionSystem;
-import play.system.GameEngine;
-import play.system.HudSystem;
-import play.system.ProductionSystem;
-import play.system.QueueSystem;
-import play.system.RenderSystem;
-import play.system.SeedMovementSystem;
-import play.system.ShopSystem;
+import play.system.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -41,6 +30,7 @@ public class MainController {
         @FXML private Button startButton;
         @FXML private Slider timeSlider;
         @FXML private Canvas gameCanvas;
+        @FXML private AnchorPane canvasContainer; // for size binding
 
         // Engine & systems
         private final GameEngine engine = new GameEngine();
@@ -49,21 +39,17 @@ public class MainController {
         private QueueSystem queueSystem;
         private SeedMovementSystem movementSystem;
         private CollisionSystem collisionSystem;
-
-        // NEW: rendering & HUD systems
         private RenderSystem renderSystem;
         private HudSystem hudSystem;
 
         // Level meta
         private String currentLevelPath = "/levels/level1.json";
-        private int timeLimitSeconds = 120;
         private double timeRemaining = 120.0;
         private boolean timeUpHandled = false;
         private boolean gameEnded = false;
         private boolean resultDialogQueued = false;
-        private boolean hasStarted = false;
 
-        // Wiring interaction (hold W and drag from OUT to IN)
+        // Wiring
         private boolean wiringMode = false;
         private Entity dragStartPort = null;
         private double dragX, dragY;
@@ -79,35 +65,37 @@ public class MainController {
         private double totalWire = 3000;
         private double usedWire  = 0;
 
+        // Flow state
+        private boolean running = false;
+        private boolean hasStarted = false;
+
         // Loop timing
         private AnimationTimer loop;
         private long prevNanos = 0L;
         private double elapsed = 0.0;
-        private boolean running = false;
-
-        private static final double SYSTEM_SIZE = UiConstants.SYSTEM_SIZE;
 
         public void initLevel(String levelPath) {
                 currentLevelPath = (levelPath != null) ? levelPath : "/levels/level1.json";
 
-                // Full reset for restart
                 engine.resetForLevel();
                 usedWire = 0;
                 timeUpHandled = false;
                 gameEnded = false;
                 resultDialogQueued = false;
+                hasStarted = false;
+                running = false;
+                updateStartButtonLabel();
+                updateStartButtonStyle();
 
                 LevelLoaderV2.Loaded loaded = LevelLoaderV2.loadFromResource(engine, currentLevelPath);
                 totalWire = loaded.totalWire;
-                timeLimitSeconds = Math.max(10, loaded.timeLimitSeconds);
+                int timeLimitSeconds = Math.max(10, loaded.timeLimitSeconds);
                 timeRemaining = timeLimitSeconds;
                 engine.setPlannedTotal(loaded.plannedSeeds);
 
-                // Ensure NO links initially
-                engine.entities().removeIf(e -> e.has(play.components.Link.class));
+                engine.entities().removeIf(e -> e.has(Link.class));
                 usedWire = 0;
 
-                // Systems (order matters): Production -> Queue -> Movement -> Collision
                 shopSystem       = new ShopSystem(engine);
                 productionSystem = new ProductionSystem(engine, engine.entities(), 0.2);
                 queueSystem      = new QueueSystem(engine, engine.entities());
@@ -120,12 +108,10 @@ public class MainController {
                 engine.addSystem(movementSystem);
                 engine.addSystem(collisionSystem);
 
-                // NEW: Render system (entities & wiring preview)
                 GraphicsContext gc = gameCanvas.getGraphicsContext2D();
                 renderSystem = new RenderSystem(engine.entities(), gc);
                 engine.addSystem(renderSystem);
 
-                // NEW: HUD system (labels)
                 hudSystem = new HudSystem(
                         engine,
                         engine.entities(),
@@ -142,7 +128,12 @@ public class MainController {
 
         @FXML
         private void initialize() {
-                // Keyboard
+                // Bind canvas to container so it fills the center area
+                if (canvasContainer != null) {
+                        gameCanvas.widthProperty().bind(canvasContainer.widthProperty());
+                        gameCanvas.heightProperty().bind(canvasContainer.heightProperty());
+                }
+
                 ChangeListener<Object> sceneReady = new ChangeListener<>() {
                         @Override public void changed(javafx.beans.value.ObservableValue<?> obs, Object o, Object n) {
                                 if (gameCanvas.getScene() == null) return;
@@ -151,7 +142,7 @@ public class MainController {
                                         KeyCode c = e.getCode();
                                         if (c == KeyCode.RIGHT) forwardPressed = true;
                                         if (c == KeyCode.LEFT)  backwardPressed = true;
-                                        if (!running && !hasStarted && c == KeyCode.W) wiringMode = true; // <-- changed
+                                        if (!running && !hasStarted && c == KeyCode.W) wiringMode = true; // only pre-start
                                         if (c == KeyCode.S)     openShop();
                                 });
                                 gameCanvas.getScene().setOnKeyReleased(e -> {
@@ -165,6 +156,9 @@ public class MainController {
                         }
                 };
                 gameCanvas.sceneProperty().addListener(sceneReady);
+
+                updateStartButtonLabel();
+                updateStartButtonStyle();
         }
 
         private void setupUiHooks() {
@@ -196,7 +190,6 @@ public class MainController {
                                 else                                   timeScale = 1.0;
 
                                 if (running && !gameEnded) {
-                                        // Advance simulation
                                         double step = 1.0 / 120.0;
                                         double acc = dt * timeScale;
                                         int maxSubSteps = 8;
@@ -208,58 +201,42 @@ public class MainController {
                                                 sub++;
                                         }
 
-                                        // Countdown (scaled with timeScale)
                                         timeRemaining -= dt * timeScale;
                                         if (timeRemaining <= 0 && !timeUpHandled) {
                                                 timeRemaining = 0;
                                                 handleTimeUp();
                                         }
 
-                                        // Check win/lose continuously
                                         checkWinLose();
                                 }
 
-                                // Always render & refresh HUD even when paused
                                 if (renderSystem != null) renderSystem.update(0);
                                 if (hudSystem != null) hudSystem.update(0);
 
-                                updateStartEnabled(); // gating for Start button before run
+                                updateStartEnabled();
                         }
                 };
                 loop.start();
         }
 
-        // ----- Shop / Start -----
         private void openShop() {
                 boolean was = running;
                 running = false;
-
-                // pass the current window as owner
                 Stage owner = (Stage) gameCanvas.getScene().getWindow();
                 ShopViewHelper.showShop(owner, engine, shopSystem);
-
                 running = was;
                 gameCanvas.requestFocus();
         }
 
-
         private void toggleRun() {
                 if (gameEnded) return;
-
-                // If we're about to start for the first time, keep the existing gating behavior
-                if (!hasStarted && !running) {
-                        // (gating already handled by updateStartEnabled / Start disabled when not ready)
-                }
-
                 running = !running;
-
                 if (running) {
-                        hasStarted = true;   // entering RUNNING from either BUILDING or PAUSED
-                        wiringMode = false;  // never wire while running
+                        hasStarted = true;
+                        wiringMode = false;
                 }
-
-                // Button label reflects state
-                startButton.setText(running ? "Pause" : (hasStarted ? "Resume" : "Start"));
+                updateStartButtonLabel();
+                updateStartButtonStyle();
                 gameCanvas.requestFocus();
         }
 
@@ -275,11 +252,9 @@ public class MainController {
                 }
         }
 
-        // ----- Time up handling -----
         private void handleTimeUp() {
                 timeUpHandled = true;
 
-                // 1) Convert remaining producer quotas to "lost"
                 int remainingQuotas = 0;
                 for (Entity e : engine.entities()) {
                         if (!e.has(Producer.class)) continue;
@@ -293,7 +268,6 @@ public class MainController {
                 }
                 if (remainingQuotas > 0) engine.incrementLostBy(remainingQuotas);
 
-                // 2) Remove all in-flight packet entities and count as lost
                 int inFlight = 0;
                 List<Entity> toRemove = new ArrayList<>();
                 for (Entity e : engine.entities()) {
@@ -306,7 +280,6 @@ public class MainController {
                         engine.entities().removeAll(toRemove);
                 }
 
-                // 3) After time up, evaluate result now
                 checkWinLose();
                 if (!gameEnded) {
                         int planned = engine.getPlannedTotal();
@@ -324,22 +297,18 @@ public class MainController {
                 int planned = engine.getPlannedTotal();
                 if (planned <= 0) return;
 
-                if (engine.getLostCount() * 2 >= planned) {
-                        endGame(false);
-                        return;
-                }
-                if (engine.getDeliveredCount() * 2 >= planned) {
-                        endGame(true);
-                }
+                if (engine.getLostCount() * 2 >= planned) { endGame(false); return; }
+                if (engine.getDeliveredCount() * 2 >= planned) { endGame(true); }
         }
 
         private void endGame(boolean win) {
                 if (gameEnded) return;
                 gameEnded = true;
                 running = false;
-                startButton.setText("Start");
+                hasStarted = false;
+                updateStartButtonLabel();
+                updateStartButtonStyle();
 
-                // Defer dialog to next pulse to avoid "showAndWait during animation/layout"
                 if (!resultDialogQueued) {
                         resultDialogQueued = true;
                         javafx.application.Platform.runLater(() -> showResultDialog(win));
@@ -380,9 +349,7 @@ public class MainController {
                         alert.getButtonTypes().setAll(restart, mainMenu);
                 }
 
-                try {
-                        alert.initOwner(gameCanvas.getScene().getWindow());
-                } catch (Exception ignore) {}
+                try { alert.initOwner(gameCanvas.getScene().getWindow()); } catch (Exception ignore) {}
 
                 Optional<ButtonType> res = alert.showAndWait();
                 if (res.isPresent()) {
@@ -391,9 +358,7 @@ public class MainController {
                         } else if (next != null && res.get() == next) {
                                 initLevel(nextPath);
                         } else {
-                                try {
-                                        GameNavigator.showMainMenu((Stage) gameCanvas.getScene().getWindow());
-                                } catch (Exception ignore) {}
+                                try { GameNavigator.showMainMenu((Stage) gameCanvas.getScene().getWindow()); } catch (Exception ignore) {}
                         }
                 }
         }
@@ -404,14 +369,13 @@ public class MainController {
                 return null;
         }
 
-
-        // ----- Wiring mouse handlers -----
+        // Wiring handlers (only pre-start)
         private void onMousePressed(MouseEvent e) {
                 if (!wiringMode || running || hasStarted) return;
                 Entity port = findPortAt(e.getX(), e.getY());
                 if (port == null) return;
                 PortInfo p = port.get(PortInfo.class);
-                if (p.io != PortInfo.IO.OUT) return; // must start from OUT
+                if (p.io != PortInfo.IO.OUT) return;
                 dragStartPort = port;
                 dragX = e.getX();
                 dragY = e.getY();
@@ -442,19 +406,15 @@ public class MainController {
                 if (a.parentSystem == b.parentSystem) return false;
                 if (a.shape != b.shape) return false;
 
-                // replace any existing links from OUT or to IN (rewiring)
                 removeOutgoingLinks(fromPort);
                 removeIncomingLinks(toPort);
 
                 Transform ta = fromPort.get(Transform.class);
                 Transform tb = toPort.get(Transform.class);
                 double wireLen = Math.hypot(tb.x - ta.x, tb.y - ta.y);
-                if (usedWire + wireLen > totalWire) {
-                        // (optional) could show a toast here
-                        return false;
-                }
+                if (usedWire + wireLen > totalWire) return false;
 
-                Entity linkE = new Entity().add(new play.components.Link(fromPort, toPort));
+                Entity linkE = new Entity().add(new Link(fromPort, toPort));
                 engine.entities().add(linkE);
                 usedWire += wireLen;
                 return true;
@@ -463,8 +423,8 @@ public class MainController {
         private void removeOutgoingLinks(Entity fromPort) {
                 List<Entity> toRemove = new ArrayList<>();
                 for (Entity e : engine.entities()) {
-                        if (!e.has(play.components.Link.class)) continue;
-                        if (e.get(play.components.Link.class).fromPort == fromPort) toRemove.add(e);
+                        if (!e.has(Link.class)) continue;
+                        if (e.get(Link.class).fromPort == fromPort) toRemove.add(e);
                 }
                 subtractWireForLinks(toRemove);
                 engine.entities().removeAll(toRemove);
@@ -473,8 +433,8 @@ public class MainController {
         private void removeIncomingLinks(Entity toPort) {
                 List<Entity> toRemove = new ArrayList<>();
                 for (Entity e : engine.entities()) {
-                        if (!e.has(play.components.Link.class)) continue;
-                        if (e.get(play.components.Link.class).toPort == toPort) toRemove.add(e);
+                        if (!e.has(Link.class)) continue;
+                        if (e.get(Link.class).toPort == toPort) toRemove.add(e);
                 }
                 subtractWireForLinks(toRemove);
                 engine.entities().removeAll(toRemove);
@@ -482,7 +442,7 @@ public class MainController {
 
         private void subtractWireForLinks(List<Entity> links) {
                 for (Entity e : links) {
-                        play.components.Link l = e.get(play.components.Link.class);
+                        Link l = e.get(Link.class);
                         if (l.fromPort != null && l.toPort != null &&
                                 l.fromPort.has(Transform.class) && l.toPort.has(Transform.class)) {
                                 Transform a = l.fromPort.get(Transform.class);
@@ -504,28 +464,11 @@ public class MainController {
                 return null;
         }
 
-        private boolean isSystemEntity(Entity e) {
-                return e.has(Transform.class)
-                        && !e.has(PortInfo.class)
-                        && !e.has(Seed.class)
-                        && !e.has(play.components.Link.class);
-        }
-
-        // ----- HUD / gating -----
         private void updateStartEnabled() {
-                if (gameEnded) {
-                        startButton.setDisable(true);
-                        return;
-                }
-                if (running) {
-                        startButton.setDisable(false); // can always pause
-                        return;
-                }
-                if (hasStarted) {
-                        startButton.setDisable(false); // PAUSED -> always allow resume
-                        return;
-                }
-                // BUILDING: only allow Start when wiring is valid
+                if (gameEnded) { startButton.setDisable(true); return; }
+                if (running) { startButton.setDisable(false); return; }
+                if (hasStarted) { startButton.setDisable(false); return; }
+
                 boolean allFilled = allPortsFilled();
                 boolean connected = isGraphConnected();
                 startButton.setDisable(!(allFilled && connected));
@@ -534,8 +477,8 @@ public class MainController {
         private boolean allPortsFilled() {
                 Map<Entity, Integer> outDeg = new HashMap<>();
                 Map<Entity, Integer> inDeg  = new HashMap<>();
-                for (Entity e : engine.entities()) if (e.has(play.components.Link.class)) {
-                        play.components.Link l = e.get(play.components.Link.class);
+                for (Entity e : engine.entities()) if (e.has(Link.class)) {
+                        Link l = e.get(Link.class);
                         outDeg.merge(l.fromPort, 1, Integer::sum);
                         inDeg.merge(l.toPort, 1, Integer::sum);
                 }
@@ -557,8 +500,8 @@ public class MainController {
                 Map<Entity, Set<Entity>> adj = new HashMap<>();
                 for (Entity s : systems) adj.put(s, new HashSet<>());
                 for (Entity e : engine.entities()) {
-                        if (!e.has(play.components.Link.class)) continue;
-                        play.components.Link l = e.get(play.components.Link.class);
+                        if (!e.has(Link.class)) continue;
+                        Link l = e.get(Link.class);
                         Entity A = l.fromPort.get(PortInfo.class).parentSystem;
                         Entity B = l.toPort.get(PortInfo.class).parentSystem;
                         adj.get(A).add(B);
@@ -576,8 +519,24 @@ public class MainController {
                 return seen.size() == systems.size();
         }
 
-        /** Tiny helper to show the Shop modal with injected engine/shop. */
-        private static final class ShopViewHelper {
+        private void updateStartButtonLabel() {
+                if (running) startButton.setText("Pause");
+                else if (hasStarted) startButton.setText("Resume");
+                else startButton.setText("Start");
+        }
+
+        private void updateStartButtonStyle() {
+                if (!startButton.getStyleClass().contains("primary")) {
+                        startButton.getStyleClass().add("primary");
+                }
+                startButton.getStyleClass().remove("resume");
+                if (!running && hasStarted) {
+                        startButton.getStyleClass().add("resume");
+                }
+        }
+
+        /** Tiny helper to show the Shop modal with styling and owner. */
+        static final class ShopViewHelper {
                 static void showShop(Stage owner, GameEngine engine, ShopSystem shop) {
                         try {
                                 javafx.fxml.FXMLLoader loader = new javafx.fxml.FXMLLoader(
@@ -588,24 +547,26 @@ public class MainController {
                                 ctrl.init(engine, shop);
 
                                 javafx.stage.Stage stage = new javafx.stage.Stage();
-                                stage.setScene(new javafx.scene.Scene(root));
+                                javafx.scene.Scene scene = new javafx.scene.Scene(root);
+                                scene.getStylesheets().addAll(
+                                        MainController.class.getResource("/css/theme.css").toExternalForm(),
+                                        MainController.class.getResource("/css/shop.css").toExternalForm()
+                                );
+                                stage.setScene(scene);
                                 stage.setTitle("Shop");
                                 stage.setResizable(false);
 
-                                // Proper modality + owner
                                 if (owner != null) {
                                         stage.initOwner(owner);
                                         stage.initModality(javafx.stage.Modality.WINDOW_MODAL);
                                 } else {
-                                        // fallback to app-modal if no owner
                                         stage.initModality(javafx.stage.Modality.APPLICATION_MODAL);
                                 }
 
-                                stage.showAndWait(); // blocks until Close
+                                stage.showAndWait();
                         } catch (Exception ex) {
                                 ex.printStackTrace();
                         }
                 }
         }
-
 }

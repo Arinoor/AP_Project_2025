@@ -1,0 +1,32 @@
+#shopRoot {
+    -fx-background-color: -color-surface;
+    -fx-padding: 16;
+    -fx-background-radius: -radius-lg;
+}
+
+#shopRoot .title {
+    -fx-text-fill: -color-text;
+    -fx-font-size: 18px;
+    -fx-font-weight: 800;
+    -fx-padding: 0 0 8 0;
+}
+
+.shop-row {
+    -fx-background-color: -color-surface-2;
+    -fx-background-radius: -radius-md;
+    -fx-padding: 10;
+    -fx-spacing: 10;
+}
+
+#coinsInfo { -fx-font-weight: 700; -fx-text-fill: -color-text; }
+
+.shop-row .button {
+    -fx-background-color: linear-gradient(to bottom, -accent, -accent-strong);
+    -fx-text-fill: #0b1415;
+    -fx-font-weight: 700;
+}
+
+#lblAtarMsg, #lblAiryMsg, #lblAnaMsg {
+    -fx-text-fill: -color-muted;
+    -fx-font-size: 12px;
+}

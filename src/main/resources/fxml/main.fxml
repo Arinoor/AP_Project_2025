@@ -4,25 +4,25 @@
 <?import javafx.scene.layout.*?>
 <BorderPane xmlns:fx="http://javafx.com/fxml/1" fx:controller="play.ui.MainController">
     <top>
-        <HBox spacing="12" style="-fx-padding:8; -fx-background-color: #f8f8f8;">
+        <HBox fx:id="hudBar" spacing="12">
             <Label text="Conduit Garden" style="-fx-font-weight:bold;"/>
             <Region HBox.hgrow="ALWAYS"/>
             <Label fx:id="remainingWireLabel" text="Wire Left: 0"/>
             <Label fx:id="entitiesLabel" text="Entities: 0"/>
             <Label fx:id="seedsLabel" text="Seeds: 0"/>
-            <Label fx:id="packetLossLabel" text="P.Loss/Total: 0/0 (0%)"/>
+            <Label fx:id="packetLossLabel" text="Loss: 0/0 (0%)"/>
             <Label fx:id="coinsLabel" text="Coins: 0"/>
             <Label fx:id="timeLabel" text="Time: 00:00"/>
             <Button fx:id="shopButton" text="Shop"/>
-            <Button fx:id="startButton" text="Start"/>
+            <Button fx:id="startButton" text="Start" styleClass="primary"/>
         </HBox>
     </top>
     <center>
         <VBox>
-            <AnchorPane fx:id="canvasContainer">
-                <Canvas fx:id="gameCanvas" width="900" height="520"/>
+            <AnchorPane fx:id="canvasContainer" VBox.vgrow="ALWAYS">
+                <Canvas fx:id="gameCanvas"/>
             </AnchorPane>
-            <HBox spacing="8" style="-fx-padding:8;">
+            <HBox fx:id="bottomStrip" spacing="8">
                 <Label text="Jump time:"/>
                 <Slider fx:id="timeSlider" min="0" max="120.0" value="0" prefWidth="400"/>
                 <Region HBox.hgrow="ALWAYS"/>
