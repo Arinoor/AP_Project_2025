@@ -150,7 +150,7 @@ public class QueueSystem implements System {
                                 PortInfo.Shape outShape = l.fromPort.get(PortInfo.class).shape;
 
                                 // per-hop kinematics
-                                applyKinematicsForHop(s, outShape);
+                                Kinematics.applyForHop(s, outShape);
 
                                 // place at OUT port and start hop
                                 Transform tFrom = l.fromPort.get(Transform.class);
@@ -173,21 +173,5 @@ public class QueueSystem implements System {
                         if (s.currentLink == link) return false; // one seed per wire at a time
                 }
                 return true;
-        }
-
-        /** Per-hop rules from the spec. */
-        private void applyKinematicsForHop(Seed s, PortInfo.Shape outShape) {
-                boolean compatibleStart =
-                        (s.type == Seed.Type.SQUARE  && outShape == PortInfo.Shape.SQUARE) ||
-                                (s.type == Seed.Type.TRIANGLE && outShape == PortInfo.Shape.TRIANGLE);
-
-                if (s.type == Seed.Type.SQUARE) {
-                        double base = 120.0;
-                        s.speed = compatibleStart ? base * 0.5 : base; // half when compatible
-                        s.accel = 0.0;
-                } else {
-                        s.speed = 140.0;
-                        s.accel = compatibleStart ? 0.0 : 220.0;       // accelerate when incompatible
-                }
         }
 }
