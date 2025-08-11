@@ -439,7 +439,6 @@ public class MainController {
                 Entity linkE = new Entity().add(new play.components.Link(fromPort, toPort));
                 engine.entities().add(linkE);
                 usedWire += wireLen;
-                if (!toPort.has(Queue.class)) toPort.add(new Queue(5));
                 return true;
         }
 
