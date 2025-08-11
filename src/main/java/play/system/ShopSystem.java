@@ -1,5 +1,8 @@
 package play.system;
 
+import play.components.Seed;
+import play.core.Entity;
+
 public class ShopSystem implements System {
         public static class ShopState {
                 public boolean disableImpactWaves = false;
@@ -46,10 +49,16 @@ public class ShopSystem implements System {
                 return true;
         }
 
-        public boolean buyAnahita() { // reset packet "noise" (collisions) now, cost 5
+        public boolean buyAnahita() { // reset packet "noise" now, cost 5
                 if (engine.getCoins() < 5) return false;
                 engine.incrementCoins(-5);
-                // handled in UI or a small sweep system that zeroes all Seeds' collisions
+
+                // Immediately sweep all seeds and clear noise (and related build-ups)
+                for (Entity e : engine.entities()) {
+                        if (!e.has(Seed.class)) continue;
+                        Seed s = e.get(Seed.class);
+                        s.noise = 0.0;         // <-- the important part
+                }
                 return true;
         }
 }
