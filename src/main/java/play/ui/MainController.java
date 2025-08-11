@@ -61,6 +61,7 @@ public class MainController {
         private boolean timeUpHandled = false;
         private boolean gameEnded = false;
         private boolean resultDialogQueued = false;
+        private boolean hasStarted = false;
 
         // Wiring interaction (hold W and drag from OUT to IN)
         private boolean wiringMode = false;
@@ -150,7 +151,7 @@ public class MainController {
                                         KeyCode c = e.getCode();
                                         if (c == KeyCode.RIGHT) forwardPressed = true;
                                         if (c == KeyCode.LEFT)  backwardPressed = true;
-                                        if (!running && c == KeyCode.W) wiringMode = true;     // wiring only when NOT running
+                                        if (!running && !hasStarted && c == KeyCode.W) wiringMode = true; // <-- changed
                                         if (c == KeyCode.S)     openShop();
                                 });
                                 gameCanvas.getScene().setOnKeyReleased(e -> {
@@ -232,17 +233,33 @@ public class MainController {
         private void openShop() {
                 boolean was = running;
                 running = false;
-                ShopViewHelper.showShop(engine, shopSystem);
+
+                // pass the current window as owner
+                Stage owner = (Stage) gameCanvas.getScene().getWindow();
+                ShopViewHelper.showShop(owner, engine, shopSystem);
+
                 running = was;
                 gameCanvas.requestFocus();
         }
 
+
         private void toggleRun() {
                 if (gameEnded) return;
+
+                // If we're about to start for the first time, keep the existing gating behavior
+                if (!hasStarted && !running) {
+                        // (gating already handled by updateStartEnabled / Start disabled when not ready)
+                }
+
                 running = !running;
-                // Wiring only allowed when NOT running
-                if (running) wiringMode = false;
-                startButton.setText(running ? "Pause" : "Start");
+
+                if (running) {
+                        hasStarted = true;   // entering RUNNING from either BUILDING or PAUSED
+                        wiringMode = false;  // never wire while running
+                }
+
+                // Button label reflects state
+                startButton.setText(running ? "Pause" : (hasStarted ? "Resume" : "Start"));
                 gameCanvas.requestFocus();
         }
 
@@ -387,9 +404,10 @@ public class MainController {
                 return null;
         }
 
+
         // ----- Wiring mouse handlers -----
         private void onMousePressed(MouseEvent e) {
-                if (!wiringMode || running) return;
+                if (!wiringMode || running || hasStarted) return;
                 Entity port = findPortAt(e.getX(), e.getY());
                 if (port == null) return;
                 PortInfo p = port.get(PortInfo.class);
@@ -401,14 +419,14 @@ public class MainController {
         }
 
         private void onMouseDragged(MouseEvent e) {
-                if (!wiringMode || running || dragStartPort == null) return;
+                if (!wiringMode || running || hasStarted || dragStartPort == null) return;
                 dragX = e.getX();
                 dragY = e.getY();
                 if (renderSystem != null) renderSystem.updateWiringPreview(dragStartPort, dragX, dragY, true);
         }
 
         private void onMouseReleased(MouseEvent e) {
-                if (!wiringMode || running || dragStartPort == null) return;
+                if (!wiringMode || running || hasStarted || dragStartPort == null) return;
                 Entity target = findPortAt(e.getX(), e.getY());
                 if (target != null) tryCreateLink(dragStartPort, target);
                 dragStartPort = null;
@@ -495,10 +513,19 @@ public class MainController {
 
         // ----- HUD / gating -----
         private void updateStartEnabled() {
-                if (running || gameEnded) {
-                        startButton.setDisable(false);
+                if (gameEnded) {
+                        startButton.setDisable(true);
                         return;
                 }
+                if (running) {
+                        startButton.setDisable(false); // can always pause
+                        return;
+                }
+                if (hasStarted) {
+                        startButton.setDisable(false); // PAUSED -> always allow resume
+                        return;
+                }
+                // BUILDING: only allow Start when wiring is valid
                 boolean allFilled = allPortsFilled();
                 boolean connected = isGraphConnected();
                 startButton.setDisable(!(allFilled && connected));
@@ -551,7 +578,7 @@ public class MainController {
 
         /** Tiny helper to show the Shop modal with injected engine/shop. */
         private static final class ShopViewHelper {
-                static void showShop(GameEngine engine, ShopSystem shop) {
+                static void showShop(Stage owner, GameEngine engine, ShopSystem shop) {
                         try {
                                 javafx.fxml.FXMLLoader loader = new javafx.fxml.FXMLLoader(
                                         MainController.class.getResource("/fxml/Shop.fxml")
@@ -559,15 +586,26 @@ public class MainController {
                                 javafx.scene.Parent root = loader.load();
                                 play.ui.ShopController ctrl = loader.getController();
                                 ctrl.init(engine, shop);
+
                                 javafx.stage.Stage stage = new javafx.stage.Stage();
                                 stage.setScene(new javafx.scene.Scene(root));
                                 stage.setTitle("Shop");
                                 stage.setResizable(false);
-                                stage.initModality(javafx.stage.Modality.APPLICATION_MODAL);
-                                stage.showAndWait();
+
+                                // Proper modality + owner
+                                if (owner != null) {
+                                        stage.initOwner(owner);
+                                        stage.initModality(javafx.stage.Modality.WINDOW_MODAL);
+                                } else {
+                                        // fallback to app-modal if no owner
+                                        stage.initModality(javafx.stage.Modality.APPLICATION_MODAL);
+                                }
+
+                                stage.showAndWait(); // blocks until Close
                         } catch (Exception ex) {
                                 ex.printStackTrace();
                         }
                 }
         }
+
 }

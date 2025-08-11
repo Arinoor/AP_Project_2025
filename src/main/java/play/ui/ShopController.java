@@ -68,8 +68,7 @@ public class ShopController {
 
         @FXML
         private void onClose() {
-                clearStatus();
-                // The actual stage closing is handled by whoever opened the shop modal.
+                ((javafx.stage.Stage) closeBtn.getScene().getWindow()).close();
         }
 
         private void refreshCoins() {
