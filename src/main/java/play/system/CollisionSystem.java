@@ -15,7 +15,7 @@ public class CollisionSystem implements System {
         private final List<Entity> entities;
         private final ShopSystem.ShopState shop;
 
-        private final double unit;           // pixels per "unit"
+        private final double unit;           // pixels per "unit" // make it less if you want harder condition for collision
         private final double IMPACT_RADIUS;  // px
         private static final double OFFSET_FACTOR = 0.12;
         private static final double PAIR_COOLDOWN_SEC = 0.75;
@@ -120,7 +120,7 @@ public class CollisionSystem implements System {
 
         private double radiusFor(Seed s) {
                 final double sizeUnits = s.sizeUnits(); // 2 or 3
-                return (sizeUnits * unit) * 0.5;
+                return (sizeUnits * unit) * 0.5; // make less if you want harder condition for collision
         }
 
         private void scheduleReset(Seed s) {

@@ -66,7 +66,7 @@ public class QueueSystem implements System {
                         s.lateral = 0.0;          // optionally reset lateral on entry
 
                         // currency for EACH packet entering a system
-                        engine.incrementCoins(1);
+                        engine.incrementCoins(1); // TODO 1 coin for square and 2 coins for triangle
 
                         // Reference systems consume (do not forward)
                         if (system.has(Reference.class)) {
