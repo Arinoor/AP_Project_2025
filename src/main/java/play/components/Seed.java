@@ -6,16 +6,16 @@ public class Seed {
         public final Type type;
 
         // kinematics
-        public double speed = 120.0;     // px/s along the link
-        public double accel = 0.0;       // px/s^2 along the link
+        public double speed = 120.0;     // units / s
+        public double accel = 0.0;       // units / s^2
 
         // where the seed is on its current link: 0..1
         public double progress = 0.0;
 
-        // lateral offset from the wire in pixels (visual & collision space)
+        // lateral offset from the wire (impact causes drift). "Death" if exceeds threshold
         public double lateral = 0.0;
 
-        // impact wave energy to be decayed each tick (AoE ripple cooldown)
+        // impact wave energy to be decayed each tick (AoE ripple)
         public double impactEnergy = 0.0;
 
         // collision budgeting per project doc
@@ -25,12 +25,12 @@ public class Seed {
         // pairing with the link (component, not entity)
         public Link currentLink = null;
 
-        // guards immediate re-collisions
+        // short guard to avoid instant re-collisions
         public boolean justCollided = false;
 
         public Seed(Type type) {
                 this.type = type;
-                // Slightly more tolerant than before so “one bump” isn’t death.
-                this.capacity = (type == Type.SQUARE) ? 3 : 5;
+                // More tolerant: no loss on 1–2 hits. Keep triangle > square.
+                this.capacity = (type == Type.SQUARE) ? 4 : 6;
         }
 }

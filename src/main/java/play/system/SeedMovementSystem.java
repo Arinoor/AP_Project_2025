@@ -7,9 +7,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Advances seeds along their current link, applies acceleration, and enforces
- * loss based on collision budget and lateral deviation. Deviation threshold is
- * size-aware (square=2 units, triangle=3 units) scaled by pixelsPerUnit.
+ * Advances seeds, applies acceleration, and removes seeds only when
+ * (a) lateral exceeds a size-aware threshold OR (b) collision budget exhausted.
+ * More tolerant constants so single impacts don't cause instant losses.
  */
 public class SeedMovementSystem implements System {
         private final GameEngine engine;
@@ -20,9 +20,11 @@ public class SeedMovementSystem implements System {
         private final double pixelsPerUnit;
 
         // Gentle drift decay
-        private static final double LATERAL_DAMP = 0.98;
-        // When impactEnergy decays below this, collisions re-enable
-        private static final double IMPACT_COOLDOWN_OFF = 0.15;
+        private static final double LATERAL_DAMP = 0.985;
+
+        // When impactEnergy decays below this, collisions re-enable (raised for longer guard)
+        private static final double IMPACT_COOLDOWN_OFF = 0.35;
+
         private static final double MIN_LINK_LEN = 1e-3;
 
         public SeedMovementSystem(GameEngine engine, List<Entity> entities, ShopSystem shopSystem, double pixelsPerUnit) {
@@ -45,7 +47,7 @@ public class SeedMovementSystem implements System {
                         l.updateLength();
                         double length = Math.max(MIN_LINK_LEN, l.length);
 
-                        // Proper kinematics: dv = a*dt, then integrate
+                        // Proper kinematics: dv = a*dt, then integrate distance
                         s.speed += s.accel * dt;
                         if (s.speed < 0) s.speed = 0;
 
@@ -53,21 +55,22 @@ public class SeedMovementSystem implements System {
                         double dp = dist / length;
                         s.progress += dp;
 
-                        // decay impact energy and auto-clear collision guard
+                        // decay impact flash and auto-clear collision guard
                         s.impactEnergy *= Math.pow(0.6, dt * 60.0);
                         if (s.impactEnergy < IMPACT_COOLDOWN_OFF) {
                                 s.justCollided = false;
                         }
 
-                        // shop: disable lateral on demand
+                        // shop: disable lateral if purchased
                         if (shop != null && shop.disableLateral) s.lateral = 0.0;
 
-                        // light lateral damping so drift slowly fades
+                        // light damping so drift fades slowly
                         s.lateral *= LATERAL_DAMP;
 
                         // Loss: size-aware lateral threshold + collision capacity
                         double sizeUnits = (s.type == Seed.Type.SQUARE) ? 2.0 : 3.0;
-                        double lateralThreshold = sizeUnits * pixelsPerUnit;
+                        // More tolerant lateral threshold (25% larger than before)
+                        double lateralThreshold = sizeUnits * pixelsPerUnit * 1.25;
 
                         if (Math.abs(s.lateral) > lateralThreshold || s.collisions >= s.capacity) {
                                 s.currentLink = null;
@@ -76,7 +79,7 @@ public class SeedMovementSystem implements System {
                                 continue;
                         }
 
-                        // arrival clamp (QueueSystem will handle handoff this frame)
+                        // arrival clamp (handoff handled elsewhere the same frame)
                         if (s.progress >= 1.0) s.progress = 1.0;
 
                         // place Transform on the line
