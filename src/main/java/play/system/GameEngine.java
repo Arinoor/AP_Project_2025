@@ -1,81 +1,115 @@
 package play.system;
 
-import play.audio.AudioManager;
 import play.core.Entity;
 import play.components.Seed;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
+/**
+ * Minimal ECS-style engine used by your game.
+ * Holds entities, systems, and global counters (coins, produced, delivered, lost, planned).
+ */
 public class GameEngine {
+
+        // Entities & systems
         private final List<Entity> entities = new ArrayList<>();
-        private final List<System> systems = new ArrayList<>();
+        private final List<System> systems  = new ArrayList<>();
 
-        // counters / HUD
-        private int producedCount = 0;
+        // Global counters
+        private int plannedTotal   = 0;
+        private int producedCount  = 0;
         private int deliveredCount = 0;
-        private int lostCount = 0;
-        private int reachedReference = 0;
-        private int coins = 0;
+        private int lostCount      = 0;
+        private int coins          = 0;
 
-        // level meta
-        private int plannedTotal = 0;
-
-        public List<Entity> entities() { return entities; }
-        public void addSystem(System sys) { systems.add(sys); }
-
-        public void tick(double dt) {
-                for (System s : systems) s.update(dt);
+        // --- ECS management ---
+        public List<Entity> entities() {
+                return entities;
         }
 
-        // --- Level lifecycle ---
-        public void resetForLevel() {
+        public void addSystem(System s) {
+                systems.add(s);
+        }
+
+        public void clearSystems() {
                 systems.clear();
+        }
+
+        /** Advance the simulation by dt seconds. Calls systems in the order they were added. */
+        public void tick(double dt) {
+                // iterate on a snapshot to allow systems to add/remove other systems safely (rare)
+                for (System s : new ArrayList<>(systems)) {
+                        s.update(dt);
+                }
+        }
+
+        /** Reset everything for a new level. */
+        public void resetForLevel() {
                 entities.clear();
-                producedCount = 0;
+                clearSystems();
+                plannedTotal   = 0;
+                producedCount  = 0;
                 deliveredCount = 0;
-                lostCount = 0;
-                reachedReference = 0;
-                coins = 0;
-                plannedTotal = 0;
+                lostCount      = 0;
+                coins          = 0;
         }
 
-        public void setPlannedTotal(int planned) {
-                this.plannedTotal = Math.max(0, planned);
+        // --- Game meta & scoring ---
+        public void setPlannedTotal(int total) {
+                this.plannedTotal = Math.max(0, total);
         }
-        public int getPlannedTotal() { return plannedTotal; }
 
-        // --- Counters ---
-        public void notifySeedDelivered(Seed seed) {
+        public int getPlannedTotal() {
+                return plannedTotal;
+        }
+
+        public void incrementProduced() {
+                producedCount++;
+        }
+
+        /** Called when a seed is delivered into a Reference system. */
+        public void notifySeedDelivered(Seed s) {
                 deliveredCount++;
-                // (coins on delivery, if any, are handled elsewhere)
+                // coin award is handled elsewhere (QueueSystem on system entry), by design
         }
-
-        public void incrementProduced() { producedCount++; }
 
         public void incrementLost() {
                 lostCount++;
-                AudioManager.getInstance().playSfx("/sfx/packetloss.wav");
         }
 
-        public void incrementLostBy(int amount) {
-                if (amount <= 0) return;
-                lostCount += amount;
-                // play one sfx ping to avoid spam on bulk loss
-                AudioManager.getInstance().playSfx("/sfx/packetloss.wav");
+        public void incrementLostBy(int n) {
+                if (n <= 0) return;
+                lostCount += n;
         }
 
-        public void incrementReachedReference() { reachedReference++; }
+        public int getProducedCount() {
+                return producedCount;
+        }
 
-        public void incrementCoins(int amount) {
-                coins += amount;
+        public int getDeliveredCount() {
+                return deliveredCount;
+        }
+
+        public int getLostCount() {
+                return lostCount;
+        }
+
+        // --- Currency ---
+        public int getCoins() {
+                return coins;
+        }
+
+        /** Can pass negative to spend; won’t go below zero. */
+        public void incrementCoins(int delta) {
+                coins += delta;
                 if (coins < 0) coins = 0;
         }
 
-        // --- Getters ---
-        public int getCoins() { return coins; }
-        public int getProducedCount() { return producedCount; }
-        public int getDeliveredCount() { return deliveredCount; }
-        public int getLostCount() { return lostCount; }
-        public int getReachedReference() { return reachedReference; }
+        // --- Convenience (compatibility with existing code) ---
+        /** Some code calls this; we map it to delivery for compatibility. */
+        public void incrementReachedReference() {
+                deliveredCount++;
+        }
 }

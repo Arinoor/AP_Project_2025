@@ -1,9 +1,19 @@
 package play.system;
 
-import play.components.Seed;
 import play.core.Entity;
+import play.components.Seed;
 
+/**
+ * Owns temporary gameplay modifiers purchasable in the Shop.
+ * UI must NOT mutate gameplay; it should only call these methods and show messages.
+ */
 public class ShopSystem implements System {
+
+        // --- Costs (tweak/balance here)
+        public static final int COST_ATAR     = 3; // disable impact waves 10s
+        public static final int COST_AIRYAMAN = 4; // disable collisions 5s
+        public static final int COST_ANAHITA  = 5; // reset packet noise immediately
+
         public static class ShopState {
                 public boolean disableImpactWaves = false;
                 public boolean disableCollisions  = false;
@@ -32,33 +42,43 @@ public class ShopSystem implements System {
                 if (state.disableLateral     && time >= state.latOffUntil)    state.disableLateral     = false;
         }
 
-        // shop actions per project doc
-        public boolean buyAtar() { // disable Impact waves 10s, cost 3
-                if (engine.getCoins() < 3) return false;
-                engine.incrementCoins(-3);
+        // === Purchases ===
+
+        /** Disable impact waves for 10s. */
+        public boolean buyAtar() {
+                if (!deductCoins(COST_ATAR)) return false;
                 state.disableImpactWaves = true;
                 state.impactOffUntil = time + 10.0;
                 return true;
         }
 
-        public boolean buyAiryaman() { // disable collisions 5s, cost 4
-                if (engine.getCoins() < 4) return false;
-                engine.incrementCoins(-4);
+        /** Disable collisions for 5s. */
+        public boolean buyAiryaman() {
+                if (!deductCoins(COST_AIRYAMAN)) return false;
                 state.disableCollisions = true;
                 state.collOffUntil = time + 5.0;
                 return true;
         }
 
-        public boolean buyAnahita() { // reset packet "noise" now, cost 5
-                if (engine.getCoins() < 5) return false;
-                engine.incrementCoins(-5);
+        /** Immediately reset noise for all seeds (and related build-ups). */
+        public boolean buyAnahita() {
+                if (!deductCoins(COST_ANAHITA)) return false;
 
-                // Immediately sweep all seeds and clear noise (and related build-ups)
+                // Sweep all seeds and clear noise + related transients
                 for (Entity e : engine.entities()) {
                         if (!e.has(Seed.class)) continue;
                         Seed s = e.get(Seed.class);
-                        s.noise = 0.0;         // <-- the important part
+                        s.noise = 0.0;        // <-- the key requirement
+
                 }
+                return true;
+        }
+
+        // === Helpers ===
+
+        private boolean deductCoins(int cost) {
+                if (engine.getCoins() < cost) return false;
+                engine.incrementCoins(-cost);
                 return true;
         }
 }

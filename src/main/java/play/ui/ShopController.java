@@ -61,7 +61,7 @@ public class ShopController {
                 if (shop.buyAnahita()) {
                         lblAnaMsg.setText("All packet noise reset.");
                 } else {
-                        lblAnaMsg.setText("Not enough coins (need 5).");
+                        lblAnaMsg.setText("Not enough coins (need " + ShopSystem.COST_ANAHITA + ").");
                 }
                 refreshCoins();
         }
