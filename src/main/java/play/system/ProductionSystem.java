@@ -8,8 +8,8 @@ import java.util.List;
 
 /**
  * Produces packets from EVERY OUT port of each system with a Producer.
- * Seed type derives from the OUT port shape. Kinematics are set for the first hop
- * based on the OUT port used (this is the "start port" for the hop).
+ * Seed type derives from the OUT port shape.
+ * Respects fixed per-level quotas in Producer.remainingSquare / remainingTriangle.
  */
 public class ProductionSystem implements System {
         private final GameEngine engine;
@@ -33,25 +33,32 @@ public class ProductionSystem implements System {
                         if (!sysE.has(Producer.class)) continue;
                         Producer prod = sysE.get(Producer.class);
 
+                        // If no quota left for both types, skip entirely
+                        if (!prod.hasAnyRemaining()) continue;
+
                         prod.timer += dt;
                         if (prod.timer < prod.interval) continue;
                         prod.timer = 0.0;
 
-                        // find all OUT ports of this system
+                        // find all OUT ports
                         List<Entity> outPorts = findOutPorts(sysE);
                         if (outPorts.isEmpty()) continue;
 
                         for (Entity outPort : outPorts) {
-                                Entity freeLink = findFreeLinkFrom(outPort);
-                                if (freeLink == null) continue;
-
                                 PortInfo pinfo = outPort.get(PortInfo.class);
                                 Seed.Type type = (pinfo.shape == PortInfo.Shape.SQUARE) ? Seed.Type.SQUARE : Seed.Type.TRIANGLE;
+
+                                // Check remaining quota
+                                if (type == Seed.Type.SQUARE && prod.remainingSquare <= 0) continue;
+                                if (type == Seed.Type.TRIANGLE && prod.remainingTriangle <= 0) continue;
+
+                                Entity freeLink = findFreeLinkFrom(outPort);
+                                if (freeLink == null) continue;
 
                                 Entity seedE = new Entity();
                                 Seed s = new Seed(type);
 
-                                // Per-hop kinematics based on OUT port shape used to spawn
+                                // Kinematics for the first hop based on the OUT port shape
                                 applyKinematicsForHop(s, pinfo.shape);
 
                                 // place at the OUT port
@@ -65,6 +72,13 @@ public class ProductionSystem implements System {
 
                                 engine.entities().add(seedE);
                                 engine.incrementProduced();
+
+                                // decrement quota
+                                if (type == Seed.Type.SQUARE) prod.remainingSquare--;
+                                else                           prod.remainingTriangle--;
+
+                                // If all quotas consumed, no need to try more ports this tick
+                                if (!prod.hasAnyRemaining()) break;
                         }
                 }
         }
@@ -97,7 +111,7 @@ public class ProductionSystem implements System {
                 return true;
         }
 
-        /** Same rules as QueueSystem; shared here to avoid drift. */
+        /** Same rules you use post-queue handoff to keep behavior consistent. */
         private void applyKinematicsForHop(Seed s, PortInfo.Shape outShape) {
                 boolean compatibleStart =
                         (s.type == Seed.Type.SQUARE  && outShape == PortInfo.Shape.SQUARE) ||

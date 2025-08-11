@@ -2,7 +2,10 @@
   "totalWire": 5000,
 
   "devices": [
-    { "id": "SRC-1", "capacity": 5, "x": 150, "y": 240, "producer": { "interval": 0.6 } },
+    {
+      "id": "SRC-1", "capacity": 5, "x": 150, "y": 240,
+      "producer": { "interval": 0.6, "countSquare": 10, "countTriangle": 10 }
+    },
 
     { "id": "MID-1", "capacity": 5, "x": 420, "y": 180 },
     { "id": "MID-2", "capacity": 5, "x": 420, "y": 380 },
@@ -23,5 +26,4 @@
     { "id": "R1:inS",  "device": "REF-1", "x": 670, "y": 260, "shape": "square",   "io": "in"  },
     { "id": "R1:inT",  "device": "REF-1", "x": 670, "y": 300, "shape": "triangle", "io": "in"  }
   ]
-
 }
