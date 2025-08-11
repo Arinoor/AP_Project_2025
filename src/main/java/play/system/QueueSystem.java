@@ -5,18 +5,12 @@ import play.components.*;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.Random;
 
-/**
- * Dequeues from device input ports and assigns a free outgoing link.
- * Selection:
- *  - Prefer an empty link whose OUT port shape matches the seed type.
- *  - Otherwise pick a random empty link among the rest.
- * Kinematics are recomputed per hop based on the chosen OUT port shape.
- */
 public class QueueSystem implements System {
         private final GameEngine engine;
         private final List<Entity> entities;
+        private static final Random RNG = new Random();
 
         public QueueSystem(GameEngine engine, List<Entity> entities) {
                 this.engine = engine;
@@ -36,13 +30,12 @@ public class QueueSystem implements System {
                         Entity systemE = pinfo.parentSystem;
                         if (systemE == null) continue;
 
-                        // Gather candidate outgoing links from this device
+                        // gather free outgoing links from this system
                         List<Entity> candidates = new ArrayList<>();
                         for (Entity linkE : entities) {
                                 if (!linkE.has(Link.class)) continue;
                                 Link l = linkE.get(Link.class);
-                                if (l.fromPort == null) continue;
-                                if (!l.fromPort.has(PortInfo.class)) continue;
+                                if (l.fromPort == null || !l.fromPort.has(PortInfo.class)) continue;
                                 if (l.fromPort.get(PortInfo.class).parentSystem != systemE) continue;
                                 if (isLinkFree(l)) candidates.add(linkE);
                         }
@@ -52,22 +45,22 @@ public class QueueSystem implements System {
                         if (seedE == null || !seedE.has(Seed.class)) continue;
                         Seed s = seedE.get(Seed.class);
 
-                        Entity chosen = pickBest(candidates, s);
+                        Entity chosen = pickByPriority(s, candidates);
                         if (chosen != null) {
                                 q.pop();
+
                                 Link l = chosen.get(Link.class);
                                 s.currentLink = l;
-                                s.progress = 0.0;
 
-                                // ---- Per-hop kinematics based on OUT port shape
-                                PortInfo.Shape outShape = l.fromPort.get(PortInfo.class).shape;
-                                applyKinematicsForHop(s, outShape);
+                                // set position to start and configure vectors for this hop
+                                Transform ft = l.fromPort.get(Transform.class);
+                                s.px = ft.x; s.py = ft.y;
+                                ProductionSystem.configureVectorsForHop(s, l);
 
-                                // position at fromPort
-                                if (seedE.has(Transform.class) && l.fromPort.has(Transform.class)) {
+                                // keep Transform in sync for rendering
+                                if (seedE.has(Transform.class)) {
                                         Transform st = seedE.get(Transform.class);
-                                        Transform ft = l.fromPort.get(Transform.class);
-                                        st.x = ft.x; st.y = ft.y;
+                                        st.x = s.px; st.y = s.py;
                                 }
                         }
                 }
@@ -81,39 +74,13 @@ public class QueueSystem implements System {
                 return true;
         }
 
-        private Entity pickBest(List<Entity> links, Seed s) {
+        private Entity pickByPriority(Seed s, List<Entity> links) {
+                PortInfo.Shape want = (s.type == Seed.Type.SQUARE) ? PortInfo.Shape.SQUARE : PortInfo.Shape.TRIANGLE;
                 List<Entity> compat = new ArrayList<>();
-                List<Entity> other  = new ArrayList<>();
-
                 for (Entity linkE : links) {
-                        Link l = linkE.get(Link.class);
-                        PortInfo.Shape outShape = l.fromPort.get(PortInfo.class).shape;
-                        boolean matches = (s.type == Seed.Type.SQUARE && outShape == PortInfo.Shape.SQUARE)
-                                || (s.type == Seed.Type.TRIANGLE && outShape == PortInfo.Shape.TRIANGLE);
-                        if (matches) compat.add(linkE);
-                        else other.add(linkE);
+                        if (linkE.get(Link.class).fromPort.get(PortInfo.class).shape == want) compat.add(linkE);
                 }
-
-                ThreadLocalRandom rng = ThreadLocalRandom.current();
-                if (!compat.isEmpty()) {
-                        return compat.get(rng.nextInt(compat.size()));
-                }
-                return other.isEmpty() ? null : other.get(rng.nextInt(other.size()));
-        }
-
-        /** Applies per-hop rules from the spec. */
-        private void applyKinematicsForHop(Seed s, PortInfo.Shape outShape) {
-                boolean compatibleStart =
-                        (s.type == Seed.Type.SQUARE  && outShape == PortInfo.Shape.SQUARE) ||
-                                (s.type == Seed.Type.TRIANGLE && outShape == PortInfo.Shape.TRIANGLE);
-
-                if (s.type == Seed.Type.SQUARE) {
-                        double base = 120.0;
-                        s.speed = compatibleStart ? base * 0.5 : base; // half speed if compatible start
-                        s.accel = 0.0;
-                } else { // TRIANGLE
-                        s.speed = 140.0;
-                        s.accel = compatibleStart ? 0.0 : 220.0; // accelerate on incompatible start
-                }
+                if (!compat.isEmpty()) return compat.get(RNG.nextInt(compat.size()));
+                return links.get(RNG.nextInt(links.size()));
         }
 }

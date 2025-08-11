@@ -7,11 +7,6 @@ import play.components.*;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Size-aware global collisions + AoE impact ripple.
- * - Square size = 2 units, Triangle size = 3 units (units -> pixels via pixelsPerUnit).
- * - AoE excludes the two packets that collided.
- */
 public class CollisionSystem implements System {
         private final GameEngine engine;
         private final List<Entity> entities;
@@ -20,7 +15,8 @@ public class CollisionSystem implements System {
         private final double unit;          // pixels per "unit"
         private final double IMPACT_RADIUS; // AoE radius in pixels
 
-        private static final double OFFSET_FACTOR = 0.20;
+        // magnitude for velocity kick
+        private static final double KICK_SCALE = 28.0;
 
         public CollisionSystem(GameEngine engine, List<Entity> entities, ShopSystem shopSystem) {
                 this(engine, entities, shopSystem, 12.0);
@@ -65,21 +61,17 @@ public class CollisionSystem implements System {
 
                                 if (sa.justCollided || sb.justCollided) continue;
 
-                                // register collision noise
-                                sa.collisions++;
-                                sb.collisions++;
-                                sa.justCollided = true;
-                                sb.justCollided = true;
-
-                                scheduleReset(sa);
-                                scheduleReset(sb);
+                                sa.collisions++; sb.collisions++;
+                                sa.justCollided = true; sb.justCollided = true;
+                                sa.impactEnergy = Math.max(sa.impactEnergy, 1.0);
+                                sb.impactEnergy = Math.max(sb.impactEnergy, 1.0);
 
                                 if (shop == null || !shop.disableImpactWaves) {
                                         double cx = (ta.x + tb.x) * 0.5;
                                         double cy = (ta.y + tb.y) * 0.5;
 
-                                        double destroyRadius = Math.min(ra, rb) * 1.0; // near-center strongest
-                                        applyImpactWave(cx, cy, destroyRadius, ea, eb); // exclude pair
+                                        double destroyRadius = Math.min(ra, rb);
+                                        applyImpactVelocityKick(cx, cy, destroyRadius, ea, eb);
                                 }
 
                                 AudioManager.getInstance().playSfx("/sfx/collide.wav");
@@ -92,12 +84,8 @@ public class CollisionSystem implements System {
                 return (sizeUnits * unit) * 0.5;
         }
 
-        private void scheduleReset(Seed s) {
-                s.impactEnergy = Math.max(s.impactEnergy, 1.0);
-        }
-
-        /** Applies AoE to all other packets except the two that collided. */
-        private void applyImpactWave(double cx, double cy, double destroyRadius, Entity excludeA, Entity excludeB) {
+        /** Give nearby packets a perpendicular velocity impulse (exclude the colliding pair). */
+        private void applyImpactVelocityKick(double cx, double cy, double destroyRadius, Entity excludeA, Entity excludeB) {
                 for (Entity e : entities) {
                         if (e == excludeA || e == excludeB) continue;
                         if (!e.has(Seed.class) || !e.has(Transform.class)) continue;
@@ -118,15 +106,15 @@ public class CollisionSystem implements System {
                         double mag = Math.hypot(lx, ly);
                         if (mag < 1e-6) continue;
 
-                        // link perpendicular (unit vector)
+                        // perpendicular unit of link
                         double px = -ly / mag;
                         double py =  lx / mag;
 
-                        // wave direction (from center outward)
+                        // outward wave direction
                         double wx = (dist < 1e-6) ? 0 : dx / dist;
                         double wy = (dist < 1e-6) ? 0 : dy / dist;
 
-                        // Strength profile
+                        // strength profile (1 inside destroy radius, quad falloff to 0 at edge)
                         final double strength;
                         if (dist <= destroyRadius) {
                                 strength = 1.0;
@@ -135,12 +123,13 @@ public class CollisionSystem implements System {
                                 strength = k * k;
                         }
 
-                        // Project wave onto link's perpendicular for lateral deflection
+                        // project wave onto link's perpendicular -> kick direction
                         double perpComponent = wx * px + wy * py;
-                        double offset = perpComponent * strength * (IMPACT_RADIUS * 0.08) * OFFSET_FACTOR;
+                        double kick = perpComponent * strength * KICK_SCALE;
 
-                        // Apply lateral "kick"
-                        s.lateral += offset;
+                        // add velocity impulse
+                        s.vx += px * kick;
+                        s.vy += py * kick;
                 }
         }
 }

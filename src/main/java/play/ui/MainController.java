@@ -321,22 +321,36 @@ public class MainController {
         }
 
         private boolean isGraphConnected() {
+                // Only true systems: has Transform and is NOT a Port, NOT a Seed (packet), NOT a Link
                 List<Entity> systems = engine.entities().stream()
-                        .filter(e -> e.has(Transform.class) && !e.has(PortInfo.class))
+                        .filter(e -> e.has(Transform.class)
+                                && !e.has(PortInfo.class)
+                                && !e.has(Seed.class)
+                                && !e.has(Link.class))
                         .collect(Collectors.toList());
+
                 if (systems.isEmpty()) return true;
 
                 Map<Entity, Set<Entity>> adj = new HashMap<>();
                 for (Entity s : systems) adj.put(s, new HashSet<>());
+
                 for (Entity e : engine.entities()) {
                         if (!e.has(Link.class)) continue;
                         Link l = e.get(Link.class);
+                        if (l.fromPort == null || l.toPort == null) continue;
+                        if (!l.fromPort.has(PortInfo.class) || !l.toPort.has(PortInfo.class)) continue;
+
                         Entity A = l.fromPort.get(PortInfo.class).parentSystem;
                         Entity B = l.toPort.get(PortInfo.class).parentSystem;
-                        adj.get(A).add(B);
-                        adj.get(B).add(A);
+
+                        // Only add if both endpoints are recognized systems
+                        if (adj.containsKey(A) && adj.containsKey(B)) {
+                                adj.get(A).add(B);
+                                adj.get(B).add(A);
+                        }
                 }
 
+                // BFS
                 Set<Entity> seen = new HashSet<>();
                 Deque<Entity> dq = new ArrayDeque<>();
                 dq.add(systems.get(0));
@@ -347,6 +361,7 @@ public class MainController {
                 }
                 return seen.size() == systems.size();
         }
+
 
         // ----- Rendering -----
         private void draw() {

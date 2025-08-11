@@ -5,27 +5,32 @@ public class Seed {
 
         public final Type type;
 
-        // kinematics
-        public double speed = 120.0;     // units / s
-        public double accel = 0.0;       // units / s^2
+        // world position
+        public double px = 0.0;
+        public double py = 0.0;
 
-        // where the seed is on its current link: 0..1
-        public double progress = 0.0;
+        // kinematics (world space)
+        public double vx = 0.0;
+        public double vy = 0.0;
+        public double ax = 0.0;
+        public double ay = 0.0;
 
-        // lateral offset from the wire (impact causes drift). "Death" if exceeds threshold
-        public double lateral = 0.0;
+        // compatibility bookkeeping (kept for HUD / rules)
+        public double impactEnergy = 0.0;  // used as a brief collision guard
+        public boolean justCollided = false;
 
-        // impact wave energy to be decayed each tick (AoE ripple)
-        public double impactEnergy = 0.0;
-
-        // collision budgeting per project doc
+        // collision budgeting per doc
         public int collisions = 0;
         public int capacity;
 
-        // pairing with the link (component, not entity)
-        public Link currentLink = null;
+        // progress on current link is derived each frame via projection, but we keep it for UI
+        public double progress = 0.0;
 
-        public boolean justCollided = false;
+        // still useful to expose the instantaneous perpendicular offset magnitude
+        public double lateral = 0.0;
+
+        // paired link (component, not entity)
+        public Link currentLink = null;
 
         public Seed(Type type) {
                 this.type = type;
