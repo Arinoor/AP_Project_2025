@@ -5,44 +5,39 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 
+/** Central place to swap between Main Menu and Game scenes. */
 public final class GameNavigator {
-        private GameNavigator(){}
+        private GameNavigator() {}
 
-        /** Show the main menu on the current stage. */
-        public static void showMenu(Stage stage) {
+        /** Show the Main Menu scene on the given Stage. */
+        public static void showMainMenu(Stage stage) {
                 try {
                         Parent root = FXMLLoader.load(GameNavigator.class.getResource("/fxml/MainMenu.fxml"));
-                        stage.setScene(new Scene(root));
+                        Scene scene = new Scene(root, 960, 600);
+                        stage.setTitle("Conduit Garden — Main Menu");
                         stage.setResizable(false);
-                        stage.setFullScreen(false);
-                        stage.setMaximized(false);
-                        stage.setTitle("Conduit Garden - Menu");
-                } catch (Exception e) {
-                        e.printStackTrace();
+                        stage.setScene(scene);
+                        stage.show();
+                } catch (Exception ex) {
+                        ex.printStackTrace();
                 }
         }
 
-        /** Load the main game scene and lock the window (non-movable, non-resizable, no close). */
+        /** Start the game by loading main.fxml and initializing the chosen level. */
         public static void startGame(Stage stage, String levelPath) {
                 try {
                         FXMLLoader loader = new FXMLLoader(GameNavigator.class.getResource("/fxml/main.fxml"));
                         Parent root = loader.load();
                         MainController ctrl = loader.getController();
-                        ctrl.initLevel(levelPath); // new hook—safe if levelPath==null
+                        ctrl.initLevel(levelPath);
 
-                        Scene scene = new Scene(root);
-                        stage.setScene(scene);
-                        // Lock the frame as requested
+                        Scene scene = new Scene(root, 960, 600);
+                        stage.setTitle("Conduit Garden — Gameplay");
                         stage.setResizable(false);
-                        stage.setMaximized(false);
-                        stage.setFullScreen(true);         // hides system chrome, prevents moving/resizing
-                        stage.setFullScreenExitHint("");
-                        stage.setOnCloseRequest(evt -> evt.consume()); // prevent closing
-                        stage.setTitle("Conduit Garden");
+                        stage.setScene(scene);
                         stage.show();
-                        root.requestFocus(); // so key events work immediately
-                } catch (Exception e) {
-                        e.printStackTrace();
+                } catch (Exception ex) {
+                        ex.printStackTrace();
                 }
         }
 }

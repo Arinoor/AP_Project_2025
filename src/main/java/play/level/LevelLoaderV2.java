@@ -13,30 +13,30 @@ import java.util.Map;
 /**
  * LevelLoaderV2
  *
- * Loads ONLY systems and ports from JSON. Does NOT create links.
- * Player creates links at runtime.
+ * Loads ONLY systems and ports from JSON. Does NOT create any links.
+ * The player will create links at runtime via the wiring tool.
  *
- * JSON format (links, if present, are ignored):
+ * JSON additions:
+ *  - timeLimitSeconds: int, optional (default 120)
+ *  - device.producer.quota.square / triangle: per-device fixed counts
+ *
+ * Example:
  * {
+ *   "timeLimitSeconds": 90,
  *   "totalWire": 5000,
  *   "devices": [
- *     {
- *       "id": "SRC-1", "x": 150, "y": 240,
- *       "producer": { "interval": 0.6, "countSquare": 10, "countTriangle": 8 }
- *     },
- *     { "id": "REF-1", "x": 700, "y": 280, "reference": true }
+ *     { "id":"SRC-1","x":150,"y":240,
+ *       "producer":{"interval":0.6,"quota":{"square":10,"triangle":10}} }
  *   ],
- *   "ports": [
- *     { "id": "S1:outS", "device": "SRC-1", "x": 200, "y": 240, "shape": "square",   "io": "out" },
- *     { "id": "S1:outT", "device": "SRC-1", "x": 200, "y": 280, "shape": "triangle", "io": "out" },
- *     { "id": "R1:inS",  "device": "REF-1", "x": 670, "y": 260, "shape": "square",   "io": "in"  }
- *   ]
+ *   "ports": [ ... ]
  * }
  */
 public final class LevelLoaderV2 {
 
         public static final class Loaded {
                 public double totalWire = 3000;
+                public int timeLimitSeconds = 120;
+                public int plannedSeeds = 0;
                 public final Map<String, Entity> systemsById = new HashMap<>();
                 public final Map<String, Entity> portsById   = new HashMap<>();
         }
@@ -54,6 +54,7 @@ public final class LevelLoaderV2 {
                         JsonNode root = M.readTree(in);
 
                         out.totalWire = root.path("totalWire").asDouble(3000.0);
+                        out.timeLimitSeconds = root.path("timeLimitSeconds").asInt(120);
 
                         // 1) Devices (systems)
                         for (JsonNode d : root.path("devices")) {
@@ -64,23 +65,31 @@ public final class LevelLoaderV2 {
                                 Entity systemE = new Entity();
                                 systemE.add(new Transform(x, y));
 
-                                // Reference?
+                                // reference?
                                 if (d.path("reference").asBoolean(false)) {
                                         systemE.add(new Reference());
                                 }
 
-                                // Producer?
+                                // producer on device?
                                 JsonNode prodNode = d.path("producer");
                                 if (!prodNode.isMissingNode() && !prodNode.isNull()) {
-                                        double interval     = prodNode.path("interval").asDouble(1.0);
-                                        int countSquare     = prodNode.path("countSquare").asInt(0);
-                                        int countTriangle   = prodNode.path("countTriangle").asInt(0);
+                                        double interval = prodNode.path("interval").asDouble(1.0);
 
-                                        if (interval > 0.0) {
-                                                Producer producer = new Producer(interval);
-                                                producer.remainingSquare   = Math.max(0, countSquare);
-                                                producer.remainingTriangle = Math.max(0, countTriangle);
-                                                systemE.add(producer);
+                                        // optional quotas
+                                        int qS = -1;
+                                        int qT = -1;
+                                        JsonNode quota = prodNode.path("quota");
+                                        if (!quota.isMissingNode() && !quota.isNull()) {
+                                                if (quota.has("square"))   qS = quota.path("square").asInt(-1);
+                                                if (quota.has("triangle")) qT = quota.path("triangle").asInt(-1);
+
+                                                // Sum only finite quotas into planned total
+                                                if (qS > 0) out.plannedSeeds += qS;
+                                                if (qT > 0) out.plannedSeeds += qT;
+
+                                                systemE.add(new Producer(interval, qS, qT));
+                                        } else {
+                                                systemE.add(new Producer(interval));
                                         }
                                 }
 
@@ -118,24 +127,21 @@ public final class LevelLoaderV2 {
                                 engine.entities().add(portE);
                                 out.portsById.put(id, portE);
 
-                                // (Optional backward-compat) If someone wrote `"producer": true` on a port,
-                                // we DO NOT infer quotas; we recommend defining quotas at device level.
+                                // Optional: producer specified at port level (rare)
                                 if (p.path("producer").asBoolean(false)) {
-                                        if (!parentSystem.has(Producer.class)) {
-                                                Producer pr = new Producer(p.path("interval").asDouble(1.0));
-                                                // Quotas default to 0 (i.e., no production) unless provided at device level
-                                                parentSystem.add(pr);
+                                        double interval = p.path("interval").asDouble(1.0);
+                                        if (!parentSystem.has(Producer.class) && interval > 0.0) {
+                                                parentSystem.add(new Producer(interval));
                                         }
                                 }
 
-                                // (Optional) "reference": true at port level -> mark system as reference
+                                // Optional: reference specified at port level
                                 if (p.path("reference").asBoolean(false) && !parentSystem.has(Reference.class)) {
                                         parentSystem.add(new Reference());
                                 }
                         }
 
-                        // 3) Links (ignored intentionally for this phase)
-
+                        // 3) Links (ignored on load)
                 } catch (Exception e) {
                         throw new RuntimeException("Failed to load level from " + path, e);
                 }

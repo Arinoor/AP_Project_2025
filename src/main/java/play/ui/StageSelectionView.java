@@ -1,38 +1,49 @@
 package play.ui;
 
-import javafx.geometry.Insets;
-import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.ToggleGroup;
+import javafx.scene.control.RadioButton;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
+/** Minimal level picker. Add more levels here if you add files. */
 public final class StageSelectionView {
-        private StageSelectionView(){}
+        private StageSelectionView() {}
 
         public static void show(Stage owner) {
-                Stage dlg = new Stage();
+                Dialog<String> dlg = new Dialog<>();
                 dlg.initOwner(owner);
                 dlg.initModality(Modality.APPLICATION_MODAL);
-                dlg.setResizable(false);
-                VBox root = new VBox(10);
-                root.setPadding(new Insets(16));
-                root.setStyle("-fx-background-color:#1b222b;");
+                dlg.setTitle("Select Stage");
 
-                Label title = new Label("Select Stage");
-                title.setStyle("-fx-text-fill:#e6edf3; -fx-font-size:16; -fx-font-weight:bold;");
+                ToggleGroup group = new ToggleGroup();
+                RadioButton l1 = new RadioButton("Level 1");
+                l1.setUserData("/levels/level1.json");
+                l1.setToggleGroup(group);
+                l1.setSelected(true);
 
-                Button level1 = new Button("Level 1");
-                Button level2 = new Button("Level 2");
-                Button cancel = new Button("Cancel");
-                level1.setOnAction(e -> { dlg.close(); GameNavigator.startGame(owner, "/levels/level1.json"); });
-                level2.setOnAction(e -> { dlg.close(); GameNavigator.startGame(owner, "/levels/level2.json"); });
-                cancel.setOnAction(e -> dlg.close());
+                RadioButton l2 = new RadioButton("Level 2");
+                l2.setUserData("/levels/level2.json");
+                l2.setToggleGroup(group);
 
-                root.getChildren().addAll(title, level1, level2, cancel);
-                dlg.setScene(new Scene(root));
-                dlg.setTitle("Stages");
-                dlg.showAndWait();
+                VBox box = new VBox(10, l1, l2);
+                box.setStyle("-fx-padding:16;");
+                dlg.getDialogPane().setContent(box);
+                dlg.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+
+                dlg.setResultConverter(bt -> {
+                        if (bt == ButtonType.OK && group.getSelectedToggle() != null) {
+                                return (String) group.getSelectedToggle().getUserData();
+                        }
+                        return null;
+                });
+
+                dlg.showAndWait().ifPresent(path -> {
+                        if (path != null) {
+                                GameNavigator.startGame(owner, path);
+                        }
+                });
         }
 }

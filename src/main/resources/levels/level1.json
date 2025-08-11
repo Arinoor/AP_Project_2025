@@ -1,16 +1,15 @@
 {
+  "timeLimitSeconds": 90,
   "totalWire": 5000,
 
   "devices": [
-    {
-      "id": "SRC-1", "capacity": 5, "x": 150, "y": 240,
-      "producer": { "interval": 0.6, "countSquare": 10, "countTriangle": 10 }
-    },
+    { "id": "SRC-1", "x": 150, "y": 240,
+      "producer": { "interval": 0.6, "quota": { "square": 10, "triangle": 10 } } },
 
-    { "id": "MID-1", "capacity": 5, "x": 420, "y": 180 },
-    { "id": "MID-2", "capacity": 5, "x": 420, "y": 380 },
+    { "id": "MID-1", "x": 420, "y": 180 },
+    { "id": "MID-2", "x": 420, "y": 380 },
 
-    { "id": "REF-1", "capacity": 5, "x": 700, "y": 280, "reference": true }
+    { "id": "REF-1", "x": 700, "y": 280, "reference": true }
   ],
 
   "ports": [

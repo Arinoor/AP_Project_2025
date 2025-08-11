@@ -1,9 +1,12 @@
 {
+  "timeLimitSeconds": 120,
   "totalWire": 6000,
 
   "devices": [
-    { "id": "SRC-1", "x": 160, "y": 160, "producer": { "interval": 0.35, "countSquare": 12, "countTriangle": 8 } },
-    { "id": "SRC-2", "x": 160, "y": 320, "producer": { "interval": 0.35, "countSquare": 12, "countTriangle": 8 } },
+    { "id": "SRC-1", "x": 160, "y": 160,
+      "producer": { "interval": 0.35, "quota": { "square": 12, "triangle": 12 } } },
+    { "id": "SRC-2", "x": 160, "y": 320,
+      "producer": { "interval": 0.35, "quota": { "square": 12, "triangle": 12 } } },
 
     { "id": "MID-1", "x": 420, "y": 200 },
     { "id": "MID-2", "x": 420, "y": 320 },
