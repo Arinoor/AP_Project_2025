@@ -6,6 +6,11 @@ import play.components.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Produces packets from EVERY OUT port of each system with a Producer.
+ * Seed type derives from the OUT port shape. Kinematics are set for the first hop
+ * based on the OUT port used (this is the "start port" for the hop).
+ */
 public class ProductionSystem implements System {
         private final GameEngine engine;
         private final List<Entity> entities;
@@ -21,7 +26,9 @@ public class ProductionSystem implements System {
         public void update(double dt) {
                 if (dt > dtCap) dt = dtCap;
 
+                // Snapshot to avoid ConcurrentModification when we add seeds below
                 List<Entity> snapshot = new ArrayList<>(entities);
+
                 for (Entity sysE : snapshot) {
                         if (!sysE.has(Producer.class)) continue;
                         Producer prod = sysE.get(Producer.class);
@@ -30,34 +37,37 @@ public class ProductionSystem implements System {
                         if (prod.timer < prod.interval) continue;
                         prod.timer = 0.0;
 
-                        for (Entity outPort : findOutPorts(sysE)) {
-                                Entity freeLinkE = findFreeLinkFrom(outPort);
-                                if (freeLinkE == null) continue;
+                        // find all OUT ports of this system
+                        List<Entity> outPorts = findOutPorts(sysE);
+                        if (outPorts.isEmpty()) continue;
 
-                                Link link = freeLinkE.get(Link.class);
-                                PortInfo.Shape outShape = outPort.get(PortInfo.class).shape;
-                                Seed.Type type = (outShape == PortInfo.Shape.SQUARE) ? Seed.Type.SQUARE : Seed.Type.TRIANGLE;
+                        for (Entity outPort : outPorts) {
+                                Entity freeLink = findFreeLinkFrom(outPort);
+                                if (freeLink == null) continue;
 
-                                // spawn seed at the port
-                                Transform pt = outPort.get(Transform.class);
+                                PortInfo pinfo = outPort.get(PortInfo.class);
+                                Seed.Type type = (pinfo.shape == PortInfo.Shape.SQUARE) ? Seed.Type.SQUARE : Seed.Type.TRIANGLE;
+
                                 Entity seedE = new Entity();
                                 Seed s = new Seed(type);
-                                s.px = pt.x; s.py = pt.y;
 
-                                // attach and configure vectors for this hop
-                                s.currentLink = link;
-                                configureVectorsForHop(s, link);
+                                // Per-hop kinematics based on OUT port shape used to spawn
+                                applyKinematicsForHop(s, pinfo.shape);
 
-                                seedE.add(new Transform(s.px, s.py));
+                                // place at the OUT port
+                                Transform pt = outPort.get(Transform.class);
+                                seedE.add(new Transform(pt.x, pt.y));
                                 seedE.add(s);
+
+                                // attach to chosen link
+                                s.currentLink = freeLink.get(Link.class);
+                                s.progress = 0.0;
 
                                 engine.entities().add(seedE);
                                 engine.incrementProduced();
                         }
                 }
         }
-
-        /* ===== helpers ===== */
 
         private List<Entity> findOutPorts(Entity systemE) {
                 List<Entity> result = new ArrayList<>();
@@ -87,37 +97,19 @@ public class ProductionSystem implements System {
                 return true;
         }
 
-        /** Squares: constant; compatible start = half speed. Triangles: accel on incompatible start. */
-        public static void configureVectorsForHop(Seed s, Link link) {
-                Transform a = link.fromPort.get(Transform.class);
-                Transform b = link.toPort.get(Transform.class);
-
-                double dx = b.x - a.x, dy = b.y - a.y;
-                double len = Math.hypot(dx, dy);
-                if (len < 1e-6) { s.vx = s.vy = s.ax = s.ay = 0; return; }
-
-                double ux = dx / len, uy = dy / len; // direction along the wire
-
-                // decide base speed/accel by the OUT port shape (start port)
-                PortInfo.Shape startShape = link.fromPort.get(PortInfo.class).shape;
+        /** Same rules as QueueSystem; shared here to avoid drift. */
+        private void applyKinematicsForHop(Seed s, PortInfo.Shape outShape) {
+                boolean compatibleStart =
+                        (s.type == Seed.Type.SQUARE  && outShape == PortInfo.Shape.SQUARE) ||
+                                (s.type == Seed.Type.TRIANGLE && outShape == PortInfo.Shape.TRIANGLE);
 
                 if (s.type == Seed.Type.SQUARE) {
                         double base = 120.0;
-                        boolean compatible = (startShape == PortInfo.Shape.SQUARE);
-                        double speed = compatible ? base * 0.5 : base;
-                        s.vx = ux * speed;
-                        s.vy = uy * speed;
-                        s.ax = 0.0; s.ay = 0.0;
-                } else {
-                        double speed = 140.0;
-                        boolean incompatible = (startShape != PortInfo.Shape.TRIANGLE);
-                        double accel = incompatible ? 220.0 : 0.0;
-                        s.vx = ux * speed;
-                        s.vy = uy * speed;
-                        s.ax = ux * accel;
-                        s.ay = uy * accel;
+                        s.speed = compatibleStart ? base * 0.5 : base; // half when compatible
+                        s.accel = 0.0;
+                } else { // TRIANGLE
+                        s.speed = 140.0;
+                        s.accel = compatibleStart ? 0.0 : 220.0;       // accelerate when incompatible
                 }
-                s.progress = 0.0;
-                s.lateral = 0.0;
         }
 }

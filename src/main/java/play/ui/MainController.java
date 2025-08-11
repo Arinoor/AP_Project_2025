@@ -38,7 +38,6 @@ public class MainController {
         private ShopSystem shopSystem;
         private ProductionSystem productionSystem;
         private QueueSystem queueSystem;
-        private RoutingSystem routingSystem;
         private SeedMovementSystem movementSystem;
         private CollisionSystem collisionSystem;
 
@@ -78,21 +77,19 @@ public class MainController {
                 engine.entities().removeIf(e -> e.has(Link.class));
                 usedWire = 0;
 
-                // Systems
-                shopSystem = new ShopSystem(engine);
+                // Systems (order matters):
+                // Production -> Queue (arrivals/dispatch) -> Movement -> Collision
+                shopSystem       = new ShopSystem(engine);
                 productionSystem = new ProductionSystem(engine, engine.entities(), 0.2);
-                queueSystem = new QueueSystem(engine, engine.entities());
-                routingSystem = new RoutingSystem(engine, engine.entities());
-                movementSystem = new SeedMovementSystem(engine, engine.entities(), shopSystem, UiConstants.PORT_SIZE);
-                // Pass packet visual size so radii match visuals
-                collisionSystem = new CollisionSystem(engine, engine.entities(), shopSystem, UiConstants.PACKET_SIZE);
+                queueSystem      = new QueueSystem(engine, engine.entities());
+                movementSystem   = new SeedMovementSystem(engine, engine.entities(), shopSystem, UiConstants.PORT_SIZE);
+                collisionSystem  = new CollisionSystem(engine, engine.entities(), shopSystem, UiConstants.PACKET_SIZE);
 
                 engine.addSystem(shopSystem);
                 engine.addSystem(productionSystem);
                 engine.addSystem(queueSystem);
                 engine.addSystem(movementSystem);
                 engine.addSystem(collisionSystem);
-                engine.addSystem(routingSystem);
 
                 setupUiHooks();
                 startLoop();
@@ -321,36 +318,22 @@ public class MainController {
         }
 
         private boolean isGraphConnected() {
-                // Only true systems: has Transform and is NOT a Port, NOT a Seed (packet), NOT a Link
                 List<Entity> systems = engine.entities().stream()
-                        .filter(e -> e.has(Transform.class)
-                                && !e.has(PortInfo.class)
-                                && !e.has(Seed.class)
-                                && !e.has(Link.class))
+                        .filter(e -> e.has(Transform.class) && !e.has(PortInfo.class))
                         .collect(Collectors.toList());
-
                 if (systems.isEmpty()) return true;
 
                 Map<Entity, Set<Entity>> adj = new HashMap<>();
                 for (Entity s : systems) adj.put(s, new HashSet<>());
-
                 for (Entity e : engine.entities()) {
                         if (!e.has(Link.class)) continue;
                         Link l = e.get(Link.class);
-                        if (l.fromPort == null || l.toPort == null) continue;
-                        if (!l.fromPort.has(PortInfo.class) || !l.toPort.has(PortInfo.class)) continue;
-
                         Entity A = l.fromPort.get(PortInfo.class).parentSystem;
                         Entity B = l.toPort.get(PortInfo.class).parentSystem;
-
-                        // Only add if both endpoints are recognized systems
-                        if (adj.containsKey(A) && adj.containsKey(B)) {
-                                adj.get(A).add(B);
-                                adj.get(B).add(A);
-                        }
+                        adj.get(A).add(B);
+                        adj.get(B).add(A);
                 }
 
-                // BFS
                 Set<Entity> seen = new HashSet<>();
                 Deque<Entity> dq = new ArrayDeque<>();
                 dq.add(systems.get(0));
@@ -361,7 +344,6 @@ public class MainController {
                 }
                 return seen.size() == systems.size();
         }
-
 
         // ----- Rendering -----
         private void draw() {
@@ -377,7 +359,7 @@ public class MainController {
                 for (int x = 0; x < gameCanvas.getWidth(); x += 20) g.strokeLine(x, 0, x, gameCanvas.getHeight());
                 for (int y = 0; y < gameCanvas.getHeight(); y += 20) g.strokeLine(0, y, gameCanvas.getWidth(), y);
 
-                // links
+                // links (colored by shape)
                 for (Entity e : engine.entities()) {
                         if (!e.has(Link.class)) continue;
                         Link l = e.get(Link.class);
@@ -387,15 +369,14 @@ public class MainController {
                         Transform a = l.fromPort.get(Transform.class);
                         Transform b = l.toPort.get(Transform.class);
 
-                        // Shape comes from the ports; your wiring enforces matching shapes.
                         PortInfo.Shape shape = l.fromPort.get(PortInfo.class).shape;
                         javafx.scene.paint.Color linkColor =
                                 (shape == PortInfo.Shape.SQUARE) ? javafx.scene.paint.Color.web("#5dc2ff")
                                         : javafx.scene.paint.Color.web("#ff86a5");
 
-                        gameCanvas.getGraphicsContext2D().setStroke(linkColor);
-                        gameCanvas.getGraphicsContext2D().setLineWidth(2.0);
-                        gameCanvas.getGraphicsContext2D().strokeLine(a.x, a.y, b.x, b.y);
+                        g.setStroke(linkColor);
+                        g.setLineWidth(2.0);
+                        g.strokeLine(a.x, a.y, b.x, b.y);
                 }
 
                 // wiring preview (hold W)
@@ -451,7 +432,7 @@ public class MainController {
                         }
                 }
 
-                // packets: draw like ports (slightly larger)
+                // packets
                 for (Entity e : engine.entities()) {
                         if (!e.has(Seed.class) || !e.has(Transform.class)) continue;
                         Seed s = e.get(Seed.class);

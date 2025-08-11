@@ -7,6 +7,13 @@ import play.components.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Size-aware global collisions + AoE impact ripple.
+ * - Square size = 2 units, Triangle size = 3 units (units -> pixels via pixelsPerUnit).
+ * - AoE excludes the two packets that collided.
+ * - Adds a small separation nudge for packets colliding on the SAME link to prevent
+ *   instant re-collisions.
+ */
 public class CollisionSystem implements System {
         private final GameEngine engine;
         private final List<Entity> entities;
@@ -15,8 +22,8 @@ public class CollisionSystem implements System {
         private final double unit;          // pixels per "unit"
         private final double IMPACT_RADIUS; // AoE radius in pixels
 
-        // magnitude for velocity kick
-        private static final double KICK_SCALE = 28.0;
+        // Softer global impulse so one hit doesn’t kick a square out of bounds
+        private static final double OFFSET_FACTOR = 0.06;
 
         public CollisionSystem(GameEngine engine, List<Entity> entities, ShopSystem shopSystem) {
                 this(engine, entities, shopSystem, 12.0);
@@ -27,7 +34,7 @@ public class CollisionSystem implements System {
                 this.entities = entities;
                 this.shop = (shopSystem != null) ? shopSystem.getState() : null;
                 this.unit = Math.max(6.0, pixelsPerUnit);
-                this.IMPACT_RADIUS = this.unit * 15.0;
+                this.IMPACT_RADIUS = this.unit * 12.0; // a bit tighter than before to reduce chaos
         }
 
         @Override
@@ -59,19 +66,33 @@ public class CollisionSystem implements System {
                                 double d2 = dx*dx + dy*dy;
                                 if (d2 > (rSum * rSum)) continue;
 
+                                // Guard: don't double-collide in the same instant
                                 if (sa.justCollided || sb.justCollided) continue;
 
-                                sa.collisions++; sb.collisions++;
-                                sa.justCollided = true; sb.justCollided = true;
-                                sa.impactEnergy = Math.max(sa.impactEnergy, 1.0);
-                                sb.impactEnergy = Math.max(sb.impactEnergy, 1.0);
+                                // register collision budgets per doc
+                                sa.collisions++;
+                                sb.collisions++;
+                                sa.justCollided = true;
+                                sb.justCollided = true;
 
+                                // Light cooldown using impactEnergy (decayed in SeedMovementSystem)
+                                scheduleReset(sa);
+                                scheduleReset(sb);
+
+                                // If on the SAME link, nudge apart along progress to avoid sticky re-collisions
+                                if (sa.currentLink == sb.currentLink) {
+                                        final double sep = 0.02; // 2% of link length separation
+                                        sa.progress = Math.max(0.0, sa.progress - sep);
+                                        sb.progress = Math.min(1.0, sb.progress + sep);
+                                }
+
+                                // AoE ripple unless shop disables impact waves
                                 if (shop == null || !shop.disableImpactWaves) {
                                         double cx = (ta.x + tb.x) * 0.5;
                                         double cy = (ta.y + tb.y) * 0.5;
 
-                                        double destroyRadius = Math.min(ra, rb);
-                                        applyImpactVelocityKick(cx, cy, destroyRadius, ea, eb);
+                                        double destroyRadius = Math.min(ra, rb); // near-center strongest
+                                        applyImpactWave(cx, cy, destroyRadius, ea, eb); // exclude pair
                                 }
 
                                 AudioManager.getInstance().playSfx("/sfx/collide.wav");
@@ -84,8 +105,13 @@ public class CollisionSystem implements System {
                 return (sizeUnits * unit) * 0.5;
         }
 
-        /** Give nearby packets a perpendicular velocity impulse (exclude the colliding pair). */
-        private void applyImpactVelocityKick(double cx, double cy, double destroyRadius, Entity excludeA, Entity excludeB) {
+        private void scheduleReset(Seed s) {
+                // SeedMovementSystem uses a slower decay (base=0.90) for ~0.3s cooldown
+                s.impactEnergy = Math.max(s.impactEnergy, 1.0);
+        }
+
+        /** Applies AoE to all other packets except the two that collided. */
+        private void applyImpactWave(double cx, double cy, double destroyRadius, Entity excludeA, Entity excludeB) {
                 for (Entity e : entities) {
                         if (e == excludeA || e == excludeB) continue;
                         if (!e.has(Seed.class) || !e.has(Transform.class)) continue;
@@ -106,15 +132,15 @@ public class CollisionSystem implements System {
                         double mag = Math.hypot(lx, ly);
                         if (mag < 1e-6) continue;
 
-                        // perpendicular unit of link
+                        // link perpendicular (unit vector)
                         double px = -ly / mag;
                         double py =  lx / mag;
 
-                        // outward wave direction
+                        // wave direction (from center outward)
                         double wx = (dist < 1e-6) ? 0 : dx / dist;
                         double wy = (dist < 1e-6) ? 0 : dy / dist;
 
-                        // strength profile (1 inside destroy radius, quad falloff to 0 at edge)
+                        // Strength profile
                         final double strength;
                         if (dist <= destroyRadius) {
                                 strength = 1.0;
@@ -123,13 +149,12 @@ public class CollisionSystem implements System {
                                 strength = k * k;
                         }
 
-                        // project wave onto link's perpendicular -> kick direction
+                        // Project wave onto link's perpendicular for lateral deflection
                         double perpComponent = wx * px + wy * py;
-                        double kick = perpComponent * strength * KICK_SCALE;
+                        double offset = perpComponent * strength * (IMPACT_RADIUS * 0.08) * OFFSET_FACTOR;
 
-                        // add velocity impulse
-                        s.vx += px * kick;
-                        s.vy += py * kick;
+                        // Apply lateral "kick"
+                        s.lateral += offset;
                 }
         }
 }

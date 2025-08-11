@@ -5,35 +5,32 @@ public class Seed {
 
         public final Type type;
 
-        // world position
-        public double px = 0.0;
-        public double py = 0.0;
+        // kinematics
+        public double speed = 120.0;     // px/s along the link
+        public double accel = 0.0;       // px/s^2 along the link
 
-        // kinematics (world space)
-        public double vx = 0.0;
-        public double vy = 0.0;
-        public double ax = 0.0;
-        public double ay = 0.0;
+        // where the seed is on its current link: 0..1
+        public double progress = 0.0;
 
-        // compatibility bookkeeping (kept for HUD / rules)
-        public double impactEnergy = 0.0;  // used as a brief collision guard
-        public boolean justCollided = false;
+        // lateral offset from the wire in pixels (visual & collision space)
+        public double lateral = 0.0;
 
-        // collision budgeting per doc
+        // impact wave energy to be decayed each tick (AoE ripple cooldown)
+        public double impactEnergy = 0.0;
+
+        // collision budgeting per project doc
         public int collisions = 0;
         public int capacity;
 
-        // progress on current link is derived each frame via projection, but we keep it for UI
-        public double progress = 0.0;
-
-        // still useful to expose the instantaneous perpendicular offset magnitude
-        public double lateral = 0.0;
-
-        // paired link (component, not entity)
+        // pairing with the link (component, not entity)
         public Link currentLink = null;
+
+        // guards immediate re-collisions
+        public boolean justCollided = false;
 
         public Seed(Type type) {
                 this.type = type;
-                this.capacity = (type == Type.SQUARE) ? 2 : 3;
+                // Slightly more tolerant than before so “one bump” isn’t death.
+                this.capacity = (type == Type.SQUARE) ? 3 : 5;
         }
 }
