@@ -59,13 +59,6 @@ public class ShopController {
         @FXML
         private void onAnahita() {
                 if (shop.buyAnahita()) {
-                        // Immediately zero packet "noise" (collision counters) per project doc
-                        for (Entity e : engine.entities()) {
-                                if (e.has(Seed.class)) {
-                                        e.get(Seed.class).collisions = 0;
-                                        e.get(Seed.class).lateral = 0.0; // optional: wipe lateral noise
-                                }
-                        }
                         lblAnaMsg.setText("All packet noise reset.");
                 } else {
                         lblAnaMsg.setText("Not enough coins (need 5).");
