@@ -106,7 +106,7 @@ public class MainController {
                                         KeyCode c = e.getCode();
                                         if (c == KeyCode.RIGHT) forwardPressed = true;
                                         if (c == KeyCode.LEFT)  backwardPressed = true;
-                                        if (c == KeyCode.W)     wiringMode = true;
+                                        if (c == KeyCode.W && !running) wiringMode = true;  // wiring only when paused
                                         if (c == KeyCode.S)     openShop();
                                 });
                                 gameCanvas.getScene().setOnKeyReleased(e -> {
@@ -130,7 +130,7 @@ public class MainController {
                         timeSlider.setValue(0);
                 });
 
-                // Mouse wiring (only while holding W)
+                // Mouse wiring (only while holding W and while paused)
                 gameCanvas.addEventHandler(MouseEvent.MOUSE_PRESSED, this::onMousePressed);
                 gameCanvas.addEventHandler(MouseEvent.MOUSE_DRAGGED, this::onMouseDragged);
                 gameCanvas.addEventHandler(MouseEvent.MOUSE_RELEASED, this::onMouseReleased);
@@ -180,6 +180,7 @@ public class MainController {
 
         private void toggleRun() {
                 running = !running;
+                if (running) wiringMode = false; // auto-exit wiring on start
                 startButton.setText(running ? "Pause" : "Start");
                 gameCanvas.requestFocus();
         }
@@ -197,7 +198,7 @@ public class MainController {
 
         // ----- Wiring mouse handlers -----
         private void onMousePressed(MouseEvent e) {
-                if (!wiringMode) return;
+                if (running || !wiringMode) return;
                 Entity port = findPortAt(e.getX(), e.getY());
                 if (port == null) return;
                 PortInfo p = port.get(PortInfo.class);
@@ -208,19 +209,23 @@ public class MainController {
         }
 
         private void onMouseDragged(MouseEvent e) {
-                if (!wiringMode || dragStartPort == null) return;
+                if (running || !wiringMode || dragStartPort == null) return;
                 dragX = e.getX();
                 dragY = e.getY();
         }
 
         private void onMouseReleased(MouseEvent e) {
-                if (!wiringMode || dragStartPort == null) return;
+                if (running || !wiringMode || dragStartPort == null) return;
                 Entity target = findPortAt(e.getX(), e.getY());
-                if (target != null) tryCreateLink(dragStartPort, target);
+                if (target != null) tryCreateOrReplaceLink(dragStartPort, target);
                 dragStartPort = null;
         }
 
-        private boolean tryCreateLink(Entity fromPort, Entity toPort) {
+        /**
+         * Create a link from OUT->IN. If either endpoint is already linked, we remove the old link(s)
+         * and install the new one, provided wire budget allows after subtracting removed lengths.
+         */
+        private boolean tryCreateOrReplaceLink(Entity fromPort, Entity toPort) {
                 if (!fromPort.has(PortInfo.class) || !toPort.has(PortInfo.class)) return false;
                 PortInfo a = fromPort.get(PortInfo.class);
                 PortInfo b = toPort.get(PortInfo.class);
@@ -228,30 +233,58 @@ public class MainController {
                 if (a.io != PortInfo.IO.OUT || b.io != PortInfo.IO.IN) return false;
                 if (a.parentSystem == b.parentSystem) return false;
                 if (a.shape != b.shape) return false;
-                if (hasOutgoingLink(fromPort) || hasIncomingLink(toPort)) return false;
 
                 Transform ta = fromPort.get(Transform.class);
                 Transform tb = toPort.get(Transform.class);
-                double wireLen = Math.hypot(tb.x - ta.x, tb.y - ta.y);
-                if (usedWire + wireLen > totalWire) return false;
+                double newLen = Math.hypot(tb.x - ta.x, tb.y - ta.y);
 
+                // Find existing links to be removed (if any)
+                Entity oldOut = getOutgoingLinkEntity(fromPort);
+                Entity oldIn  = getIncomingLinkEntity(toPort);
+
+                double removedLen = 0.0;
+                if (oldOut != null) removedLen += linkLength(oldOut);
+                if (oldIn  != null && oldIn != oldOut) removedLen += linkLength(oldIn);
+
+                // Budget check: (used - removed + new) <= total
+                double projected = usedWire - removedLen + newLen;
+                if (projected > totalWire) return false;
+
+                // Remove old links and adjust budget
+                if (oldOut != null) engine.entities().remove(oldOut);
+                if (oldIn  != null && oldIn != oldOut) engine.entities().remove(oldIn);
+                usedWire -= removedLen;
+
+                // Create new link
                 Entity linkE = new Entity().add(new Link(fromPort, toPort));
                 engine.entities().add(linkE);
-                usedWire += wireLen;
+                usedWire += newLen;
+
+                // Ensure destination IN port has a queue
                 if (!toPort.has(Queue.class)) toPort.add(new Queue(5));
+
                 return true;
         }
 
-        private boolean hasOutgoingLink(Entity fromPort) {
+        private Entity getOutgoingLinkEntity(Entity fromPort) {
                 for (Entity e : engine.entities())
-                        if (e.has(Link.class) && e.get(Link.class).fromPort == fromPort) return true;
-                return false;
+                        if (e.has(Link.class) && e.get(Link.class).fromPort == fromPort) return e;
+                return null;
         }
 
-        private boolean hasIncomingLink(Entity toPort) {
+        private Entity getIncomingLinkEntity(Entity toPort) {
                 for (Entity e : engine.entities())
-                        if (e.has(Link.class) && e.get(Link.class).toPort == toPort) return true;
-                return false;
+                        if (e.has(Link.class) && e.get(Link.class).toPort == toPort) return e;
+                return null;
+        }
+
+        private double linkLength(Entity linkEntity) {
+                Link l = linkEntity.get(Link.class);
+                if (l == null || l.fromPort == null || l.toPort == null) return 0;
+                if (!l.fromPort.has(Transform.class) || !l.toPort.has(Transform.class)) return 0;
+                Transform a = l.fromPort.get(Transform.class);
+                Transform b = l.toPort.get(Transform.class);
+                return Math.hypot(b.x - a.x, b.y - a.y);
         }
 
         private Entity findPortAt(double x, double y) {
@@ -379,8 +412,8 @@ public class MainController {
                         g.strokeLine(a.x, a.y, b.x, b.y);
                 }
 
-                // wiring preview (hold W)
-                if (wiringMode && dragStartPort != null) {
+                // wiring preview (only when paused)
+                if (!running && wiringMode && dragStartPort != null) {
                         Transform a = dragStartPort.get(Transform.class);
                         g.setStroke(Color.YELLOWGREEN);
                         g.setLineWidth(2.0);
@@ -415,7 +448,7 @@ public class MainController {
                         if (!e.has(PortInfo.class) || !e.has(Transform.class)) continue;
                         PortInfo p = e.get(PortInfo.class);
                         Transform t = e.get(Transform.class);
-                        boolean wired = (p.io == PortInfo.IO.OUT ? hasOutgoingLink(e) : hasIncomingLink(e));
+                        boolean wired = (p.io == PortInfo.IO.OUT ? getOutgoingLinkEntity(e) != null : getIncomingLinkEntity(e) != null);
 
                         if (p.shape == PortInfo.Shape.SQUARE) {
                                 g.setFill(wired ? Color.web("#5dc2ff") : Color.web("#9ad9ff"));
@@ -447,8 +480,9 @@ public class MainController {
                         if (!e.has(PortInfo.class)) continue;
                         PortInfo p = e.get(PortInfo.class);
                         if (p.parentSystem != system) continue;
-                        if (p.io == PortInfo.IO.OUT) ok &= hasOutgoingLink(e);
-                        else                         ok &= hasIncomingLink(e);
+                        boolean filled = (p.io == PortInfo.IO.OUT) ? (getOutgoingLinkEntity(e) != null)
+                                : (getIncomingLinkEntity(e) != null);
+                        ok &= filled;
                         if (!ok) return false;
                 }
                 return true;
