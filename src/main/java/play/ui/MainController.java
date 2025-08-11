@@ -363,16 +363,24 @@ public class MainController {
                 for (int y = 0; y < gameCanvas.getHeight(); y += 20) g.strokeLine(0, y, gameCanvas.getWidth(), y);
 
                 // links
-                g.setStroke(Color.GRAY);
-                g.setLineWidth(2);
                 for (Entity e : engine.entities()) {
                         if (!e.has(Link.class)) continue;
                         Link l = e.get(Link.class);
                         if (l.fromPort == null || l.toPort == null) continue;
                         if (!l.fromPort.has(Transform.class) || !l.toPort.has(Transform.class)) continue;
+
                         Transform a = l.fromPort.get(Transform.class);
                         Transform b = l.toPort.get(Transform.class);
-                        g.strokeLine(a.x, a.y, b.x, b.y);
+
+                        // Shape comes from the ports; your wiring enforces matching shapes.
+                        PortInfo.Shape shape = l.fromPort.get(PortInfo.class).shape;
+                        javafx.scene.paint.Color linkColor =
+                                (shape == PortInfo.Shape.SQUARE) ? javafx.scene.paint.Color.web("#5dc2ff")
+                                        : javafx.scene.paint.Color.web("#ff86a5");
+
+                        gameCanvas.getGraphicsContext2D().setStroke(linkColor);
+                        gameCanvas.getGraphicsContext2D().setLineWidth(2.0);
+                        gameCanvas.getGraphicsContext2D().strokeLine(a.x, a.y, b.x, b.y);
                 }
 
                 // wiring preview (hold W)
