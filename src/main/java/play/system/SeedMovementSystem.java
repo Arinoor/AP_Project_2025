@@ -6,20 +6,30 @@ import play.components.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Advances seeds along their current link, applies acceleration, and enforces
+ * loss based on collision budget and lateral deviation. Deviation threshold is
+ * size-aware (square=2 units, triangle=3 units) scaled by pixelsPerUnit.
+ */
 public class SeedMovementSystem implements System {
         private final GameEngine engine;
         private final List<Entity> entities;
         private final ShopSystem.ShopState shop;
 
-        private static final double MAX_LATERAL = 24.0;
+        // Visual/physics scale: how many pixels equals one "unit" (a port)
+        private final double pixelsPerUnit;
+
+        // Gentle drift decay
         private static final double LATERAL_DAMP = 0.98;
+        // When impactEnergy decays below this, collisions re-enable
         private static final double IMPACT_COOLDOWN_OFF = 0.15;
         private static final double MIN_LINK_LEN = 1e-3;
 
-        public SeedMovementSystem(GameEngine engine, List<Entity> entities, ShopSystem shopSystem) {
+        public SeedMovementSystem(GameEngine engine, List<Entity> entities, ShopSystem shopSystem, double pixelsPerUnit) {
                 this.engine = engine;
                 this.entities = entities;
-                this.shop  = (shopSystem != null) ? shopSystem.getState() : null;
+                this.shop = (shopSystem != null) ? shopSystem.getState() : null;
+                this.pixelsPerUnit = Math.max(6.0, pixelsPerUnit);
         }
 
         @Override
@@ -35,39 +45,51 @@ public class SeedMovementSystem implements System {
                         l.updateLength();
                         double length = Math.max(MIN_LINK_LEN, l.length);
 
-                        // progress advance with proper acceleration integration
-                        double dist = s.speed * dt + 0.5 * s.accel * dt * dt;
-                        s.progress += dist / length;
-
-                        // <- important: actually update speed so triangles ramp up on incompatible links
+                        // ---- Proper kinematics: apply acceleration to speed, then integrate distance
                         s.speed += s.accel * dt;
+                        if (s.speed < 0) s.speed = 0; // safety
 
-                        // decay impact energy; re-enable collisions
+                        double dist = s.speed * dt + 0.5 * s.accel * dt * dt;
+                        double dp = dist / length;
+                        s.progress += dp;
+
+                        // decay impact energy and auto-clear collision guard
                         s.impactEnergy *= Math.pow(0.6, dt * 60.0);
-                        if (s.impactEnergy < IMPACT_COOLDOWN_OFF) s.justCollided = false;
+                        if (s.impactEnergy < IMPACT_COOLDOWN_OFF) {
+                                s.justCollided = false;
+                        }
 
-                        // shop: disable lateral
+                        // shop: disable lateral on demand
                         if (shop != null && shop.disableLateral) s.lateral = 0.0;
+
+                        // light lateral damping so drift slowly fades
                         s.lateral *= LATERAL_DAMP;
 
-                        // death conditions
-                        if (Math.abs(s.lateral) > MAX_LATERAL || s.collisions >= s.capacity) {
+                        // ---- Loss: size-aware lateral threshold + collision capacity
+                        double sizeUnits = (s.type == Seed.Type.SQUARE) ? 2.0 : 3.0;
+                        double lateralThreshold = sizeUnits * pixelsPerUnit;
+
+                        if (Math.abs(s.lateral) > lateralThreshold || s.collisions >= s.capacity) {
                                 s.currentLink = null;
                                 toRemove.add(e);
                                 engine.incrementLost();
                                 continue;
                         }
 
+                        // arrival clamp (RoutingSystem will handle handoff this frame)
                         if (s.progress >= 1.0) s.progress = 1.0;
 
-                        // place on link
+                        // place Transform on the line (renderers can add a lateral offset if desired)
                         Transform st = e.get(Transform.class);
-                        Transform a  = l.fromPort.get(Transform.class);
-                        Transform b  = l.toPort.get(Transform.class);
-                        st.x = a.x + (b.x - a.x) * s.progress;
-                        st.y = a.y + (b.y - a.y) * s.progress;
+                        Transform a = l.fromPort.get(Transform.class);
+                        Transform b = l.toPort.get(Transform.class);
+                        double nx = a.x + (b.x - a.x) * s.progress;
+                        double ny = a.y + (b.y - a.y) * s.progress;
+                        st.x = nx;
+                        st.y = ny;
                 }
 
+                // remove any "lost" seeds
                 for (Entity e : toRemove) entities.remove(e);
         }
 }

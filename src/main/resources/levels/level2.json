@@ -1,25 +1,66 @@
 {
-  "totalWire": 7000,
+  "totalWire": 9000,
+
   "devices": [
-    { "id": "SRC-1", "capacity": 5, "x": 120, "y": 180, "producer": { "interval": 0.5 } },
-    { "id": "SRC-2", "capacity": 5, "x": 120, "y": 360, "producer": { "interval": 0.8 } },
-    { "id": "MID-1", "capacity": 5, "x": 400, "y": 140 },
-    { "id": "MID-2", "capacity": 5, "x": 400, "y": 320 },
-    { "id": "REF-1", "capacity": 5, "x": 680, "y": 240, "reference": true }
+    { "id": "SRC-A", "x": 150, "y":  80, "producer": { "interval": 0.25 } },
+    { "id": "SRC-B", "x": 150, "y": 200, "producer": { "interval": 0.25 } },
+    { "id": "SRC-C", "x": 150, "y": 320, "producer": { "interval": 0.25 } },
+    { "id": "SRC-D", "x": 150, "y": 440, "producer": { "interval": 0.25 } },
+
+    { "id": "MID-1", "x": 480, "y": 120 },
+    { "id": "MID-2", "x": 480, "y": 240 },
+    { "id": "MID-3", "x": 480, "y": 360 },
+    { "id": "MID-4", "x": 480, "y": 480 },
+
+    { "id": "REF-1", "x": 780, "y": 100, "reference": true },
+    { "id": "REF-2", "x": 780, "y": 220, "reference": true },
+    { "id": "REF-3", "x": 780, "y": 340, "reference": true },
+    { "id": "REF-4", "x": 780, "y": 460, "reference": true }
   ],
+
   "ports": [
-    { "id": "S1:outS", "device": "SRC-1", "x": 170, "y": 180, "shape": "square",   "io": "out" },
-    { "id": "S1:outT", "device": "SRC-1", "x": 170, "y": 220, "shape": "triangle", "io": "out" },
-    { "id": "S2:outS", "device": "SRC-2", "x": 170, "y": 360, "shape": "square",   "io": "out" },
-    { "id": "S2:outT", "device": "SRC-2", "x": 170, "y": 400, "shape": "triangle", "io": "out" },
+    { "id": "SA:outS", "device": "SRC-A", "x": 200, "y":  80, "shape": "square",   "io": "out" },
+    { "id": "SA:outT", "device": "SRC-A", "x": 200, "y": 116, "shape": "triangle", "io": "out" },
 
-    { "id": "M1:inS",  "device": "MID-1", "x": 370, "y": 140, "shape": "square",   "io": "in"  },
-    { "id": "M1:outT", "device": "MID-1", "x": 430, "y": 140, "shape": "triangle", "io": "out" },
+    { "id": "SB:outS", "device": "SRC-B", "x": 200, "y": 200, "shape": "square",   "io": "out" },
+    { "id": "SB:outT", "device": "SRC-B", "x": 200, "y": 236, "shape": "triangle", "io": "out" },
 
-    { "id": "M2:inT",  "device": "MID-2", "x": 370, "y": 320, "shape": "triangle", "io": "in"  },
-    { "id": "M2:outS", "device": "MID-2", "x": 430, "y": 320, "shape": "square",   "io": "out" },
+    { "id": "SC:outS", "device": "SRC-C", "x": 200, "y": 320, "shape": "square",   "io": "out" },
+    { "id": "SC:outT", "device": "SRC-C", "x": 200, "y": 356, "shape": "triangle", "io": "out" },
 
-    { "id": "R1:inS",  "device": "REF-1", "x": 650, "y": 220, "shape": "square",   "io": "in"  },
-    { "id": "R1:inT",  "device": "REF-1", "x": 650, "y": 260, "shape": "triangle", "io": "in"  }
+    { "id": "SD:outS", "device": "SRC-D", "x": 200, "y": 440, "shape": "square",   "io": "out" },
+    { "id": "SD:outT", "device": "SRC-D", "x": 200, "y": 476, "shape": "triangle", "io": "out" },
+
+    { "id": "M1:inS",  "device": "MID-1", "x": 450, "y": 104, "shape": "square",   "io": "in"  },
+    { "id": "M1:inT",  "device": "MID-1", "x": 450, "y": 136, "shape": "triangle", "io": "in"  },
+    { "id": "M1:outS", "device": "MID-1", "x": 510, "y": 104, "shape": "square",   "io": "out" },
+    { "id": "M1:outT", "device": "MID-1", "x": 510, "y": 136, "shape": "triangle", "io": "out" },
+
+    { "id": "M2:inS",  "device": "MID-2", "x": 450, "y": 224, "shape": "square",   "io": "in"  },
+    { "id": "M2:inT",  "device": "MID-2", "x": 450, "y": 256, "shape": "triangle", "io": "in"  },
+    { "id": "M2:outS", "device": "MID-2", "x": 510, "y": 224, "shape": "square",   "io": "out" },
+    { "id": "M2:outT", "device": "MID-2", "x": 510, "y": 256, "shape": "triangle", "io": "out" },
+
+    { "id": "M3:inS",  "device": "MID-3", "x": 450, "y": 344, "shape": "square",   "io": "in"  },
+    { "id": "M3:inT",  "device": "MID-3", "x": 450, "y": 376, "shape": "triangle", "io": "in"  },
+    { "id": "M3:outS", "device": "MID-3", "x": 510, "y": 344, "shape": "square",   "io": "out" },
+    { "id": "M3:outT", "device": "MID-3", "x": 510, "y": 376, "shape": "triangle", "io": "out" },
+
+    { "id": "M4:inS",  "device": "MID-4", "x": 450, "y": 464, "shape": "square",   "io": "in"  },
+    { "id": "M4:inT",  "device": "MID-4", "x": 450, "y": 496, "shape": "triangle", "io": "in"  },
+    { "id": "M4:outS", "device": "MID-4", "x": 510, "y": 464, "shape": "square",   "io": "out" },
+    { "id": "M4:outT", "device": "MID-4", "x": 510, "y": 496, "shape": "triangle", "io": "out" },
+
+    { "id": "R1:inS",  "device": "REF-1", "x": 750, "y":  84, "shape": "square",   "io": "in"  },
+    { "id": "R1:inT",  "device": "REF-1", "x": 750, "y": 116, "shape": "triangle", "io": "in"  },
+
+    { "id": "R2:inS",  "device": "REF-2", "x": 750, "y": 204, "shape": "square",   "io": "in"  },
+    { "id": "R2:inT",  "device": "REF-2", "x": 750, "y": 236, "shape": "triangle", "io": "in"  },
+
+    { "id": "R3:inS",  "device": "REF-3", "x": 750, "y": 324, "shape": "square",   "io": "in"  },
+    { "id": "R3:inT",  "device": "REF-3", "x": 750, "y": 356, "shape": "triangle", "io": "in"  },
+
+    { "id": "R4:inS",  "device": "REF-4", "x": 750, "y": 444, "shape": "square",   "io": "in"  },
+    { "id": "R4:inT",  "device": "REF-4", "x": 750, "y": 476, "shape": "triangle", "io": "in"  }
   ]
 }

@@ -6,6 +6,11 @@ import play.components.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Produces packets from EVERY OUT port of each system with a Producer.
+ * Seed type derives from the OUT port shape. Kinematics are set based on the
+ * OUT port used (this is the "start port" for the hop).
+ */
 public class ProductionSystem implements System {
         private final GameEngine engine;
         private final List<Entity> entities;
@@ -21,7 +26,7 @@ public class ProductionSystem implements System {
         public void update(double dt) {
                 if (dt > dtCap) dt = dtCap;
 
-                // snapshot to avoid CME while adding seeds
+                // Snapshot to avoid ConcurrentModification when we add seeds below
                 List<Entity> snapshot = new ArrayList<>(entities);
 
                 for (Entity sysE : snapshot) {
@@ -32,29 +37,31 @@ public class ProductionSystem implements System {
                         if (prod.timer < prod.interval) continue;
                         prod.timer = 0.0;
 
-                        // emit from every OUT port that has a free link
-                        for (Entity outPort : findOutPorts(sysE)) {
+                        // find all OUT ports
+                        List<Entity> outPorts = findOutPorts(sysE);
+                        if (outPorts.isEmpty()) continue;
+
+                        for (Entity outPort : outPorts) {
                                 Entity freeLink = findFreeLinkFrom(outPort);
                                 if (freeLink == null) continue;
 
-                                Link link = freeLink.get(Link.class);
-                                PortInfo.Shape outShape = outPort.get(PortInfo.class).shape;
-
-                                // seed type is the OUT port’s shape
-                                Seed.Type type = (outShape == PortInfo.Shape.SQUARE) ? Seed.Type.SQUARE : Seed.Type.TRIANGLE;
+                                PortInfo pinfo = outPort.get(PortInfo.class);
+                                Seed.Type type = (pinfo.shape == PortInfo.Shape.SQUARE) ? Seed.Type.SQUARE : Seed.Type.TRIANGLE;
 
                                 Entity seedE = new Entity();
                                 Seed s = new Seed(type);
 
-                                // spawn at port
+                                // Per-hop kinematics based on OUT port used to spawn
+                                applyKinematicsForHop(s, pinfo.shape);
+
+                                // place at the OUT port
                                 Transform pt = outPort.get(Transform.class);
                                 seedE.add(new Transform(pt.x, pt.y));
                                 seedE.add(s);
 
-                                // attach to link and set kinematics for THIS link
-                                s.currentLink = link;
+                                // attach to chosen link
+                                s.currentLink = freeLink.get(Link.class);
                                 s.progress = 0.0;
-                                applyKinematicsForLink(s, link);
 
                                 engine.entities().add(seedE);
                                 engine.incrementProduced();
@@ -90,19 +97,19 @@ public class ProductionSystem implements System {
                 return true;
         }
 
-        /** Squares: constant; compatible start = half speed. Triangles: accel on incompatible start. */
-        static void applyKinematicsForLink(Seed s, Link l) {
-                PortInfo.Shape fromShape = l.fromPort.get(PortInfo.class).shape;
+        /** Same rules as QueueSystem; shared here to avoid drift. */
+        private void applyKinematicsForHop(Seed s, PortInfo.Shape outShape) {
+                boolean compatibleStart =
+                        (s.type == Seed.Type.SQUARE  && outShape == PortInfo.Shape.SQUARE) ||
+                                (s.type == Seed.Type.TRIANGLE && outShape == PortInfo.Shape.TRIANGLE);
 
                 if (s.type == Seed.Type.SQUARE) {
                         double base = 120.0;
-                        boolean compatibleStart = (fromShape == PortInfo.Shape.SQUARE);
-                        s.speed = compatibleStart ? base * 0.5 : base;
+                        s.speed = compatibleStart ? base * 0.5 : base; // half when compatible
                         s.accel = 0.0;
                 } else { // TRIANGLE
                         s.speed = 140.0;
-                        boolean incompatibleStart = (fromShape != PortInfo.Shape.TRIANGLE);
-                        s.accel = incompatibleStart ? 220.0 : 0.0;
+                        s.accel = compatibleStart ? 0.0 : 220.0; // accelerate when incompatible
                 }
         }
 }

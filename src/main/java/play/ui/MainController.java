@@ -83,7 +83,7 @@ public class MainController {
                 productionSystem = new ProductionSystem(engine, engine.entities(), 0.2);
                 queueSystem = new QueueSystem(engine, engine.entities());
                 routingSystem = new RoutingSystem(engine, engine.entities());
-                movementSystem = new SeedMovementSystem(engine, engine.entities(), shopSystem);
+                movementSystem = new SeedMovementSystem(engine, engine.entities(), shopSystem, UiConstants.PORT_SIZE);
                 // Pass packet visual size so radii match visuals
                 collisionSystem = new CollisionSystem(engine, engine.entities(), shopSystem, UiConstants.PACKET_SIZE);
 
