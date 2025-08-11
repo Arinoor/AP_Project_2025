@@ -10,15 +10,16 @@ public class SeedMovementSystem implements System {
         private final GameEngine engine;
         private final List<Entity> entities;
         private final ShopSystem.ShopState shop;
+
         private static final double MAX_LATERAL = 24.0;
-        private static final double LATERAL_DAMP = 0.98;       // gentle drift decay
-        private static final double IMPACT_COOLDOWN_OFF = 0.15; // when impactEnergy decays below this, collisions re-enable
+        private static final double LATERAL_DAMP = 0.98;
+        private static final double IMPACT_COOLDOWN_OFF = 0.15;
         private static final double MIN_LINK_LEN = 1e-3;
 
         public SeedMovementSystem(GameEngine engine, List<Entity> entities, ShopSystem shopSystem) {
                 this.engine = engine;
                 this.entities = entities;
-                this.shop = (shopSystem != null) ? shopSystem.getState() : null;
+                this.shop  = (shopSystem != null) ? shopSystem.getState() : null;
         }
 
         @Override
@@ -34,21 +35,19 @@ public class SeedMovementSystem implements System {
                         l.updateLength();
                         double length = Math.max(MIN_LINK_LEN, l.length);
 
-                        // progress advance with simple kinematics
+                        // progress advance with proper acceleration integration
                         double dist = s.speed * dt + 0.5 * s.accel * dt * dt;
-                        double dp = dist / length;
-                        s.progress += dp;
+                        s.progress += dist / length;
 
-                        // decay impact energy and auto-clear collision guard
+                        // <- important: actually update speed so triangles ramp up on incompatible links
+                        s.speed += s.accel * dt;
+
+                        // decay impact energy; re-enable collisions
                         s.impactEnergy *= Math.pow(0.6, dt * 60.0);
-                        if (s.impactEnergy < IMPACT_COOLDOWN_OFF) {
-                                s.justCollided = false;
-                        }
+                        if (s.impactEnergy < IMPACT_COOLDOWN_OFF) s.justCollided = false;
 
-                        // shop: disable lateral on demand
+                        // shop: disable lateral
                         if (shop != null && shop.disableLateral) s.lateral = 0.0;
-
-                        // light lateral damping so drift slowly fades
                         s.lateral *= LATERAL_DAMP;
 
                         // death conditions
@@ -59,20 +58,16 @@ public class SeedMovementSystem implements System {
                                 continue;
                         }
 
-                        // arrival clamp (RoutingSystem will handle handoff this frame)
                         if (s.progress >= 1.0) s.progress = 1.0;
 
-                        // place Transform on the line (renderers can add a lateral offset if desired)
+                        // place on link
                         Transform st = e.get(Transform.class);
-                        Transform a = l.fromPort.get(Transform.class);
-                        Transform b = l.toPort.get(Transform.class);
-                        double nx = a.x + (b.x - a.x) * s.progress;
-                        double ny = a.y + (b.y - a.y) * s.progress;
-                        st.x = nx;
-                        st.y = ny;
+                        Transform a  = l.fromPort.get(Transform.class);
+                        Transform b  = l.toPort.get(Transform.class);
+                        st.x = a.x + (b.x - a.x) * s.progress;
+                        st.y = a.y + (b.y - a.y) * s.progress;
                 }
 
-                // remove any "lost" seeds
                 for (Entity e : toRemove) entities.remove(e);
         }
 }
