@@ -1,6 +1,7 @@
 package play.model.systems;
 
-import play.model.audio.AudioManager;
+import play.model.audio.AudioAssets;
+import play.model.audio.AudioService;
 import play.model.components.Link;
 import play.model.components.Seed;
 import play.model.components.Transform;
@@ -12,37 +13,62 @@ import java.util.*;
 /**
  * Size-aware collisions + AoE + pairwise cooldown + separation.
  * Also adds "noise" on every collision (independent of lateral/impact).
+ * Now also plays a soft collision SFX (throttled) via AudioService.
  */
 public class CollisionSystem implements System {
+
         private final GameEngine engine;
         private final List<Entity> entities;
+        /** Snapshot of shop state (nullable) */
         private final ShopSystem.ShopState shop;
 
-        private final double unit;           // pixels per "unit" // make it less if you want harder condition for collision
-        private final double IMPACT_RADIUS;  // px
+        /** Pixels per "unit" (affects collision radius); make smaller for stricter collisions. */
+        private final double unit;
+        /** Impact wave radius in pixels. */
+        private final double IMPACT_RADIUS;
+
         private static final double OFFSET_FACTOR = 0.12;
         private static final double PAIR_COOLDOWN_SEC = 0.75;
 
         /** Noise added (in UNITS) to each seed per collision. */
         private static final double NOISE_PER_HIT_UNITS = 0.5;
 
+        /** Optional audio service for SFX (may be null). */
+        private final AudioService audio;
+        private double sfxCooldown = 0.0; // seconds
+        private static final double SFX_THROTTLE = 0.12; // 120ms between collision SFX
+
+        /** Pair -> cooldown seconds. */
         private final Map<PairKey, Double> pairCooldowns = new HashMap<>();
 
-        public CollisionSystem(GameEngine engine, List<Entity> entities, ShopSystem shopSystem) {
-                this(engine, entities, shopSystem, 12.0);
+        public CollisionSystem(GameEngine engine,
+                               List<Entity> entities,
+                               ShopSystem shopSystem,
+                               double packetSize) {
+                this(engine, entities, shopSystem, packetSize, null);
         }
 
-        public CollisionSystem(GameEngine engine, List<Entity> entities, ShopSystem shopSystem, double pixelsPerUnit) {
+        public CollisionSystem(GameEngine engine,
+                               List<Entity> entities,
+                               ShopSystem shopSystem,
+                               double packetSize,
+                               AudioService audioService) {
                 this.engine = engine;
                 this.entities = entities;
                 this.shop = (shopSystem != null) ? shopSystem.getState() : null;
-                this.unit = Math.max(6.0, pixelsPerUnit);
-                this.IMPACT_RADIUS = this.unit * 15.0;
+                // Keep your original semantics: unit is the pixel scale used for thresholds.
+                this.unit = Math.max(4.0, packetSize);
+                // Reasonable default for AoE radius based on visual size.
+                this.IMPACT_RADIUS = Math.max(24.0, this.unit * 8.0);
+                this.audio = audioService;
         }
 
         @Override
         public void update(double dt) {
+                // Collisions globally disabled by shop -> skip entirely.
                 if (shop != null && shop.disableCollisions) return;
+
+                if (sfxCooldown > 0) sfxCooldown -= dt;
 
                 // Decay pair cooldowns
                 if (!pairCooldowns.isEmpty()) {
@@ -55,11 +81,15 @@ public class CollisionSystem implements System {
                         }
                 }
 
-                // Collect seeds
+                // Collect seeds with transform
                 List<Entity> seeds = new ArrayList<>();
-                for (Entity e : entities) if (e.has(Seed.class) && e.has(Transform.class)) seeds.add(e);
+                for (Entity e : entities) {
+                        if (e.has(Seed.class) && e.has(Transform.class)) seeds.add(e);
+                }
 
                 final int n = seeds.size();
+                boolean anyHitThisTick = false;
+
                 for (int i = 0; i < n; i++) {
                         Entity ea = seeds.get(i);
                         Transform ta = ea.get(Transform.class);
@@ -116,14 +146,16 @@ public class CollisionSystem implements System {
                                         applyImpactWave(cx, cy, destroyRadius, ea, eb);
                                 }
 
-                                AudioManager.getInstance().playSfx("/sfx/collide.wav");
+                                anyHitThisTick = true;
                         }
                 }
+
+                if (anyHitThisTick) tryPlayCollisionSfx();
         }
 
         private double radiusFor(Seed s) {
                 final double sizeUnits = s.sizeUnits(); // 2 or 3
-                return (sizeUnits * unit) * 0.5; // make less if you want harder condition for collision
+                return (sizeUnits * unit) * 0.5; // smaller => stricter collision
         }
 
         private void scheduleReset(Seed s) {
@@ -175,7 +207,9 @@ public class CollisionSystem implements System {
                         double mag = Math.hypot(lx, ly);
                         if (mag < 1e-6) continue;
 
-                        double px = -ly / mag, py = lx / mag; // link perpendicular
+                        // link perpendicular
+                        double px = -ly / mag, py = lx / mag;
+                        // world dir from impact center
                         double wx = (dist < 1e-6) ? 0 : dx / dist, wy = (dist < 1e-6) ? 0 : dy / dist;
 
                         final double strength = (dist <= destroyRadius) ? 1.0 : Math.pow(1.0 - (dist / IMPACT_RADIUS), 2.0);
@@ -186,12 +220,28 @@ public class CollisionSystem implements System {
                 }
         }
 
+        private void tryPlayCollisionSfx() {
+                play.model.settings.Settings s = play.model.settings.SettingsStore.load();
+                if (!s.sfxEnabled) return;
+
+                play.model.audio.AudioService svc = (audio != null) ? audio : play.model.audio.GlobalAudio.get();
+                if (svc == null) return;
+                if (shop != null && shop.disableCollisions) return;
+                if (sfxCooldown > 0) return;
+
+                svc.playSfx(play.model.audio.AudioAssets.COLLISION);
+                sfxCooldown = 0.12;
+        }
+
         private static final class PairKey {
                 private final Entity a, b;
                 private final int hash;
                 private PairKey(Entity a, Entity b) {
-                        if (java.lang.System.identityHashCode(a) <= java.lang.System.identityHashCode(b)) { this.a = a; this.b = b; }
-                        else { this.a = b; this.b = a; }
+                        if (java.lang.System.identityHashCode(a) <= java.lang.System.identityHashCode(b)) {
+                                this.a = a; this.b = b;
+                        } else {
+                                this.a = b; this.b = a;
+                        }
                         this.hash = java.lang.System.identityHashCode(this.a) * 31 + java.lang.System.identityHashCode(this.b);
                 }
                 static PairKey of(Entity x, Entity y) { return new PairKey(x, y); }

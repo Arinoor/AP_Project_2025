@@ -5,8 +5,8 @@
             fx:id="menuRoot" style="-fx-padding:24;">
     <center>
         <VBox spacing="16" alignment="CENTER">
-            <Label fx:id="gameTitle" text="Conduit Garden"/>
-            <Label fx:id="gameSubtitle" text="Blueprint Hell"/>
+            <Label fx:id="gameTitle" text="BluePrintHell"/>
+            <Label fx:id="gameSubtitle" text="ArianLastDance"/>
             <Separator/>
             <Button fx:id="startBtn"   text="New Game"   styleClass="primary"/>
             <Button fx:id="stagesBtn"  text="Levels"/>
