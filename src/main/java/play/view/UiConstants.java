@@ -12,4 +12,9 @@ public final class UiConstants {
 
         /** System rectangle size (independent from port/packet). */
         public static final double SYSTEM_SIZE = 64.0; // tweak as you like
+
+        // Phase 2: bends
+        public static final double BEND_DOT_RADIUS     = 4.5;    // px (visual)
+        public static final double BEND_HIT_RADIUS     = 10.0;   // px (mouse hit-test)
+        public static final double BEND_DRAG_MAX_RADIUS= 120.0;  // px from creation point
 }

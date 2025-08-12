@@ -7,13 +7,16 @@ import play.model.components.Seed;
 import play.model.components.Transform;
 import play.model.core.Entity;
 import play.model.engine.GameEngine;
+import play.utils.WiringUtils;
 
 import java.util.*;
 
 /**
  * Size-aware collisions + AoE + pairwise cooldown + separation.
  * Also adds "noise" on every collision (independent of lateral/impact).
- * Now also plays a soft collision SFX (throttled) via AudioService.
+ * Plays a soft collision SFX (throttled) via AudioService.
+ *
+ * Polyline-compatible: all link-length and direction math is based on WiringUtils.
  */
 public class CollisionSystem implements System {
 
@@ -132,7 +135,7 @@ public class CollisionSystem implements System {
                                 scheduleReset(sa);
                                 scheduleReset(sb);
 
-                                // Separate along links so they don't re-hit immediately
+                                // Separate along links so they don't re-hit immediately (polyline-aware)
                                 separateAlongLinks(sa, ea, sb, eb, rSum, Math.sqrt(Math.max(1e-12, d2)));
 
                                 // Pairwise cooldown
@@ -162,6 +165,10 @@ public class CollisionSystem implements System {
                 s.impactEnergy = Math.max(s.impactEnergy, 1.0);
         }
 
+        /**
+         * Polyline-aware separation: move seeds backwards/forwards along their link
+         * by an amount proportional to the overlap (converted from px to normalized progress).
+         */
         private void separateAlongLinks(Seed sa, Entity ea, Seed sb, Entity eb, double rSum, double actualDist) {
                 final double overlap = Math.max(0.0, rSum - actualDist);
                 if (overlap <= 0) return;
@@ -170,15 +177,15 @@ public class CollisionSystem implements System {
 
                 if (sa.currentLink != null) {
                         Link la = sa.currentLink;
-                        la.updateLength();
-                        double len = Math.max(1e-6, la.length);
+                        double len = Math.max(1e-6, WiringUtils.pathLength(la));
                         double dp = (overlap * 0.5 + extra) / len;
                         sa.progress = clamp01(sa.progress - dp);
+                        // position update is handled by movement system on its next tick/render;
+                        // no immediate transform set is needed here.
                 }
                 if (sb.currentLink != null) {
                         Link lb = sb.currentLink;
-                        lb.updateLength();
-                        double len = Math.max(1e-6, lb.length);
+                        double len = Math.max(1e-6, WiringUtils.pathLength(lb));
                         double dp = (overlap * 0.5 + extra) / len;
                         sb.progress = clamp01(sb.progress + dp);
                 }
@@ -186,6 +193,11 @@ public class CollisionSystem implements System {
 
         private double clamp01(double v) { return (v < 0) ? 0 : (v > 1) ? 1 : v; }
 
+        /**
+         * Polyline-aware impact wave:
+         *  - For each seed in radius, compute the local tangent of its link at its current progress.
+         *  - Use the perpendicular of that tangent to compute lateral offset, scaled by distance.
+         */
         private void applyImpactWave(double cx, double cy, double destroyRadius, Entity excludeA, Entity excludeB) {
                 for (Entity e : entities) {
                         if (e == excludeA || e == excludeB) continue;
@@ -200,16 +212,16 @@ public class CollisionSystem implements System {
                         double dist = Math.hypot(dx, dy);
                         if (dist > IMPACT_RADIUS) continue;
 
-                        Link l = s.currentLink;
-                        Transform a = l.fromPort.get(Transform.class);
-                        Transform b = l.toPort.get(Transform.class);
-                        double lx = b.x - a.x, ly = b.y - a.y;
-                        double mag = Math.hypot(lx, ly);
+                        // Local tangent as finite difference around current progress
+                        double[] tan = tangentAt(s.currentLink, s.progress);
+                        double tx = tan[0], ty = tan[1];
+                        double mag = Math.hypot(tx, ty);
                         if (mag < 1e-6) continue;
 
-                        // link perpendicular
-                        double px = -ly / mag, py = lx / mag;
-                        // world dir from impact center
+                        // Perpendicular to tangent (unit)
+                        double px = -ty / mag, py = tx / mag;
+
+                        // World dir from impact center
                         double wx = (dist < 1e-6) ? 0 : dx / dist, wy = (dist < 1e-6) ? 0 : dy / dist;
 
                         final double strength = (dist <= destroyRadius) ? 1.0 : Math.pow(1.0 - (dist / IMPACT_RADIUS), 2.0);
@@ -218,6 +230,19 @@ public class CollisionSystem implements System {
 
                         s.lateral += offset;
                 }
+        }
+
+        /**
+         * Approximate tangent (dx,dy) on a polyline link at normalized t by sampling
+         * two nearby points (arc-length parameterization).
+         */
+        private double[] tangentAt(Link l, double t) {
+                final double eps = 1e-3; // small param step
+                double t0 = clamp01(t - eps);
+                double t1 = clamp01(t + eps);
+                WiringUtils.Pt a = WiringUtils.pointAlongNormalized(l, t0);
+                WiringUtils.Pt b = WiringUtils.pointAlongNormalized(l, t1);
+                return new double[] { b.x - a.x, b.y - a.y };
         }
 
         private void tryPlayCollisionSfx() {
@@ -229,8 +254,8 @@ public class CollisionSystem implements System {
                 if (shop != null && shop.disableCollisions) return;
                 if (sfxCooldown > 0) return;
 
-                svc.playSfx(play.model.audio.AudioAssets.COLLISION);
-                sfxCooldown = 0.12;
+                svc.playSfx(AudioAssets.COLLISION);
+                sfxCooldown = SFX_THROTTLE;
         }
 
         private static final class PairKey {

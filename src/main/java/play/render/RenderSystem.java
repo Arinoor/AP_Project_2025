@@ -2,6 +2,7 @@ package play.render;
 
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.paint.Color;
+import play.controller.BendTool;
 import play.model.core.Entity;
 import play.model.components.Link;
 import play.model.components.PortInfo;
@@ -9,6 +10,7 @@ import play.model.components.Reference;
 import play.model.components.Seed;
 import play.model.components.Transform;
 import play.model.systems.System;
+import play.utils.WiringUtils;
 import play.view.PacketView;
 import play.view.UiConstants;
 
@@ -24,9 +26,16 @@ public class RenderSystem implements System {
         private Entity previewStartPort = null;
         private double previewX, previewY;
 
+        // Optional: for drawing bend hover ring
+        private BendTool bendTool;
+
         public RenderSystem(List<Entity> entities, GraphicsContext g) {
                 this.entities = entities;
                 this.g = g;
+        }
+
+        public void setBendTool(BendTool bendTool) {
+                this.bendTool = bendTool;
         }
 
         /** Let the controller update the rubber-band preview while wiring. */
@@ -38,9 +47,7 @@ public class RenderSystem implements System {
         }
 
         @Override
-        public void update(double dt) {
-                draw();
-        }
+        public void update(double dt) { draw(); }
 
         private void draw() {
                 // background
@@ -53,24 +60,45 @@ public class RenderSystem implements System {
                 for (int x = 0; x < g.getCanvas().getWidth(); x += 20) g.strokeLine(x, 0, x, g.getCanvas().getHeight());
                 for (int y = 0; y < g.getCanvas().getHeight(); y += 20) g.strokeLine(0, y, g.getCanvas().getWidth(), y);
 
-                // links (colored by shape of FROM port)
+                // links as polylines (colored by shape of FROM port). Crossing -> red.
                 for (Entity e : entities) {
                         if (!e.has(Link.class)) continue;
                         Link l = e.get(Link.class);
-                        if (l.fromPort == null || l.toPort == null) continue;
-                        if (!l.fromPort.has(Transform.class) || !l.toPort.has(Transform.class)) continue;
+                        var pts = WiringUtils.path(l);
+                        if (pts.size() < 2) continue;
 
-                        Transform a = l.fromPort.get(Transform.class);
-                        Transform b = l.toPort.get(Transform.class);
+                        boolean crosses = WiringUtils.crossesAnySystem(l, entities, UiConstants.SYSTEM_SIZE);
 
                         PortInfo.Shape shape = l.fromPort.get(PortInfo.class).shape;
-                        Color linkColor = (shape == PortInfo.Shape.SQUARE)
-                                ? Color.web("#5dc2ff")
-                                : Color.web("#ff86a5");
+                        Color linkColor = (shape == PortInfo.Shape.SQUARE) ? Color.web("#5dc2ff") : Color.web("#ff86a5");
+                        if (crosses) linkColor = Color.web("#ff5f5f");
 
                         g.setStroke(linkColor);
                         g.setLineWidth(2.0);
-                        g.strokeLine(a.x, a.y, b.x, b.y);
+
+                        for (int i = 0; i < pts.size() - 1; i++) {
+                                var a = pts.get(i);
+                                var b = pts.get(i + 1);
+                                g.strokeLine(a.x, a.y, b.x, b.y);
+                        }
+
+                        // draw bends (visible colored dots)
+                        var bends = WiringUtils.bends(l);
+                        if (!bends.isEmpty()) {
+                                g.setFill(!crosses ? Color.web("#40c7b5") : Color.web("#ff8a8a"));
+                                for (var b : bends) {
+                                        double r = UiConstants.BEND_DOT_RADIUS;
+                                        g.fillOval(b.x - r, b.y - r, 2 * r, 2 * r);
+                                        g.setStroke(Color.BLACK);
+                                        g.setLineWidth(1);
+                                        g.strokeOval(b.x - r, b.y - r, 2 * r, 2 * r);
+                                }
+                        }
+                }
+
+                // draw bend hover highlight (if any)
+                if (bendTool != null) {
+                        bendTool.renderHover(g);
                 }
 
                 // systems (rectangle + reference ring)
@@ -82,9 +110,9 @@ public class RenderSystem implements System {
                         double w = SYSTEM_SIZE, h = SYSTEM_SIZE;
 
                         g.setFill(Color.web("#2a2f3a"));
-                        g.fillRoundRect(t.x - w/2, t.y - h/2, w, h, 8, 8);
+                        g.fillRoundRect(t.x - w / 2, t.y - h / 2, w, h, 8, 8);
                         g.setStroke(Color.web("#3c4452"));
-                        g.strokeRoundRect(t.x - w/2, t.y - h/2, w, h, 8, 8);
+                        g.strokeRoundRect(t.x - w / 2, t.y - h / 2, w, h, 8, 8);
 
                         if (e.has(Reference.class)) {
                                 g.setStroke(Color.LIGHTGREEN);
@@ -101,13 +129,13 @@ public class RenderSystem implements System {
 
                         if (p.shape == PortInfo.Shape.SQUARE) {
                                 g.setFill(Color.web("#9ad9ff"));
-                                g.fillRect(t.x - ps/2, t.y - ps/2, ps, ps);
+                                g.fillRect(t.x - ps / 2, t.y - ps / 2, ps, ps);
                                 g.setStroke(Color.web("#1f6aa5"));
-                                g.strokeRect(t.x - ps/2, t.y - ps/2, ps, ps);
+                                g.strokeRect(t.x - ps / 2, t.y - ps / 2, ps, ps);
                         } else {
                                 g.setFill(Color.web("#ffc1d0"));
-                                double[] xs = {t.x - ps/2, t.x + ps/2, t.x};
-                                double[] ys = {t.y + ps/2, t.y + ps/2, t.y - ps/2};
+                                double[] xs = {t.x - ps / 2, t.x + ps / 2, t.x};
+                                double[] ys = {t.y + ps / 2, t.y + ps / 2, t.y - ps / 2};
                                 g.fillPolygon(xs, ys, 3);
                                 g.setStroke(Color.web("#a53d4e"));
                                 g.strokePolygon(xs, ys, 3);

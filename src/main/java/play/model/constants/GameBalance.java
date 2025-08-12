@@ -13,6 +13,10 @@ public final class GameBalance {
         public static final int COST_AIRYAMAN = 4; // disable collisions 5s
         public static final int COST_ANAHITA  = 5; // reset packet noise now
 
+        // Phase 2: Bend cost & caps
+        public static final int  COST_BEND_PER_LINK_CREATE = 1; // pay once per new bend
+        public static final int  MAX_BENDS_PER_LINK        = 3;
+
         // Device buffer capacity (QueueSystem)
         public static final int DEVICE_CAPACITY = 5;
 

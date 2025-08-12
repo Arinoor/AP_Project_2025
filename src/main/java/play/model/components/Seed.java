@@ -9,7 +9,7 @@ public class Seed {
         public double speed = 120.0;     // px/s
         public double accel = 0.0;       // px/s^2
 
-        // progress along current link [0..1]
+        // LEGACY logical progress [0..1] (derived from arcPos / link.length)
         public double progress = 0.0;
 
         // lateral offset (px) relative to wire; large magnitude => loss
@@ -22,7 +22,7 @@ public class Seed {
         public int collisions = 0;
         public int capacity;
 
-        // cumulative "noise" (in PORT UNITS, not pixels). If noise > sizeUnits() => loss
+        // cumulative "noise" (in PORT UNITS). If noise > sizeUnits() => loss
         public double noise = 0.0;
 
         // the link this seed is currently traveling on
@@ -30,9 +30,12 @@ public class Seed {
 
         public boolean justCollided = false;
 
+        // Phase 2: precise arc-length state along the currentLink polyline
+        public double arcPos = 0.0; // [0..currentLink.length]
+
         public Seed(Type type) {
                 this.type = type;
-                this.capacity = (type == Type.SQUARE) ? 3 : 4; // a bit more tolerant than before
+                this.capacity = (type == Type.SQUARE) ? 3 : 4; // tolerant
         }
 
         /** Size in "port units" used for thresholds (square=2, triangle=3). */
