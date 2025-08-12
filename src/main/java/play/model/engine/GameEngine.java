@@ -1,115 +1,99 @@
 package play.model.engine;
 
 import play.model.core.Entity;
-import play.model.components.Seed;
+import play.model.events.*;
 import play.model.systems.System;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
-/**
- * Minimal ECS-style engine used by your game.
- * Holds entities, systems, and global counters (coins, produced, delivered, lost, planned).
- */
 public class GameEngine {
 
-        // Entities & systems
         private final List<Entity> entities = new ArrayList<>();
         private final List<System> systems  = new ArrayList<>();
 
-        // Global counters
-        private int plannedTotal   = 0;
-        private int producedCount  = 0;
+        // Scores / meta
+        private int producedCount = 0;
         private int deliveredCount = 0;
-        private int lostCount      = 0;
-        private int coins          = 0;
+        private int lostCount = 0;
+        private int coins = 0;
+        private int plannedTotal = 0;
 
-        // --- ECS management ---
-        public List<Entity> entities() {
-                return entities;
-        }
+        // Event bus for model events
+        private final EventBus eventBus = new EventBus();
 
-        public void addSystem(System s) {
-                systems.add(s);
-        }
+        public GameEngine() {}
 
-        public void clearSystems() {
-                systems.clear();
-        }
+        // --- Entities / Systems ---
+        public List<Entity> entities() { return entities; }
 
-        /** Advance the simulation by dt seconds. Calls systems in the order they were added. */
+        public void addSystem(System s) { systems.add(s); }
+        public void clearSystems()      { systems.clear(); }
+
         public void tick(double dt) {
-                // iterate on a snapshot to allow systems to add/remove other systems safely (rare)
-                for (System s : new ArrayList<>(systems)) {
-                        s.update(dt);
-                }
+                // iterate over a copy in case systems mutate the list
+                List<System> snapshot = new ArrayList<>(systems);
+                for (System s : snapshot) s.update(dt);
         }
 
-        /** Reset everything for a new level. */
-        public void resetForLevel() {
-                entities.clear();
-                clearSystems();
-                plannedTotal   = 0;
-                producedCount  = 0;
-                deliveredCount = 0;
-                lostCount      = 0;
-                coins          = 0;
-        }
+        // --- Meta / counters (kept for compatibility) ---
+        public void setPlannedTotal(int planned) { this.plannedTotal = Math.max(0, planned); }
+        public int getPlannedTotal()             { return plannedTotal; }
 
-        // --- Game meta & scoring ---
-        public void setPlannedTotal(int total) {
-                this.plannedTotal = Math.max(0, total);
-        }
+        public int getProducedCount()  { return producedCount; }
+        public int getDeliveredCount() { return deliveredCount; }
+        public int getLostCount()      { return lostCount; }
+        public int getCoins()          { return coins; }
 
-        public int getPlannedTotal() {
-                return plannedTotal;
-        }
-
+        // --- Mutations also post events ---
         public void incrementProduced() {
                 producedCount++;
-        }
-
-        /** Called when a seed is delivered into a Reference system. */
-        public void notifySeedDelivered(Seed s) {
-                deliveredCount++;
-                // coin award is handled elsewhere (QueueSystem on system entry), by design
+                eventBus.post(new ProducedEvent(producedCount));
         }
 
         public void incrementLost() {
                 lostCount++;
+                eventBus.post(new SeedLostEvent(1, lostCount));
         }
 
         public void incrementLostBy(int n) {
                 if (n <= 0) return;
                 lostCount += n;
+                eventBus.post(new SeedLostEvent(n, lostCount));
         }
 
-        public int getProducedCount() {
-                return producedCount;
-        }
-
-        public int getDeliveredCount() {
-                return deliveredCount;
-        }
-
-        public int getLostCount() {
-                return lostCount;
-        }
-
-        // --- Currency ---
-        public int getCoins() {
-                return coins;
-        }
-
-        /** Can pass negative to spend; won’t go below zero. */
         public void incrementCoins(int delta) {
+                if (delta == 0) return;
                 coins += delta;
                 if (coins < 0) coins = 0;
+                eventBus.post(new CoinsChangedEvent(delta, coins));
         }
 
-        // --- Convenience (compatibility with existing code) ---
-        /** Some code calls this; we map it to delivery for compatibility. */
         public void incrementReachedReference() {
                 deliveredCount++;
+                // event posted in notifySeedDelivered to carry type info
         }
+
+        /** Legacy hook: called when a seed is delivered; we emit a typed event here. */
+        public void notifySeedDelivered(play.model.components.Seed s) {
+                // ensure delivered counter is already bumped by caller (QueueSystem does this)
+                eventBus.post(new SeedDeliveredEvent(s.type, deliveredCount));
+        }
+
+        /** Clears counters and entities; use when reloading a level with the same engine. */
+        public void resetForLevel() {
+                entities.clear();
+                systems.clear();
+                producedCount = 0;
+                deliveredCount = 0;
+                lostCount = 0;
+                coins = 0;
+                plannedTotal = 0;
+        }
+
+        public EventBus events() { return eventBus; }
+
+        // Optional read-only views if you need them
+        public List<System> systemsView() { return Collections.unmodifiableList(systems); }
 }

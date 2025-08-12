@@ -1,27 +1,31 @@
 package play.model.services;
 
 import play.model.engine.GameEngine;
-import play.model.level.LevelLoaderV2;
+import play.model.level.LevelDto;
+import play.model.level.LevelFactory;
+import play.model.level.LevelParser;
 
-public class GameService {
+public final class GameService {
         private final GameEngine engine = new GameEngine();
-        private LevelLoaderV2.Loaded loaded;
-        private String currentLevel;
 
-        public GameEngine engine() { return engine; } // controllers may pass to RenderSystem
+        private double totalWire = 3000;
+        private int timeLimitSeconds = 120;
+        private int plannedSeeds = 0;
+        private String currentPath = null;
 
-        public void loadLevel(String path) {
-                engine.resetForLevel();
-                loaded = LevelLoaderV2.loadFromResource(engine, path);
-                currentLevel = path;
-                // remove any links injected by loaders
-                engine.entities().removeIf(e -> e.has(play.model.components.Link.class));
+        public void loadLevel(String resourcePath) {
+                currentPath = resourcePath;
+                LevelDto dto = LevelParser.parseFromResource(resourcePath);
+                LevelFactory.Result res = LevelFactory.applyToEngine(engine, dto);
+                this.totalWire = res.totalWire();
+                this.timeLimitSeconds = res.timeLimitSeconds();
+                this.plannedSeeds = res.plannedSeeds();
+                engine.setPlannedTotal(plannedSeeds);
         }
 
-        public String currentLevel() { return currentLevel; }
-        public double totalWire() { return (loaded != null ? loaded.totalWire : 3000); }
-        public int timeLimitSeconds() { return (loaded != null ? loaded.timeLimitSeconds : 120); }
-        public int plannedSeeds() { return (loaded != null ? loaded.plannedSeeds : 0); }
-
-        public void tick(double dt) { engine.tick(dt); }
+        public GameEngine engine() { return engine; }
+        public double totalWire() { return totalWire; }
+        public int timeLimitSeconds() { return timeLimitSeconds; }
+        public int plannedSeeds() { return plannedSeeds; }
+        public String currentLevelPath() { return currentPath; }
 }
