@@ -11,6 +11,30 @@ import java.util.*;
 public final class WiringService {
         private WiringService() {}
 
+        /** Result of precomputing a wiring operation. */
+        public static final class WiringComputation {
+                public final boolean valid;
+                public final String reason;        // null if valid
+                public final Entity fromPort;
+                public final Entity toPort;
+                public final double newWireLen;    // length of the new link (px)
+                public final double removedLen;    // total length of removed links (px)
+
+                public WiringComputation(boolean valid, String reason, Entity fromPort, Entity toPort,
+                                         double newWireLen, double removedLen) {
+                        this.valid = valid;
+                        this.reason = reason;
+                        this.fromPort = fromPort;
+                        this.toPort = toPort;
+                        this.newWireLen = newWireLen;
+                        this.removedLen = removedLen;
+                }
+
+                /** Net increase in wire usage (may be negative if you shorten the route). */
+                public double netIncrease() { return newWireLen - removedLen; }
+        }
+
+        /** Check entire board has exactly one wire per port. */
         public static boolean allPortsFilled(List<Entity> entities) {
                 Map<Entity, Integer> outDeg = new HashMap<>();
                 Map<Entity, Integer> inDeg  = new HashMap<>();
@@ -28,6 +52,7 @@ public final class WiringService {
                 return true;
         }
 
+        /** Graph connectivity across systems (ignores direction). */
         public static boolean isGraphConnected(List<Entity> entities) {
                 List<Entity> systems = new ArrayList<>();
                 for (Entity e : entities)
@@ -87,5 +112,60 @@ public final class WiringService {
                         }
                 }
                 return total;
+        }
+
+        /** Length if we add a link from->to. */
+        public static double linkLength(Entity fromPort, Entity toPort) {
+                Transform a = fromPort.get(Transform.class);
+                Transform b = toPort.get(Transform.class);
+                return Math.hypot(b.x - a.x, b.y - a.y);
+        }
+
+        /** Validate port compatibility only (no budget logic). */
+        public static String validatePorts(Entity fromPort, Entity toPort) {
+                if (fromPort == null || toPort == null) return "missing port(s)";
+                if (!fromPort.has(PortInfo.class) || !toPort.has(PortInfo.class)) return "not a port";
+                PortInfo a = fromPort.get(PortInfo.class);
+                PortInfo b = toPort.get(PortInfo.class);
+                if (a.io != PortInfo.IO.OUT || b.io != PortInfo.IO.IN) return "wrong IO direction";
+                if (a.parentSystem == b.parentSystem) return "same system";
+                if (a.shape != b.shape) return "shape mismatch";
+                if (!fromPort.has(Transform.class) || !toPort.has(Transform.class)) return "missing transforms";
+                return null; // OK
+        }
+
+        /**
+         * Compute a rewire plan:
+         * - validates ports
+         * - calculates removed wire (existing outgoing from fromPort + incoming to toPort)
+         * - calculates new wire length
+         */
+        public static WiringComputation compute(List<Entity> entities, Entity fromPort, Entity toPort) {
+                String err = validatePorts(fromPort, toPort);
+                if (err != null) {
+                        return new WiringComputation(false, err, fromPort, toPort, 0.0, 0.0);
+                }
+                List<Entity> outLinks = collectOutgoingLinks(entities, fromPort);
+                List<Entity> inLinks  = collectIncomingLinks(entities, toPort);
+                double removed = wireLengthForLinks(outLinks) + wireLengthForLinks(inLinks);
+                double added = linkLength(fromPort, toPort);
+                return new WiringComputation(true, null, fromPort, toPort, added, removed);
+        }
+
+        /**
+         * Execute the rewire operation (no budget checks):
+         * - removes existing outgoing from 'fromPort' and incoming to 'toPort'
+         * - adds a single Link(fromPort,toPort)
+         * Returns the newly created link entity.
+         */
+        public static Entity performRewire(List<Entity> entities, Entity fromPort, Entity toPort) {
+                List<Entity> outLinks = collectOutgoingLinks(entities, fromPort);
+                List<Entity> inLinks  = collectIncomingLinks(entities, toPort);
+                if (!outLinks.isEmpty()) entities.removeAll(outLinks);
+                if (!inLinks.isEmpty())  entities.removeAll(inLinks);
+
+                Entity linkE = new Entity().add(new Link(fromPort, toPort));
+                entities.add(linkE);
+                return linkE;
         }
 }
