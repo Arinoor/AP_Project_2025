@@ -214,7 +214,7 @@ public class MainController {
                                         checkWinLose();
                                 }
 
-                                // view-side updates
+                                // view-side updates (not part of engine)
                                 if (renderSystem != null) renderSystem.update(0);
                                 if (hudSystem != null) hudSystem.update(0);
 
@@ -224,19 +224,13 @@ public class MainController {
                 loop.start();
         }
 
-        // ---------- Non-blocking shop ----------
         private void openShop() {
-                boolean wasRunning = running;
+                boolean was = running;
                 running = false;
-
                 Stage owner = (Stage) gameCanvas.getScene().getWindow();
-                ShopViewHelper.showShop(owner, engine, shopSystem, () -> {
-                        // onClose callback (non-blocking): restore prior run state and focus canvas
-                        running = wasRunning;
-                        gameCanvas.requestFocus();
-                        updateStartButtonLabel();
-                        updateStartButtonStyle();
-                });
+                ShopViewHelper.showShop(owner, engine, shopSystem);
+                running = was;
+                gameCanvas.requestFocus();
         }
 
         private void toggleRun() {
@@ -322,12 +316,11 @@ public class MainController {
 
                 if (!resultDialogQueued) {
                         resultDialogQueued = true;
-                        javafx.application.Platform.runLater(() -> showResultDialogNonBlocking(win));
+                        javafx.application.Platform.runLater(() -> showResultDialog(win));
                 }
         }
 
-        // ---------- Non-blocking result dialog ----------
-        private void showResultDialogNonBlocking(boolean win) {
+        private void showResultDialog(boolean win) {
                 String title = win ? "Stage Cleared!" : "Game Over";
                 String header = win ? "Congratulations!" : "You Lost";
                 int planned = engine.getPlannedTotal();
@@ -363,20 +356,16 @@ public class MainController {
 
                 try { alert.initOwner(gameCanvas.getScene().getWindow()); } catch (Exception ignore) {}
 
-                final ButtonType finalNext = next;
-                alert.setOnHidden(ev -> {
-                        ButtonType res = alert.getResult();
-                        if (res == restart) {
+                Optional<ButtonType> res = alert.showAndWait();
+                if (res.isPresent()) {
+                        if (res.get() == restart) {
                                 initLevel(currentLevelPath);
-                        } else if (finalNext != null && res == finalNext) {
+                        } else if (next != null && res.get() == next) {
                                 initLevel(nextPath);
                         } else {
                                 try { GameNavigator.showMainMenu((Stage) gameCanvas.getScene().getWindow()); } catch (Exception ignore) {}
                         }
-                        resultDialogQueued = false; // allow future dialogs
-                });
-
-                alert.show(); // non-blocking
+                }
         }
 
         // ----- Wiring (pre-start only) -----
@@ -404,17 +393,29 @@ public class MainController {
         }
 
         private boolean tryCreateLink(Entity fromPort, Entity toPort) {
-                // Ask the service to compute plan (validation + lengths)
-                WiringService.WiringComputation comp = WiringService.compute(engine.entities(), fromPort, toPort);
-                if (!comp.valid) return false;
+                if (!fromPort.has(PortInfo.class) || !toPort.has(PortInfo.class)) return false;
+                PortInfo a = fromPort.get(PortInfo.class);
+                PortInfo b = toPort.get(PortInfo.class);
+                if (a.io != PortInfo.IO.OUT || b.io != PortInfo.IO.IN) return false;
+                if (a.parentSystem == b.parentSystem) return false;
+                if (a.shape != b.shape) return false;
 
-                double netInc = comp.netIncrease();
-                if (usedWire + netInc > totalWire) return false;
+                // replace any existing links from OUT or to IN (rewiring)
+                List<Entity> outLinks = WiringService.collectOutgoingLinks(engine.entities(), fromPort);
+                List<Entity> inLinks  = WiringService.collectIncomingLinks(engine.entities(), toPort);
+                double delta = WiringService.wireLengthForLinks(outLinks) + WiringService.wireLengthForLinks(inLinks);
+                if (!outLinks.isEmpty()) engine.entities().removeAll(outLinks);
+                if (!inLinks.isEmpty())  engine.entities().removeAll(inLinks);
+                usedWire -= delta; if (usedWire < 0) usedWire = 0;
 
-                // Apply rewire and update accounting
-                WiringService.performRewire(engine.entities(), fromPort, toPort);
-                usedWire += netInc;
-                if (usedWire < 0) usedWire = 0;
+                Transform ta = fromPort.get(Transform.class);
+                Transform tb = toPort.get(Transform.class);
+                double wireLen = Math.hypot(tb.x - ta.x, tb.y - ta.y);
+                if (usedWire + wireLen > totalWire) return false;
+
+                Entity linkE = new Entity().add(new Link(fromPort, toPort));
+                engine.entities().add(linkE);
+                usedWire += wireLen;
                 return true;
         }
 
@@ -449,9 +450,9 @@ public class MainController {
                 if (!running && hasStarted) startButton.getStyleClass().add("resume");
         }
 
-        /** Tiny helper to show the Shop modal without blocking the pulse. */
+        /** Tiny helper to show the Shop modal with injected engine/shop. */
         static final class ShopViewHelper {
-                static void showShop(Stage owner, GameEngine engine, ShopSystem shop, Runnable onClosed) {
+                static void showShop(Stage owner, GameEngine engine, ShopSystem shop) {
                         try {
                                 javafx.fxml.FXMLLoader loader = new javafx.fxml.FXMLLoader(
                                         MainController.class.getResource("/fxml/Shop.fxml")
@@ -477,14 +478,9 @@ public class MainController {
                                         stage.initModality(javafx.stage.Modality.APPLICATION_MODAL);
                                 }
 
-                                stage.setOnHidden(ev -> {
-                                        if (onClosed != null) onClosed.run();
-                                });
-
-                                stage.show(); // non-blocking
+                                stage.showAndWait();
                         } catch (Exception ex) {
                                 ex.printStackTrace();
-                                if (onClosed != null) onClosed.run();
                         }
                 }
         }
