@@ -1,100 +1,125 @@
-/* ---------- Design tokens ---------- */
+/* ====== Global tokens (JavaFX looked-up values) ====== */
 .root {
-    /* Neutrals */
-    -color-bg:             #111419;
-    -color-surface:        #181c22;
-    -color-surface-2:      #1f252d;
-    -color-elev:           #252c36;
+    /* text colors used by game.css/shop.css */
+    -fx-text-muted:   #9aa6b2;
+    -fx-text-strong:  #e6edf3;
 
-    /* Text */
-    -color-text:           #e6edf3;
-    -color-muted:          #9aa6b2;
-    -color-danger:         #ff6b6b;
-    -color-success:        #35d08a;
-    -color-warning:        #ffd166;
+    /* surfaces/palette */
+    -fx-bg:        #111419;
+    -fx-surface:   #181c22;
+    -fx-surface-2: #1f252d;
+    -fx-elev:      #252c36;
 
-    /* Accents */
-    -accent:               #40c7b5;
-    -accent-strong:        #2fb3a2;
-    -accent-soft:          #1a6f78;
+    /* accent */
+    -fx-accent:        #40c7b5;
+    -fx-accent-strong: #2fb3a2;
 
-    /* Focus ring */
-    -focus:                #79ffe1;
-
-    /* Radii / shadows */
-    -radius-lg:            16px;
-    -radius-md:            12px;
-    -radius-sm:            8px;
-
-    -shadow-1:             dropshadow(three-pass-box, rgba(0,0,0,0.35), 18, 0.15, 0, 6);
-    -shadow-2:             dropshadow(gaussian, rgba(0,0,0,0.45), 34, 0.25, 0, 10);
+    /* radii defaults (px) */
+    -fx-radius-lg: 16px;
+    -fx-radius-md: 12px;
+    -fx-radius-sm: 8px;
 }
 
-/* ---------- Scene base ---------- */
+/* ====== Scene base ====== */
 .root {
-    -fx-background-color: -color-bg;
+    -fx-background-color: -fx-bg;
     -fx-font-family: "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-    -fx-text-fill: -color-text;
+    -fx-text-fill: -fx-text-strong;
 }
 
 /* Containers */
-.hbox, .vbox, .border-pane, .anchor-pane { -fx-background-color: transparent; }
-.tool-bar, .menu-bar { -fx-background-color: -color-surface; -fx-effect: -shadow-1; }
-
-/* Labels */
-.label { -fx-text-fill: -color-text; -fx-font-size: 13px; }
-.label.muted { -fx-text-fill: -color-muted; }
-.label.success { -fx-text-fill: -color-success; }
-.label.danger { -fx-text-fill: -color-danger; }
-
-/* Buttons */
-.button {
-    -fx-background-color: linear-gradient(to bottom, -color-surface, -color-surface-2);
-    -fx-text-fill: -color-text;
-    -fx-padding: 8 16;
-    -fx-background-radius: -radius-md;
-    -fx-effect: -shadow-1;
-    -fx-border-color: rgba(255,255,255,0.06);
-    -fx-border-radius: -radius-md;
-    -fx-border-width: 1;
+.hbox, .vbox, .border-pane, .anchor-pane {
+    -fx-background-color: transparent;
 }
-.button:hover { -fx-background-color: linear-gradient(to bottom, -color-surface-2, -color-elev); }
-.button:pressed { -fx-background-color: -color-elev; -fx-translate-y: 1px; }
-.button:focused { -fx-effect: -shadow-2; -fx-border-color: -focus; }
+
+/* ====== Labels ====== */
+.label { -fx-text-fill: -fx-text-strong; -fx-font-size: 13px; }
+.label.muted { -fx-text-fill: -fx-text-muted; }
+.label.success { -fx-text-fill: -fx-success; }
+.label.danger  { -fx-text-fill: -fx-danger;  }
+
+/* ====== Buttons ====== */
+.button {
+    -fx-background-color: linear-gradient(to bottom, -fx-surface, -fx-surface-2);
+    -fx-text-fill: -fx-text-strong;
+    -fx-padding: 8 16;
+    -fx-background-radius: 12px;     /* explicit px units */
+    -fx-border-radius: 12px;
+    -fx-border-color: rgba(255,255,255,0.06);
+    -fx-border-width: 1px;
+}
+.button:hover   { -fx-background-color: linear-gradient(to bottom, -fx-surface-2, -fx-elev); }
+.button:pressed { -fx-background-color: -fx-elev; -fx-translate-y: 1px; }
+.button:focused { -fx-effect: dropshadow(gaussian, rgba(121,255,225,0.35), 20, 0.25, 0, 0); }
 
 .button.primary {
-    -fx-background-color: linear-gradient(to bottom, -accent, -accent-strong);
+    -fx-background-color: linear-gradient(to bottom, -fx-accent, -fx-accent-strong);
     -fx-text-fill: #0b1415;
-    -fx-font-weight: 700;
-    -fx-effect: -shadow-2;
+    -fx-font-weight: bold;
+    -fx-background-radius: 12px;
+    -fx-border-radius: 12px;
     -fx-border-color: transparent;
 }
-.button.primary:hover { -fx-background-color: linear-gradient(to bottom, -accent-strong, -accent); }
+.button.primary:hover { -fx-background-color: linear-gradient(to bottom, -fx-accent-strong, -fx-accent); }
 
 .button.danger {
-    -fx-background-color: linear-gradient(to bottom, #ff7a7a, #ff4d4d);
+    -fx-background-color: linear-gradient(to bottom, #ff8a8a, #ff5f5f);
     -fx-text-fill: #1b0d0d;
-    -fx-font-weight: 700;
+    -fx-font-weight: bold;
+    -fx-background-radius: 12px;
+    -fx-border-radius: 12px;
 }
 
-.button.round { -fx-background-radius: 999; -fx-padding: 10 14; }
+.button.round {
+    -fx-background-radius: 999px;
+    -fx-border-radius: 999px;
+    -fx-padding: 10 14;
+}
+
 .button:disabled { -fx-opacity: 0.45; }
 
-/* Slider */
+/* ====== Slider ====== */
 .slider { -fx-padding: 6 8; }
-.slider .track { -fx-background-color: derive(-color-surface-2, 10%); -fx-background-radius: 999; -fx-pref-height: 4px; }
-.slider .thumb { -fx-background-color: -accent; -fx-background-radius: 999; -fx-effect: -shadow-1; -fx-padding: 8; }
+.slider .track {
+    -fx-background-color: derive(-fx-surface-2, 10%);
+    -fx-background-radius: 999px;
+    -fx-pref-height: 4px;
+}
+.slider .thumb {
+    -fx-background-color: -fx-accent;
+    -fx-background-radius: 999px;
+    -fx-padding: 8px;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.35), 12, 0.2, 0, 2);
+}
 
-/* Dialogs */
-.dialog-pane { -fx-background-color: -color-surface; -fx-background-radius: -radius-lg; -fx-effect: -shadow-2; }
-.dialog-pane > .content.label { -fx-text-fill: -color-text; }
+/* ====== Dialogs ====== */
+.dialog-pane {
+    -fx-background-color: -fx-surface;
+    -fx-background-radius: 16px;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.45), 34, 0.25, 0, 10);
+}
+.dialog-pane > .content.label { -fx-text-fill: -fx-text-strong; }
 .dialog-pane:header .header-panel { -fx-background-color: transparent; }
-.dialog-pane .button { -fx-background-radius: -radius-sm; }
+.dialog-pane .button {
+    -fx-background-radius: 10px;
+    -fx-border-radius: 10px;
+}
 
-/* Pills / chips */
-.pill { -fx-background-color: -color-surface-2; -fx-text-fill: -color-text; -fx-padding: 10 14; -fx-background-radius: 999; }
-.hud-chip { -fx-background-color: -color-surface-2; -fx-text-fill: -color-muted; -fx-padding: 4 8; -fx-background-radius: 999; -fx-font-size: 12px; }
+/* ====== HUD chips / pills ====== */
+.pill {
+    -fx-background-color: -fx-surface-2;
+    -fx-text-fill: -fx-text-strong;
+    -fx-padding: 10 14;
+    -fx-background-radius: 999px;
+}
+.hud-chip {
+    -fx-background-color: -fx-surface-2;
+    -fx-text-fill: -fx-text-muted;
+    -fx-padding: 4 8;
+    -fx-background-radius: 999px;
+    -fx-font-size: 12px;
+}
 
-/* Scrolls */
+/* ====== Scroll panes ====== */
 .scroll-pane { -fx-background: transparent; -fx-background-color: transparent; }
 .scroll-pane .viewport { -fx-background-color: transparent; }

@@ -1,12 +1,30 @@
+/* Root of the menu scene */
+#menuRoot {
+    -fx-background-color: -fx-bg;
+    -fx-padding: 24px;
+}
+
+/* Title & subtitle */
+#gameTitle    { -fx-text-fill: -fx-text-strong; -fx-font-size: 28px; -fx-font-weight: 800; }
+#gameSubtitle { -fx-text-fill: -fx-text-muted;   -fx-font-size: 14px; }
+
+/* Menu buttons */
 #menuRoot .button {
     -fx-min-width: 260px;
     -fx-font-size: 16px;
-    -fx-background-radius: -radius-lg;
+    -fx-background-radius: 16px;  /* explicit px units */
+    -fx-border-radius: 16px;
     -fx-padding: 12 22;
 }
 
-#gameTitle { -fx-text-fill: -color-text; -fx-font-size: 28px; -fx-font-weight: 800; }
-#gameSubtitle { -fx-text-fill: -color-muted; -fx-font-size: 14px; }
-
-#cornerShop.button { -fx-background-color: linear-gradient(to bottom, #3fe0b7, #25b89f); }
-#cornerExit.button { -fx-background-color: linear-gradient(to bottom, #ff9e7a, #ff6f61); }
+/* Accented corner actions if you add them (optional) */
+#cornerShop.button {
+    -fx-background-color: linear-gradient(to bottom, #3fe0b7, #25b89f);
+    -fx-background-radius: 16px;
+    -fx-border-radius: 16px;
+}
+#cornerExit.button {
+    -fx-background-color: linear-gradient(to bottom, #ff9e7a, #ff6f61);
+    -fx-background-radius: 16px;
+    -fx-border-radius: 16px;
+}

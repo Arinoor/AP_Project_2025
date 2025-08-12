@@ -1,21 +1,55 @@
-#hudBar {
-    -fx-background-color: -color-surface;
-    -fx-padding: 8;
-    -fx-effect: -shadow-1;
-}
-#hudBar .label { -fx-text-fill: -color-muted; }
-#coinsLabel, #timeLabel { -fx-text-fill: -color-text; }
+/* Uses looked-up values defined in theme.css */
 
-#startButton { -fx-font-weight: 700; }
-#startButton.resume {
-    -fx-background-color: linear-gradient(to bottom, -accent, -accent-strong);
-    -fx-text-fill: #0b1415;
+/* Top HUD bar (give the HBox fx:id="hudBar" in FXML) */
+#hudBar, *#hudBar {
+    -fx-background-color: -fx-surface;
+    -fx-background-radius: 12px;
+    -fx-padding: 8 12;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 16, 0.25, 0, 4);
 }
 
-#bottomStrip { -fx-background-color: transparent; -fx-padding: 8 12 12 12; }
+/* HUD labels */
+#hudBar .label, *#hudBar *.label {
+    -fx-text-fill: -fx-text-muted;
+    -fx-font-size: 12px;
+}
 
-#canvasContainer {
-    -fx-background-color: -color-surface-2;
-    -fx-background-radius: -radius-lg;
-    -fx-effect: -shadow-1;
+/* Emphasis values (you can set styleClass="value" on important labels) */
+#hudBar .value { -fx-text-fill: -fx-text-strong; -fx-font-weight: bold; }
+
+/* Buttons inside the HUD inherit theme.css; tweak sizes only */
+#hudBar .button {
+    -fx-background-radius: 10px;
+    -fx-border-radius: 10px;
+    -fx-padding: 6 12;
+}
+
+/* Start/Resume button emphasis handled by .primary and .resume classes (theme.css) */
+
+/* Time slider row under the canvas */
+#timeRow, *#timeRow {
+    -fx-padding: 8 12;
+}
+#timeRow .label {
+    -fx-text-fill: -fx-text-muted;
+}
+
+/* Slider visuals (builds on theme.css defaults) */
+.slider .track {
+    -fx-background-color: derive(-fx-surface-2, 10%);
+    -fx-background-radius: 999px;
+    -fx-pref-height: 4px;
+}
+.slider .thumb {
+    -fx-background-color: -fx-accent;
+    -fx-background-radius: 999px;
+    -fx-padding: 8px;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.35), 12, 0.2, 0, 2);
+}
+
+/* Canvas container (fx:id="canvasContainer") */
+#canvasContainer, *#canvasContainer {
+    -fx-background-color: -fx-bg;
+    -fx-background-radius: 12px;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.15), 12, 0.20, 0, 2);
 }

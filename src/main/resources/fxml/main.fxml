@@ -2,7 +2,7 @@
 <?import javafx.scene.canvas.Canvas?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
-<BorderPane xmlns:fx="http://javafx.com/fxml/1" fx:controller="play.ui.MainController">
+<BorderPane xmlns:fx="http://javafx.com/fxml/1" fx:controller="play.controller.MainController">
     <top>
         <HBox fx:id="hudBar" spacing="12">
             <Label text="Conduit Garden" style="-fx-font-weight:bold;"/>

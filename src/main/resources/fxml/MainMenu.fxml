@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
-<BorderPane xmlns:fx="http://javafx.com/fxml/1" fx:controller="play.ui.MainMenuController"
+<BorderPane xmlns:fx="http://javafx.com/fxml/1" fx:controller="play.controller.MainMenuController"
             fx:id="menuRoot" style="-fx-padding:24;">
     <center>
         <VBox spacing="16" alignment="CENTER">

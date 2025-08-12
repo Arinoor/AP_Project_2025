@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
-<VBox xmlns:fx="http://javafx.com/fxml/1" fx:controller="play.ui.ShopController"
+<VBox xmlns:fx="http://javafx.com/fxml/1" fx:controller="play.controller.ShopController"
       fx:id="shopRoot" spacing="12">
     <Label text="Shop" styleClass="title"/>
     <HBox spacing="8" styleClass="shop-row">
