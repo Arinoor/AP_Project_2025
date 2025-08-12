@@ -1,9 +1,9 @@
 package play.model.systems;
 
-import play.model.components.*;
 import play.model.core.Entity;
 import play.model.components.*;
 import play.model.engine.GameEngine;
+import play.model.physics.Kinematics;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -120,5 +120,4 @@ public class ProductionSystem implements System {
                 }
                 return true;
         }
-
 }

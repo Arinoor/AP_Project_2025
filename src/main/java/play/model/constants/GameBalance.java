@@ -15,4 +15,12 @@ public final class GameBalance {
 
         // Device buffer capacity (QueueSystem)
         public static final int DEVICE_CAPACITY = 5;
+
+        // Movement/physics
+        public static final double SQUARE_BASE_SPEED         = 120.0; // px/s
+        public static final double TRIANGLE_BASE_SPEED       = 140.0; // px/s
+        public static final double TRIANGLE_INCOMPAT_ACCEL   = 220.0; // px/s^2
+
+        public static final double LATERAL_DAMP              = 0.98;  // per tick factor
+        public static final double IMPACT_COOLDOWN_OFF       = 0.15;  // energy threshold
 }

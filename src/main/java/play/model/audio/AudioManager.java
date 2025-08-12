@@ -1,4 +1,4 @@
-package play.audio;
+package play.model.audio;
 
 import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;

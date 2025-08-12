@@ -4,18 +4,12 @@ import play.model.core.Entity;
 import play.model.components.*;
 import play.model.engine.GameEngine;
 import play.model.constants.GameBalance;
+import play.model.physics.Kinematics;
 
 import java.util.*;
 
 /**
- * Handles:
- *  - Detect arrivals (progress >= 1.0) into the target system.
- *  - If target system is a Reference: consume + score.
- *  - Otherwise buffer per-device (capacity from GameBalance) and flush to any free OUT link.
- *    Preference: a free, compatible OUT link; else any free OUT link at random.
- *  - Applies per-hop kinematics on dispatch (triangle accel rule, square half-speed on compatible).
- *
- * This replaces the old RoutingSystem.
+ * Handles arrivals into target systems, coins, buffering, and dispatch.
  */
 public class QueueSystem implements System {
 
@@ -148,7 +142,7 @@ public class QueueSystem implements System {
                                 PortInfo.Shape outShape = l.fromPort.get(PortInfo.class).shape;
 
                                 // per-hop kinematics
-                                applyKinematicsForHop(s, outShape);
+                                Kinematics.applyForHop(s, outShape);
 
                                 // place at OUT port and start hop
                                 Transform tFrom = l.fromPort.get(Transform.class);
@@ -170,21 +164,5 @@ public class QueueSystem implements System {
                         if (e.get(Seed.class).currentLink == link) return false; // one seed per wire at a time
                 }
                 return true;
-        }
-
-        /** Per-hop rules from the spec. */
-        private void applyKinematicsForHop(Seed s, PortInfo.Shape outShape) {
-                boolean compatibleStart =
-                        (s.type == Seed.Type.SQUARE  && outShape == PortInfo.Shape.SQUARE) ||
-                                (s.type == Seed.Type.TRIANGLE && outShape == PortInfo.Shape.TRIANGLE);
-
-                if (s.type == Seed.Type.SQUARE) {
-                        double base = 120.0;
-                        s.speed = compatibleStart ? base * 0.5 : base; // half when compatible
-                        s.accel = 0.0;
-                } else {
-                        s.speed = 140.0;
-                        s.accel = compatibleStart ? 0.0 : 220.0;       // accelerate when incompatible
-                }
         }
 }

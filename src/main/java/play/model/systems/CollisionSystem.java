@@ -1,11 +1,10 @@
 package play.model.systems;
 
-import play.audio.AudioManager;
+import play.model.audio.AudioManager;
 import play.model.components.Link;
 import play.model.components.Seed;
 import play.model.components.Transform;
 import play.model.core.Entity;
-import play.model.components.*;
 import play.model.engine.GameEngine;
 
 import java.util.*;

@@ -1,14 +1,14 @@
 package play.model.systems;
 
-import play.model.components.Link;
-import play.model.components.Seed;
-import play.model.components.Transform;
 import play.model.core.Entity;
 import play.model.components.*;
 import play.model.engine.GameEngine;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import static play.model.constants.GameBalance.IMPACT_COOLDOWN_OFF;
+import static play.model.constants.GameBalance.LATERAL_DAMP;
 
 /**
  * Moves seeds along links, applies accel, and removes seeds that exceed
@@ -21,8 +21,6 @@ public class SeedMovementSystem implements System {
 
         private final double pixelsPerUnit;
 
-        private static final double LATERAL_DAMP = 0.98;
-        private static final double IMPACT_COOLDOWN_OFF = 0.15;
         private static final double MIN_LINK_LEN = 1e-3;
 
         public SeedMovementSystem(GameEngine engine, List<Entity> entities, ShopSystem shopSystem, double pixelsPerUnit) {

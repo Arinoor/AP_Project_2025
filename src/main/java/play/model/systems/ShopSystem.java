@@ -34,9 +34,6 @@ public class ShopSystem implements System {
                 if (state.disableLateral     && time >= state.latOffUntil)    state.disableLateral     = false;
         }
 
-        // === SHOP ACTIONS ===
-
-        /** Atar: disable Impact waves for 10s. Cost: 3 coins. */
         public boolean buyAtar() {
                 if (engine.getCoins() < GameBalance.COST_ATAR) return false;
                 engine.incrementCoins(-GameBalance.COST_ATAR);
@@ -45,7 +42,6 @@ public class ShopSystem implements System {
                 return true;
         }
 
-        /** Airyaman: disable collisions for 5s. Cost: 4 coins. */
         public boolean buyAiryaman() {
                 if (engine.getCoins() < GameBalance.COST_AIRYAMAN) return false;
                 engine.incrementCoins(-GameBalance.COST_AIRYAMAN);
@@ -54,20 +50,16 @@ public class ShopSystem implements System {
                 return true;
         }
 
-        /**
-         * Anahita: reset "noise" (collisions) now. Cost: 5 coins.
-         * This is performed in the model (not the UI) to respect SRP.
-         */
+        /** Reset noise/collisions now (model-side, not UI). */
         public boolean buyAnahita() {
                 if (engine.getCoins() < GameBalance.COST_ANAHITA) return false;
                 engine.incrementCoins(-GameBalance.COST_ANAHITA);
-
                 for (Entity e : engine.entities()) {
                         if (!e.has(Seed.class)) continue;
                         Seed s = e.get(Seed.class);
                         s.collisions = 0;
                         s.noise = 0.0;
-                        s.lateral = 0.0; // optional: also wipe lateral offset
+                        s.lateral = 0.0;
                 }
                 return true;
         }

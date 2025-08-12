@@ -15,6 +15,7 @@ import play.model.core.Entity;
 import play.model.engine.GameEngine;
 import play.model.services.GameService;
 import play.model.services.LevelRepository;
+import play.model.services.WiringService;
 import play.model.systems.*;
 import play.render.RenderSystem;
 import play.render.HudSystem;
@@ -37,11 +38,9 @@ public class MainController {
         @FXML private Canvas gameCanvas;
         @FXML private AnchorPane canvasContainer;
 
-        // MVC service and level repo
         private final GameService game = new GameService();
         private final LevelRepository levels = new LevelRepository();
 
-        // Engine & systems (model)
         private GameEngine engine;
         private ShopSystem shopSystem;
         private ProductionSystem productionSystem;
@@ -49,11 +48,10 @@ public class MainController {
         private SeedMovementSystem movementSystem;
         private CollisionSystem collisionSystem;
 
-        // View-side systems
+        // View-side systems (NOT registered in engine)
         private RenderSystem renderSystem;
         private HudSystem hudSystem;
 
-        // Level meta
         private String currentLevelPath = "/levels/level1.json";
         private int timeLimitSeconds = 120;
         private double timeRemaining = 120.0;
@@ -61,27 +59,22 @@ public class MainController {
         private boolean gameEnded = false;
         private boolean resultDialogQueued = false;
 
-        // Wiring interaction (pre-start only)
         private boolean wiringMode = false;
         private Entity dragStartPort = null;
         private double dragX, dragY;
 
-        // Time control
         private boolean forwardPressed = false;
         private boolean backwardPressed = false;
         private double timeScale = 1.0;
         private static final double FAST = 3.0;
         private static final double SLOW = 0.25;
 
-        // Wire budget
         private double totalWire = 3000;
         private double usedWire  = 0;
 
-        // Flow state
         private boolean running = false;
         private boolean hasStarted = false;
 
-        // Loop timing
         private AnimationTimer loop;
         private long prevNanos = 0L;
         private double elapsed = 0.0;
@@ -93,7 +86,6 @@ public class MainController {
                 game.loadLevel(currentLevelPath);
                 engine = game.engine();
 
-                // Reset UI/gameplay flags
                 usedWire = 0;
                 timeUpHandled = false;
                 gameEnded = false;
@@ -109,7 +101,7 @@ public class MainController {
                 timeRemaining = timeLimitSeconds;
                 engine.setPlannedTotal(game.plannedSeeds());
 
-                // Wire model systems
+                // Model systems
                 shopSystem       = new ShopSystem(engine);
                 productionSystem = new ProductionSystem(engine, engine.entities(), 0.2);
                 queueSystem      = new QueueSystem(engine, engine.entities());
@@ -122,10 +114,9 @@ public class MainController {
                 engine.addSystem(movementSystem);
                 engine.addSystem(collisionSystem);
 
-                // View-side systems
+                // View-side systems (do NOT register in engine)
                 GraphicsContext gc = gameCanvas.getGraphicsContext2D();
                 renderSystem = new RenderSystem(engine.entities(), gc);
-                engine.addSystem(renderSystem);
 
                 hudSystem = new HudSystem(
                         engine,
@@ -135,7 +126,6 @@ public class MainController {
                         () -> usedWire,
                         () -> timeRemaining
                 );
-                engine.addSystem(hudSystem);
 
                 setupUiHooks();
                 startLoop();
@@ -224,7 +214,7 @@ public class MainController {
                                         checkWinLose();
                                 }
 
-                                // view-side updates
+                                // view-side updates (not part of engine)
                                 if (renderSystem != null) renderSystem.update(0);
                                 if (hudSystem != null) hudSystem.update(0);
 
@@ -410,8 +400,13 @@ public class MainController {
                 if (a.parentSystem == b.parentSystem) return false;
                 if (a.shape != b.shape) return false;
 
-                removeOutgoingLinks(fromPort);
-                removeIncomingLinks(toPort);
+                // replace any existing links from OUT or to IN (rewiring)
+                List<Entity> outLinks = WiringService.collectOutgoingLinks(engine.entities(), fromPort);
+                List<Entity> inLinks  = WiringService.collectIncomingLinks(engine.entities(), toPort);
+                double delta = WiringService.wireLengthForLinks(outLinks) + WiringService.wireLengthForLinks(inLinks);
+                if (!outLinks.isEmpty()) engine.entities().removeAll(outLinks);
+                if (!inLinks.isEmpty())  engine.entities().removeAll(inLinks);
+                usedWire -= delta; if (usedWire < 0) usedWire = 0;
 
                 Transform ta = fromPort.get(Transform.class);
                 Transform tb = toPort.get(Transform.class);
@@ -422,37 +417,6 @@ public class MainController {
                 engine.entities().add(linkE);
                 usedWire += wireLen;
                 return true;
-        }
-
-        private void removeOutgoingLinks(Entity fromPort) {
-                List<Entity> toRemove = new ArrayList<>();
-                for (Entity e : engine.entities()) {
-                        if (!e.has(Link.class)) continue;
-                        if (e.get(Link.class).fromPort == fromPort) toRemove.add(e);
-                }
-                subtractWireForLinks(toRemove);
-                engine.entities().removeAll(toRemove);
-        }
-        private void removeIncomingLinks(Entity toPort) {
-                List<Entity> toRemove = new ArrayList<>();
-                for (Entity e : engine.entities()) {
-                        if (!e.has(Link.class)) continue;
-                        if (e.get(Link.class).toPort == toPort) toRemove.add(e);
-                }
-                subtractWireForLinks(toRemove);
-                engine.entities().removeAll(toRemove);
-        }
-        private void subtractWireForLinks(List<Entity> links) {
-                for (Entity e : links) {
-                        Link l = e.get(Link.class);
-                        if (l.fromPort != null && l.toPort != null &&
-                                l.fromPort.has(Transform.class) && l.toPort.has(Transform.class)) {
-                                Transform a = l.fromPort.get(Transform.class);
-                                Transform b = l.toPort.get(Transform.class);
-                                usedWire -= Math.hypot(b.x - a.x, b.y - a.y);
-                        }
-                }
-                if (usedWire < 0) usedWire = 0;
         }
 
         private Entity findPortAt(double x, double y) {
@@ -470,54 +434,9 @@ public class MainController {
                 if (gameEnded) { startButton.setDisable(true); return; }
                 if (running)    { startButton.setDisable(false); return; }
                 if (hasStarted) { startButton.setDisable(false); return; }
-                boolean allFilled = allPortsFilled();
-                boolean connected = isGraphConnected();
+                boolean allFilled = WiringService.allPortsFilled(engine.entities());
+                boolean connected = WiringService.isGraphConnected(engine.entities());
                 startButton.setDisable(!(allFilled && connected));
-        }
-
-        private boolean allPortsFilled() {
-                Map<Entity, Integer> outDeg = new HashMap<>();
-                Map<Entity, Integer> inDeg  = new HashMap<>();
-                for (Entity e : engine.entities()) if (e.has(Link.class)) {
-                        Link l = e.get(Link.class);
-                        outDeg.merge(l.fromPort, 1, Integer::sum);
-                        inDeg.merge(l.toPort, 1, Integer::sum);
-                }
-                for (Entity e : engine.entities()) {
-                        if (!e.has(PortInfo.class)) continue;
-                        PortInfo p = e.get(PortInfo.class);
-                        if (p.io == PortInfo.IO.OUT && outDeg.getOrDefault(e, 0) != 1) return false;
-                        if (p.io == PortInfo.IO.IN  && inDeg.getOrDefault(e, 0)  != 1) return false;
-                }
-                return true;
-        }
-
-        private boolean isGraphConnected() {
-                List<Entity> systems = engine.entities().stream()
-                        .filter(e -> e.has(Transform.class) && !e.has(PortInfo.class))
-                        .collect(Collectors.toList());
-                if (systems.isEmpty()) return true;
-
-                Map<Entity, Set<Entity>> adj = new HashMap<>();
-                for (Entity s : systems) adj.put(s, new HashSet<>());
-                for (Entity e : engine.entities()) {
-                        if (!e.has(Link.class)) continue;
-                        Link l = e.get(Link.class);
-                        Entity A = l.fromPort.get(PortInfo.class).parentSystem;
-                        Entity B = l.toPort.get(PortInfo.class).parentSystem;
-                        adj.get(A).add(B);
-                        adj.get(B).add(A);
-                }
-
-                Set<Entity> seen = new HashSet<>();
-                Deque<Entity> dq = new ArrayDeque<>();
-                dq.add(systems.get(0));
-                seen.add(systems.get(0));
-                while (!dq.isEmpty()) {
-                        Entity u = dq.pollFirst();
-                        for (Entity v : adj.getOrDefault(u, Set.of())) if (seen.add(v)) dq.add(v);
-                }
-                return seen.size() == systems.size();
         }
 
         private void updateStartButtonLabel() {

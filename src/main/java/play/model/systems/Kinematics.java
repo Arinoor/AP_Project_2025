@@ -1,24 +1,26 @@
-package play.model.systems;
+package play.model.physics;
 
 import play.model.components.PortInfo;
 import play.model.components.Seed;
+import play.model.constants.GameBalance;
 
-/** One source of truth for per-hop speed/accel rules. */
 public final class Kinematics {
         private Kinematics() {}
 
+        /** Apply per-hop kinematics based on the OUT port shape and seed type. */
         public static void applyForHop(Seed s, PortInfo.Shape outShape) {
                 boolean compatible =
                         (s.type == Seed.Type.SQUARE  && outShape == PortInfo.Shape.SQUARE) ||
                                 (s.type == Seed.Type.TRIANGLE && outShape == PortInfo.Shape.TRIANGLE);
 
                 if (s.type == Seed.Type.SQUARE) {
-                        double base = 120.0;
-                        s.speed = compatible ? base * 0.5 : base; // half when compatible
+                        s.speed = compatible
+                                ? GameBalance.SQUARE_BASE_SPEED * 0.5
+                                : GameBalance.SQUARE_BASE_SPEED;
                         s.accel = 0.0;
                 } else { // TRIANGLE
-                        s.speed = 140.0;
-                        s.accel = compatible ? 0.0 : 220.0;       // accelerate when incompatible
+                        s.speed = GameBalance.TRIANGLE_BASE_SPEED;
+                        s.accel = compatible ? 0.0 : GameBalance.TRIANGLE_INCOMPAT_ACCEL;
                 }
         }
 }
