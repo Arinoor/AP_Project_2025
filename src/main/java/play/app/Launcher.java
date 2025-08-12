@@ -1,4 +1,4 @@
-package play;
+package play.app;
 
 import play.controller.GameApp;
 

@@ -1,30 +1,30 @@
 package play.model.systems;
 
-import play.model.components.*;
 import play.model.core.Entity;
 import play.model.components.*;
 import play.model.engine.GameEngine;
+import play.model.constants.GameBalance;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 
 /**
  * Handles:
  *  - Detect arrivals (progress >= 1.0) into the target system.
  *  - If target system is a Reference: consume + score.
- *  - Otherwise buffer per-device (capacity 5) using a Queue component on the SYSTEM entity.
- *  - Flush from each system's device Queue to any free OUT link (prefer compatible).
- *  - Applies per-hop kinematics on dispatch.
+ *  - Otherwise buffer per-device (capacity from GameBalance) and flush to any free OUT link.
+ *    Preference: a free, compatible OUT link; else any free OUT link at random.
+ *  - Applies per-hop kinematics on dispatch (triangle accel rule, square half-speed on compatible).
  *
- * Port-level Queue components are ignored by this system.
+ * This replaces the old RoutingSystem.
  */
 public class QueueSystem implements System {
 
-        private static final int DEVICE_CAPACITY = 5;
-
         private final GameEngine engine;
         private final List<Entity> entities;
+
+        /** Per-device buffer (queue) of waiting seed entities. */
+        private final Map<Entity, Deque<Entity>> deviceQueues = new HashMap<>();
+
         private final Random rng = new Random();
 
         public QueueSystem(GameEngine engine, List<Entity> entities) {
@@ -63,9 +63,11 @@ public class QueueSystem implements System {
                         s.progress = 0.0;
                         s.lateral = 0.0;
 
-                        // coins on entry (1 for square, 2 for triangle)
-                        if (s.type == Seed.Type.SQUARE) engine.incrementCoins(1);
-                        else engine.incrementCoins(2);
+                        // coins per packet entering a system: square=1, triangle=2
+                        int reward = (s.type == Seed.Type.SQUARE)
+                                ? GameBalance.COIN_REWARD_SQUARE
+                                : GameBalance.COIN_REWARD_TRIANGLE;
+                        engine.incrementCoins(reward);
 
                         // Reference systems consume (do not forward)
                         if (system.has(Reference.class)) {
@@ -75,29 +77,22 @@ public class QueueSystem implements System {
                                 continue;
                         }
 
-                        // Enqueue into the DEVICE queue (component on the system). Create if missing.
-                        Queue deviceQ = system.has(Queue.class) ? system.get(Queue.class) : null;
-                        if (deviceQ == null) {
-                                deviceQ = new Queue(DEVICE_CAPACITY);
-                                system.add(deviceQ);
-                        }
-
-                        if (deviceQ.size() >= DEVICE_CAPACITY) {
+                        // Enqueue into the device buffer
+                        Deque<Entity> buf = deviceQueues.computeIfAbsent(system, k -> new ArrayDeque<>());
+                        if (buf.size() >= GameBalance.DEVICE_CAPACITY) {
                                 // storage overflow => packet loss
                                 entities.remove(seedE);
                                 engine.incrementLost();
-                        } else {
-                                deviceQ.push(seedE);
+                                continue;
                         }
+                        buf.addLast(seedE);
                 }
 
                 // 3) Try to flush each device's queue to an available OUT link
-                // Iterate over all systems (entities with Transform and NOT a Port/Seed/Link).
-                for (Entity system : entities) {
-                        if (!isSystemEntity(system)) continue;
-
-                        Queue deviceQ = system.has(Queue.class) ? system.get(Queue.class) : null;
-                        if (deviceQ == null || deviceQ.isEmpty()) continue;
+                for (Map.Entry<Entity, Deque<Entity>> entry : deviceQueues.entrySet()) {
+                        Entity system = entry.getKey();
+                        Deque<Entity> buf = entry.getValue();
+                        if (buf.isEmpty()) continue;
 
                         // Build lists of free OUT links from this system, grouped by shape
                         List<Entity> freeSquare = new ArrayList<>();
@@ -115,11 +110,12 @@ public class QueueSystem implements System {
                                 else freeTriangle.add(e);
                         }
 
+                        // While we can ship something out, do it
                         boolean progressed = true;
-                        while (progressed && !deviceQ.isEmpty()) {
+                        while (progressed && !buf.isEmpty()) {
                                 progressed = false;
 
-                                Entity seedE = deviceQ.peek();
+                                Entity seedE = buf.peekFirst();
                                 if (seedE == null) break;
                                 Seed s = seedE.get(Seed.class);
 
@@ -145,14 +141,14 @@ public class QueueSystem implements System {
                                 // If still nothing, stop trying this device (it's congested)
                                 if (chosenLinkE == null) break;
 
-                                // Dispatch
-                                deviceQ.pop();
+                                // We can dispatch this seed
+                                buf.removeFirst();
 
                                 Link l = chosenLinkE.get(Link.class);
                                 PortInfo.Shape outShape = l.fromPort.get(PortInfo.class).shape;
 
-                                // per-hop kinematics (centralized)
-                                Kinematics.applyForHop(s, outShape);
+                                // per-hop kinematics
+                                applyKinematicsForHop(s, outShape);
 
                                 // place at OUT port and start hop
                                 Transform tFrom = l.fromPort.get(Transform.class);
@@ -168,19 +164,27 @@ public class QueueSystem implements System {
                 }
         }
 
-        private boolean isSystemEntity(Entity e) {
-                return e.has(Transform.class)
-                        && !e.has(PortInfo.class)
-                        && !e.has(Seed.class)
-                        && !e.has(Link.class);
-        }
-
         private boolean isLinkFree(Link link) {
                 for (Entity e : entities) {
                         if (!e.has(Seed.class)) continue;
-                        Seed s = e.get(Seed.class);
-                        if (s.currentLink == link) return false; // one seed per wire at a time
+                        if (e.get(Seed.class).currentLink == link) return false; // one seed per wire at a time
                 }
                 return true;
+        }
+
+        /** Per-hop rules from the spec. */
+        private void applyKinematicsForHop(Seed s, PortInfo.Shape outShape) {
+                boolean compatibleStart =
+                        (s.type == Seed.Type.SQUARE  && outShape == PortInfo.Shape.SQUARE) ||
+                                (s.type == Seed.Type.TRIANGLE && outShape == PortInfo.Shape.TRIANGLE);
+
+                if (s.type == Seed.Type.SQUARE) {
+                        double base = 120.0;
+                        s.speed = compatibleStart ? base * 0.5 : base; // half when compatible
+                        s.accel = 0.0;
+                } else {
+                        s.speed = 140.0;
+                        s.accel = compatibleStart ? 0.0 : 220.0;       // accelerate when incompatible
+                }
         }
 }

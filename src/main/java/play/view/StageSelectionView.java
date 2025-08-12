@@ -2,21 +2,27 @@ package play.view;
 
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
-import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.RadioButton;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
-import play.controller.GameNavigator;
 
-/** Minimal level picker. Add more levels here if you add files. */
+import java.util.function.Consumer;
+
+/** Minimal level picker dialog. Calls back with the chosen level path. */
 public final class StageSelectionView {
         private StageSelectionView() {}
 
-        public static void show(Stage owner) {
+        /** Show a modal dialog to pick a level; onSelected receives the chosen classpath (e.g., "/levels/level1.json"). */
+        public static void show(Stage owner, Consumer<String> onSelected) {
                 Dialog<String> dlg = new Dialog<>();
-                dlg.initOwner(owner);
-                dlg.initModality(Modality.APPLICATION_MODAL);
+                if (owner != null) {
+                        dlg.initOwner(owner);
+                        dlg.initModality(Modality.WINDOW_MODAL);
+                } else {
+                        dlg.initModality(Modality.APPLICATION_MODAL);
+                }
                 dlg.setTitle("Select Stage");
 
                 ToggleGroup group = new ToggleGroup();
@@ -42,9 +48,7 @@ public final class StageSelectionView {
                 });
 
                 dlg.showAndWait().ifPresent(path -> {
-                        if (path != null) {
-                                GameNavigator.startGame(owner, path);
-                        }
+                        if (onSelected != null) onSelected.accept(path);
                 });
         }
 }

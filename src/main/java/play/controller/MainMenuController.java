@@ -16,7 +16,14 @@ public class MainMenuController {
         @FXML
         private void initialize() {
                 startBtn.setOnAction(e -> GameNavigator.startGame(stage(), "/levels/level1.json"));
-                stagesBtn.setOnAction(e -> StageSelectionView.show(stage()));
+
+                // Now decoupled: view calls back; controller starts the game
+                stagesBtn.setOnAction(e ->
+                        StageSelectionView.show(stage(), path -> {
+                                if (path != null) GameNavigator.startGame(stage(), path);
+                        })
+                );
+
                 settingsBtn.setOnAction(e -> SettingsView.show(stage()));
                 exitBtn.setOnAction(e -> Platform.exit());
         }

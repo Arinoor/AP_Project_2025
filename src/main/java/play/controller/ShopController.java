@@ -8,7 +8,6 @@ import play.model.systems.ShopSystem;
 
 public class ShopController {
 
-        // --- match Shop.fxml ids
         @FXML private Button btnAtar;
         @FXML private Button btnAiryaman;
         @FXML private Button btnAnahita;
@@ -18,7 +17,6 @@ public class ShopController {
         @FXML private Label  lblAnaMsg;
         @FXML private Label  coinsInfo;
 
-        // --- Core refs injected by caller ---
         private GameEngine engine;
         private ShopSystem shop;
 
@@ -29,52 +27,35 @@ public class ShopController {
                 clearStatus();
         }
 
-        @FXML
-        private void initialize() {
-                // engine/shop arrive via init()
-        }
-
-        @FXML
-        private void onAtar() {
-                if (shop.buyAtar()) {
-                        lblAtarMsg.setText("Impact waves disabled for 10s.");
-                } else {
-                        lblAtarMsg.setText("Not enough coins (need 3).");
-                }
+        @FXML private void onAtar() {
+                if (shop.buyAtar()) lblAtarMsg.setText("Impact waves disabled for 10s.");
+                else lblAtarMsg.setText("Not enough coins (need 3).");
                 refreshCoins();
         }
 
-        @FXML
-        private void onAiryaman() {
-                if (shop.buyAiryaman()) {
-                        lblAiryMsg.setText("Collisions disabled for 5s.");
-                } else {
-                        lblAiryMsg.setText("Not enough coins (need 4).");
-                }
+        @FXML private void onAiryaman() {
+                if (shop.buyAiryaman()) lblAiryMsg.setText("Collisions disabled for 5s.");
+                else lblAiryMsg.setText("Not enough coins (need 4).");
                 refreshCoins();
         }
 
-        @FXML
-        private void onAnahita() {
+        @FXML private void onAnahita() {
                 if (shop.buyAnahita()) {
                         lblAnaMsg.setText("All packet noise reset.");
                 } else {
-                        lblAnaMsg.setText("Not enough coins (need " + ShopSystem.COST_ANAHITA + ").");
+                        lblAnaMsg.setText("Not enough coins (need 5).");
                 }
                 refreshCoins();
         }
 
-        @FXML
-        private void onClose() {
+        @FXML private void onClose() {
+                clearStatus();
                 ((javafx.stage.Stage) closeBtn.getScene().getWindow()).close();
         }
 
         private void refreshCoins() {
-                if (coinsInfo != null && engine != null) {
-                        coinsInfo.setText("Your coins: " + engine.getCoins());
-                }
+                if (coinsInfo != null && engine != null) coinsInfo.setText("Your coins: " + engine.getCoins());
         }
-
         private void clearStatus() {
                 if (lblAtarMsg != null) lblAtarMsg.setText("");
                 if (lblAiryMsg != null) lblAiryMsg.setText("");

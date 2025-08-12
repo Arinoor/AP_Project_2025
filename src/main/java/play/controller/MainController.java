@@ -17,6 +17,7 @@ import play.model.services.GameService;
 import play.model.services.LevelRepository;
 import play.model.systems.*;
 import play.render.RenderSystem;
+import play.render.HudSystem;
 import play.view.UiConstants;
 
 import java.util.*;
@@ -530,7 +531,7 @@ public class MainController {
                 if (!running && hasStarted) startButton.getStyleClass().add("resume");
         }
 
-        /** Shop modal helper with stylesheet injection and modality. */
+        /** Tiny helper to show the Shop modal with injected engine/shop. */
         static final class ShopViewHelper {
                 static void showShop(Stage owner, GameEngine engine, ShopSystem shop) {
                         try {
