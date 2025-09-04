@@ -30,6 +30,10 @@ public class Seed {
 
         public boolean justCollided = false;
 
+        /** If true, this seed is travelling back along its currentLink toward the source. */
+        public boolean returning = false;
+
+
         // Phase 2: precise arc-length state along the currentLink polyline
         public double arcPos = 0.0; // [0..currentLink.length]
 

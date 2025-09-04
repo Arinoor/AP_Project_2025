@@ -21,16 +21,21 @@ import java.util.*;
  */
 public final class WiringUtils {
 
+
+
         private WiringUtils() {}
 
         /** Immutable point holder to avoid JavaFX dependency. */
         public static final class Pt {
-                public final double x, y;
+                public double x, y;
                 public Pt(double x, double y) { this.x = x; this.y = y; }
         }
 
         /** Identity-keyed bend store so Link stays unmodified. */
         private static final IdentityHashMap<Link, List<Pt>> BENDS = new IdentityHashMap<>();
+
+        private static final int SAMPLES_PER_SEGMENT = 20;
+
 
         /** Max bends per link (phase rule). */
         public static final int MAX_BENDS_PER_LINK = 3;
@@ -56,13 +61,15 @@ public final class WiringUtils {
 
         /** Total polyline length for a link. */
         public static double pathLength(Link l) {
-                List<Pt> pts = path(l);
+                List<Pt> pts = curvePoints(l);
+                if (pts.size() < 2) return 0.0;
+
                 double len = 0.0;
-                for (int i = 0; i + 1 < pts.size(); i++) {
-                        Pt p = pts.get(i), q = pts.get(i + 1);
-                        len += Math.hypot(q.x - p.x, q.y - p.y);
+                for (int i = 0; i < pts.size() - 1; i++) {
+                        Pt a = pts.get(i), b = pts.get(i + 1);
+                        len += Math.hypot(b.x - a.x, b.y - a.y);
                 }
-                return Math.max(1e-6, len);
+                return len;
         }
 
         /** Sum of polyline lengths for all Link entities in the scene. */
@@ -140,39 +147,43 @@ public final class WiringUtils {
          * Returns the inserted bend index in bends(), or -1 on failure.
          * Does NOT charge coins; UI/controller should handle economy.
          */
-        public static int addBend(Link l, int segmentIndex, double x, double y,
-                                  List<Entity> scene, double systemSizePx) {
-                List<Pt> bs = bends(l);
-                if (bs.size() >= MAX_BENDS_PER_LINK) return -1;
+        public static int addBend(Link link,
+                                  int segmentIndex,
+                                  double x, double y,
+                                  List<Entity> entities,
+                                  double systemSize) {
+                var bends = BENDS.computeIfAbsent(link, k -> new ArrayList<>());
+                if (bends.size() >= MAX_BENDS_PER_LINK) return -1;
 
-                // In path[A + bends + B], segment i maps to insertion at i in bends list.
-                int insertAt = Math.max(0, Math.min(bs.size(), segmentIndex));
-                bs.add(insertAt, new Pt(x, y));
+                // Clamp insert position into [0, bends.size()]
+                int insertAt = Math.max(0, Math.min(segmentIndex, bends.size()));
+                bends.add(insertAt, new Pt(x, y));
 
-                // Reject if crossing
-                if (crossesAnySystem(l, scene, systemSizePx)) {
-                        bs.remove(insertAt);
-                        return -1;
-                }
+                // NOTE: No crossing check here anymore; editor must allow fixing red/invalid wires.
                 return insertAt;
         }
+
 
         /**
          * Move an existing bend to (x,y). Returns true if kept; false if reverted
          * due to crossing a system. Economy/budget should be handled by caller.
          */
-        public static boolean moveBend(Link l, int bendIndex, double x, double y,
-                                       List<Entity> scene, double systemSizePx) {
-                List<Pt> bs = bends(l);
-                if (bendIndex < 0 || bendIndex >= bs.size()) return false;
-                Pt old = bs.get(bendIndex);
-                bs.set(bendIndex, new Pt(x, y));
-                if (crossesAnySystem(l, scene, systemSizePx)) {
-                        bs.set(bendIndex, old);
-                        return false;
-                }
+        public static boolean moveBend(Link link,
+                                       int bendIndex,
+                                       double x, double y,
+                                       List<Entity> entities,
+                                       double systemSize) {
+                var bends = BENDS.get(link);
+                if (bends == null || bendIndex < 0 || bendIndex >= bends.size()) return false;
+
+                Pt b = bends.get(bendIndex);
+                b.x = x;
+                b.y = y;
+
+                // NOTE: No crossing check here either; allow moves to fix invalid routing.
                 return true;
         }
+
 
         // ----------------- Path sampling -----------------
 
@@ -181,32 +192,39 @@ public final class WiringUtils {
          * Note: uses arc-length parameterization internally so packet motion is smooth.
          */
         public static Pt pointAlongNormalized(Link l, double t) {
-                t = (t < 0) ? 0 : Math.min(1, t);
-                List<Pt> pts = path(l);
+                List<Pt> pts = curvePoints(l);
+                if (pts.isEmpty()) return new Pt(0, 0);
+                if (pts.size() == 1) return pts.get(0);
 
-                double total = 0.0;
-                double[] segLen = new double[Math.max(0, pts.size() - 1)];
-                for (int i = 0; i + 1 < pts.size(); i++) {
-                        Pt a = pts.get(i), b = pts.get(i + 1);
-                        double len = Math.hypot(b.x - a.x, b.y - a.y);
-                        segLen[i] = len;
-                        total += len;
+                t = Math.max(0.0, Math.min(1.0, t));
+
+                // Build cumulative arc-length table
+                int n = pts.size();
+                double[] cum = new double[n];
+                cum[0] = 0.0;
+                for (int i = 1; i < n; i++) {
+                        Pt a = pts.get(i - 1), b = pts.get(i);
+                        cum[i] = cum[i - 1] + Math.hypot(b.x - a.x, b.y - a.y);
                 }
-                if (total <= 1e-9) {
-                        Pt a = pts.get(0);
-                        return new Pt(a.x, a.y);
-                }
+                double total = cum[n - 1];
+                if (total <= 1e-9) return pts.get(0);
+
                 double target = t * total;
-                for (int i = 0; i < segLen.length; i++) {
-                        double len = segLen[i];
-                        if (target > len) { target -= len; continue; }
-                        Pt a = pts.get(i), b = pts.get(i + 1);
-                        double u = (len <= 1e-9) ? 0 : (target / len);
-                        return new Pt(a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u);
-                }
-                Pt last = pts.get(pts.size() - 1);
-                return new Pt(last.x, last.y);
+
+                // Find segment where target falls
+                int hi = Arrays.binarySearch(cum, target);
+                if (hi < 0) hi = -hi - 1;
+                hi = Math.min(Math.max(1, hi), n - 1);
+                int lo = hi - 1;
+
+                double segLen = cum[hi] - cum[lo];
+                double local = (segLen <= 1e-9) ? 0.0 : (target - cum[lo]) / segLen;
+
+                Pt A = pts.get(lo), B = pts.get(hi);
+                return new Pt(A.x + (B.x - A.x) * local,
+                        A.y + (B.y - A.y) * local);
         }
+
 
         // ----------------- Crossing checks -----------------
 
@@ -293,6 +311,75 @@ public final class WiringUtils {
                 // collinear touch
                 return onSegment(cx, cy, dx, dy, ax, ay) || onSegment(cx, cy, dx, dy, bx, by)
                         || onSegment(ax, ay, bx, by, cx, cy) || onSegment(ax, ay, bx, by, dx, dy);
+        }
+
+        /** Returns control points: [fromPort, bends..., toPort] */
+        private static List<Pt> controlPoints(Link l) {
+                List<Pt> cps = new ArrayList<>();
+                Pt a = portCenter(l.fromPort);
+                Pt b = portCenter(l.toPort);
+                cps.add(a);
+                cps.addAll(bends(l)); // existing accessor to per-link bend list
+                cps.add(b);
+                return cps;
+        }
+
+        /** Helper to read a port's current world position (center). */
+        private static Pt portCenter(Entity port) {
+                Transform t = port.get(Transform.class);
+                return new Pt(t.x, t.y);
+        }
+
+        /** Standard Catmull–Rom (uniform, tension = 0.5) */
+        private static Pt catmull(Pt p0, Pt p1, Pt p2, Pt p3, double u) {
+                double u2 = u * u;
+                double u3 = u2 * u;
+                double x =
+                        0.5 * ((2 * p1.x) +
+                                (-p0.x + p2.x) * u +
+                                (2*p0.x - 5*p1.x + 4*p2.x - p3.x) * u2 +
+                                (-p0.x + 3*p1.x - 3*p2.x + p3.x) * u3);
+                double y =
+                        0.5 * ((2 * p1.y) +
+                                (-p0.y + p2.y) * u +
+                                (2*p0.y - 5*p1.y + 4*p2.y - p3.y) * u2 +
+                                (-p0.y + 3*p1.y - 3*p2.y + p3.y) * u3);
+                return new Pt(x, y);
+        }
+
+        /**
+         * Duplicates end points to keep the spline clamped to endpoints,
+         * and samples per control-point segment.
+         */
+        public static List<Pt> curvePoints(Link l) {
+                List<Pt> cps = controlPoints(l);
+                List<Pt> out = new ArrayList<>();
+                if (cps.size() < 2) return out;
+
+                // Degenerate straight line
+                if (cps.size() == 2) {
+                        out.add(cps.get(0));
+                        out.add(cps.get(1));
+                        return out;
+                }
+
+                // Build padded list [P-1, P0, ..., Pn, Pn+1]
+                List<Pt> pad = new ArrayList<>(cps.size() + 2);
+                pad.add(cps.get(0));
+                pad.addAll(cps);
+                pad.add(cps.get(cps.size() - 1));
+
+                for (int i = 1; i < pad.size() - 2; i++) {
+                        Pt p0 = pad.get(i - 1), p1 = pad.get(i), p2 = pad.get(i + 1), p3 = pad.get(i + 2);
+                        for (int s = 0; s < SAMPLES_PER_SEGMENT; s++) {
+                                double u = (double) s / SAMPLES_PER_SEGMENT;
+                                if (i == 1 && s == 0) out.add(new Pt(p1.x, p1.y)); // exact hit at start of segment
+                                out.add(catmull(p0, p1, p2, p3, u));
+                        }
+                }
+                // Ensure exact last point
+                out.add(cps.get(cps.size() - 1));
+                return out;
         }
 
         private static double direction(double ax, double ay, double bx, double by, double px, double py) {

@@ -37,7 +37,7 @@ public class BendTool {
         // Dragging state
         private Link dragLink = null;
         private int dragBendIndex = -1;
-
+        private double dragCx, dragCy;
         // Hover state
         private Link hoverLink = null;
         private int hoverBendIndex = -1;
@@ -89,8 +89,11 @@ public class BendTool {
                 if (bendHit != null) {
                         dragLink = bendHit.link;
                         dragBendIndex = bendHit.bendIndex;
+                        var b = WiringUtils.bends(dragLink).get(dragBendIndex); // NEW
+                        dragCx = b.x; dragCy = b.y;                              // NEW
                         return;
                 }
+
 
                 // Otherwise, add a bend on nearest segment
                 double tolerance = 6.0;
@@ -118,15 +121,26 @@ public class BendTool {
                         // Begin dragging newly inserted bend (snappy UX)
                         dragLink = segHit.link;
                         dragBendIndex = insertedAt;
+                        dragCx = e.getX();               // NEW: clamp center at insertion
+                        dragCy = e.getY();               // NEW
                 }
         }
 
         private void onMouseDragged(MouseEvent e) {
                 if (dragLink != null && dragBendIndex >= 0) {
+                        // Clamp to a small fixed radius around drag center
+                        double dx = e.getX() - dragCx;
+                        double dy = e.getY() - dragCy;
+                        double d  = Math.hypot(dx, dy);
+                        double r  = UiConstants.BEND_DRAG_MAX_RADIUS;
+
+                        double nx = (d > r && d > 1e-6) ? dragCx + dx * (r / d) : e.getX();
+                        double ny = (d > r && d > 1e-6) ? dragCy + dy * (r / d) : e.getY();
+
                         boolean ok = WiringUtils.moveBend(
                                 dragLink,
                                 dragBendIndex,
-                                e.getX(), e.getY(),
+                                nx, ny,
                                 entities,
                                 systemSize
                         );
@@ -135,6 +149,7 @@ public class BendTool {
                         }
                 }
         }
+
 
         private void onMouseReleased(MouseEvent e) {
                 dragLink = null;

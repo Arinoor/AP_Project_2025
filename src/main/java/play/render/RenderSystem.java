@@ -60,11 +60,13 @@ public class RenderSystem implements System {
                 for (int x = 0; x < g.getCanvas().getWidth(); x += 20) g.strokeLine(x, 0, x, g.getCanvas().getHeight());
                 for (int y = 0; y < g.getCanvas().getHeight(); y += 20) g.strokeLine(0, y, g.getCanvas().getWidth(), y);
 
-                // links as polylines (colored by shape of FROM port). Crossing -> red.
+                // links as curves (colored by shape of FROM port). Crossing -> red.
                 for (Entity e : entities) {
                         if (!e.has(Link.class)) continue;
                         Link l = e.get(Link.class);
-                        var pts = WiringUtils.path(l);
+
+                        // ⬇️ CHANGED: use the smooth curve points instead of straight control path
+                        var pts = WiringUtils.curvePoints(l);
                         if (pts.size() < 2) continue;
 
                         boolean crosses = WiringUtils.crossesAnySystem(l, entities, UiConstants.SYSTEM_SIZE);
