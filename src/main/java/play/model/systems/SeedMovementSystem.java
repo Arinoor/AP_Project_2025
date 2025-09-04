@@ -4,6 +4,9 @@ import play.model.core.Entity;
 import play.model.components.*;
 import play.model.engine.GameEngine;
 import play.utils.WiringUtils;
+import play.model.components.Disabled;
+import play.model.constants.GameBalance;
+
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,6 +40,15 @@ public class SeedMovementSystem implements System {
 
         @Override
         public void update(double dt) {
+
+                for (Entity sys : entities) {
+                        if (sys.has(Disabled.class)) {
+                                Disabled d = sys.get(Disabled.class);
+                                d.remaining -= dt;
+                                if (d.remaining <= 0) sys.remove(Disabled.class);
+                        }
+                }
+
                 List<Entity> toRemove = new ArrayList<>();
 
                 for (Entity e : entities) {
@@ -78,7 +90,9 @@ public class SeedMovementSystem implements System {
                         }
 
                         // Place on polyline
-                        WiringUtils.Pt pos = WiringUtils.pointAlongNormalized(l, s.progress);
+                        WiringUtils.Pt pos = s.returning
+                                ? WiringUtils.pointAlongNormalized(l, 1.0 - s.progress)
+                                : WiringUtils.pointAlongNormalized(l, s.progress);
                         Transform st = e.get(Transform.class);
                         st.x = pos.x;
                         st.y = pos.y;

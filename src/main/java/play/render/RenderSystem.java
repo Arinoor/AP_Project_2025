@@ -13,6 +13,10 @@ import play.model.systems.System;
 import play.utils.WiringUtils;
 import play.view.PacketView;
 import play.view.UiConstants;
+import javafx.scene.shape.ArcType;
+import play.model.components.Disabled;
+import play.model.constants.GameBalance;
+
 
 import java.util.List;
 
@@ -111,16 +115,70 @@ public class RenderSystem implements System {
                         Transform t = e.get(Transform.class);
                         double w = SYSTEM_SIZE, h = SYSTEM_SIZE;
 
+                        boolean isDisabled = e.has(Disabled.class);
+                        double remain = 0.0, ratio = 0.0;
+                        if (isDisabled) {
+                                remain = Math.max(0.0, e.get(Disabled.class).remaining);
+                                ratio = GameBalance.SYSTEM_DISABLE_SECONDS > 1e-9
+                                        ? Math.min(1.0, remain / GameBalance.SYSTEM_DISABLE_SECONDS)
+                                        : 1.0;
+                        }
+
+                        // Base body
                         g.setFill(Color.web("#2a2f3a"));
                         g.fillRoundRect(t.x - w / 2, t.y - h / 2, w, h, 8, 8);
                         g.setStroke(Color.web("#3c4452"));
+                        g.setLineWidth(1.0);
                         g.strokeRoundRect(t.x - w / 2, t.y - h / 2, w, h, 8, 8);
 
+                        // Reference ring
                         if (e.has(Reference.class)) {
                                 g.setStroke(Color.LIGHTGREEN);
+                                g.setLineWidth(1.5);
                                 g.strokeOval(t.x - 22, t.y - 22, 44, 44);
                         }
+
+                        // ---- VISUAL CLUE WHEN DISABLED ----
+                        if (isDisabled) {
+                                // 1) Red translucent overlay
+                                g.setGlobalAlpha(0.35);
+                                g.setFill(Color.web("#ff3b30"));
+                                g.fillRoundRect(t.x - w / 2, t.y - h / 2, w, h, 8, 8);
+                                g.setGlobalAlpha(1.0);
+
+                                // 2) Dashed red outline
+                                g.setStroke(Color.web("#ff3b30"));
+                                g.setLineWidth(2.0);
+                                g.setLineDashes(6, 4);
+                                g.strokeRoundRect(t.x - w / 2, t.y - h / 2, w, h, 8, 8);
+                                g.setLineDashes(0); // reset
+
+                                // 3) Cross mark
+                                g.setLineWidth(1.5);
+                                double pad = 6.0;
+                                g.strokeLine(t.x - w / 2 + pad, t.y - h / 2 + pad, t.x + w / 2 - pad, t.y + h / 2 - pad);
+                                g.strokeLine(t.x + w / 2 - pad, t.y - h / 2 + pad, t.x - w / 2 + pad, t.y + h / 2 - pad);
+
+                                // 4) Countdown ring (shows remaining disable time)
+                                double rr = (Math.max(w, h) * 0.6); // ring radius
+                                double ringW = rr + 16;
+                                double ringH = rr + 16;
+                                g.setLineWidth(3.0);
+                                // background ring
+                                g.setStroke(Color.web("#4a1010"));
+                                g.strokeOval(t.x - ringW / 2, t.y - ringH / 2, ringW, ringH);
+                                // progress arc (clockwise from top)
+                                g.setStroke(Color.web("#ffd1cc"));
+                                g.setLineWidth(4.0);
+                                g.strokeArc(
+                                        t.x - ringW / 2, t.y - ringH / 2, ringW, ringH,
+                                        90,                         // start at 12 o'clock
+                                        -360.0 * ratio,             // clockwise sweep
+                                        ArcType.OPEN
+                                );
+                        }
                 }
+
 
                 // ports
                 final double ps = UiConstants.PORT_SIZE;

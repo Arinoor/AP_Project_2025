@@ -28,6 +28,17 @@ public class QueueSystem implements System {
 
         @Override
         public void update(double dt) {
+                // 0) Decay "Disabled" timers on systems
+                for (Entity e : entities) {
+                        if (e.has(Disabled.class)) {
+                                Disabled d = e.get(Disabled.class);
+                                d.remaining -= dt;
+                                if (d.remaining <= 0) {
+                                        e.remove(Disabled.class);
+                                }
+                        }
+                }
+
                 // 1) Collect arrivals this frame
                 List<Entity> arrivals = new ArrayList<>();
                 for (Entity e : new ArrayList<>(entities)) {
@@ -38,17 +49,46 @@ public class QueueSystem implements System {
                         arrivals.add(e);
                 }
 
-                // 2) Process arrivals
+                // 2) Process arrivals (speed trap, became-disabled bounce, normal handling)
                 for (Entity seedE : arrivals) {
                         Seed s = seedE.get(Seed.class);
                         Link link = s.currentLink;
-                        Entity inPort = link.toPort;
+
+                        // Determine actual destination port for this traversal
+                        // - Normal travel enters link.toPort
+                        // - Returning travel enters link.fromPort (we traverse the same wire backwards)
+                        Entity inPort = s.returning ? link.fromPort : link.toPort;
                         PortInfo pTo = inPort.get(PortInfo.class);
                         Entity system = pTo.parentSystem;
 
-                        // snap to the IN port position
-                        Transform st = seedE.get(Transform.class);
+                        // Destination port position (used when we *do* finalize the arrival)
                         Transform tIn = inPort.get(Transform.class);
+                        Transform st  = seedE.get(Transform.class);
+
+                        // --- Speed trap: disable destination & bounce back (only on first arrival) ---
+                        if (!s.returning && s.speed > GameBalance.ENTRY_SPEED_LIMIT) {
+                                if (system.has(Disabled.class)) {
+                                        system.get(Disabled.class).remaining = GameBalance.SYSTEM_DISABLE_SECONDS;
+                                } else {
+                                        system.add(new Disabled(GameBalance.SYSTEM_DISABLE_SECONDS));
+                                }
+                                // Immediately start travelling back along the same wire.
+                                s.returning = true;
+                                s.progress  = 0.0;   // restart from the (old) destination end
+                                // Keep s.currentLink, keep speed/accel continuous; do not enqueue, no coins.
+                                continue;            // skip normal arrival handling this frame
+                        }
+
+                        // --- NEW: Destination may have become disabled while en route -> bounce back ---
+                        if (!s.returning && system.has(Disabled.class)) {
+                                s.returning = true;
+                                s.progress  = 0.0;   // restart from the destination end
+                                // Keep s.currentLink; no enqueue, no coins.
+                                continue;
+                        }
+
+                        // --- Normal arrival handling (includes finishing a return trip) ---
+                        // snap to the IN port position
                         st.x = tIn.x;
                         st.y = tIn.y;
 
@@ -57,11 +97,9 @@ public class QueueSystem implements System {
                         s.progress = 0.0;
                         s.lateral = 0.0;
 
-                        // coins per packet entering a system: square=1, triangle=2
-                        int reward = (s.type == Seed.Type.SQUARE)
-                                ? GameBalance.COIN_REWARD_SQUARE
-                                : GameBalance.COIN_REWARD_TRIANGLE;
-                        engine.incrementCoins(reward);
+                        // If we just finished a return trip, don't reward coins for the bounce path
+                        boolean finishedReturn = s.returning;
+                        s.returning = false;
 
                         // Reference systems consume (do not forward)
                         if (system.has(Reference.class)) {
@@ -69,6 +107,14 @@ public class QueueSystem implements System {
                                 engine.notifySeedDelivered(s);
                                 entities.remove(seedE);
                                 continue;
+                        }
+
+                        // coins per packet entering a system: square=1, triangle=2 (only if not from bounce)
+                        if (!finishedReturn) {
+                                int reward = (s.type == Seed.Type.SQUARE)
+                                        ? GameBalance.COIN_REWARD_SQUARE
+                                        : GameBalance.COIN_REWARD_TRIANGLE;
+                                engine.incrementCoins(reward);
                         }
 
                         // Enqueue into the device buffer
@@ -99,6 +145,12 @@ public class QueueSystem implements System {
                                 PortInfo pFrom = l.fromPort.get(PortInfo.class);
                                 if (pFrom.parentSystem != system) continue;
                                 if (!isLinkFree(l)) continue;
+
+                                // Do not choose links whose destination system is disabled
+                                if (l.toPort == null || !l.toPort.has(PortInfo.class)) continue;
+                                PortInfo destPi = l.toPort.get(PortInfo.class);
+                                Entity destSys = destPi.parentSystem;
+                                if (destSys != null && destSys.has(Disabled.class)) continue;
 
                                 if (pFrom.shape == PortInfo.Shape.SQUARE) freeSquare.add(e);
                                 else freeTriangle.add(e);
@@ -152,11 +204,14 @@ public class QueueSystem implements System {
 
                                 s.currentLink = l;
                                 s.progress = 0.0;
+                                s.returning = false; // leaving a system -> forward travel
 
                                 progressed = true;
                         }
                 }
         }
+
+
 
         private boolean isLinkFree(Link link) {
                 for (Entity e : entities) {

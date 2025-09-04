@@ -29,7 +29,7 @@ public final class GameBalance {
         public static final double IMPACT_COOLDOWN_OFF       = 0.15;  // energy threshold
 
         // ---- Packet-entry penalties ----
-        public static final double ENTRY_SPEED_LIMIT = 120.0;     // px/s (tune as needed)
+        public static final double ENTRY_SPEED_LIMIT = 300.0;     // px/s (tune as needed)
         public static final double SYSTEM_DISABLE_SECONDS = 5.0;   // seconds a system stays inactive
 
 }

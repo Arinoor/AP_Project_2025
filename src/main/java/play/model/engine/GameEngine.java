@@ -23,7 +23,9 @@ public class GameEngine {
         // Event bus for model events
         private final EventBus eventBus = new EventBus();
 
-        public GameEngine() {}
+        public GameEngine() {
+                coins = 7000;
+        }
 
         // --- Entities / Systems ---
         public List<Entity> entities() { return entities; }
