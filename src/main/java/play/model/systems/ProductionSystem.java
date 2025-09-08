@@ -7,19 +7,19 @@ import play.model.physics.Kinematics;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 /**
  * Produces packets from EVERY OUT port of each system with a Producer.
- * Seed type derives from the OUT port shape. Kinematics are set for the first hop
- * based on the OUT port used (this is the "start port" for the hop).
- *
- * Honors per-device quotas in Producer.remainingSquare / remainingTriangle.
- * -1 means unlimited for that type.
+ * Type is chosen by allowed types for the OUT port's shape + Producer quotas:
+ *   - SQUARE ports may spawn: SQUARE or INFINITE (independent quotas)
+ *   - TRIANGLE ports may spawn: TRIANGLE
  */
 public class ProductionSystem implements System {
         private final GameEngine engine;
         private final List<Entity> entities;
         private final double dtCap;
+        private final Random rng = new Random();
 
         public ProductionSystem(GameEngine engine, List<Entity> entities, double dtCap) {
                 this.engine = engine;
@@ -31,34 +31,44 @@ public class ProductionSystem implements System {
         public void update(double dt) {
                 if (dt > dtCap) dt = dtCap;
 
-                // Snapshot to avoid ConcurrentModification when we add seeds below
+                // Snapshot to avoid concurrent modifications while adding seeds
                 List<Entity> snapshot = new ArrayList<>(entities);
 
                 for (Entity sysE : snapshot) {
                         if (!sysE.has(Producer.class)) continue;
                         Producer prod = sysE.get(Producer.class);
 
-                        // If both quotas are exactly 0, skip producing entirely
-                        if (prod.remainingSquare == 0 && prod.remainingTriangle == 0) continue;
+                        // If all quotas are exactly 0, skip
+                        if (!prod.hasAnyQuota()) continue;
 
                         prod.timer += dt;
                         if (prod.timer < prod.interval) continue;
                         prod.timer = 0.0;
 
-                        // find all OUT ports
+                        // all OUT ports of this system
                         List<Entity> outPorts = findOutPorts(sysE);
                         if (outPorts.isEmpty()) continue;
 
                         for (Entity outPort : outPorts) {
                                 PortInfo pinfo = outPort.get(PortInfo.class);
-                                Seed.Type type = (pinfo.shape == PortInfo.Shape.SQUARE) ? Seed.Type.SQUARE : Seed.Type.TRIANGLE;
 
-                                // Quota check per type
-                                if (type == Seed.Type.SQUARE) {
-                                        if (prod.remainingSquare == 0) continue; // no square quota left
+                                // Determine allowed seed types for this OUT port
+                                Seed.Type[] allowed;
+                                if (pinfo.shape == PortInfo.Shape.SQUARE) {
+                                        allowed = new Seed.Type[]{ Seed.Type.SQUARE, Seed.Type.INFINITE };
                                 } else {
-                                        if (prod.remainingTriangle == 0) continue; // no triangle quota left
+                                        allowed = new Seed.Type[]{ Seed.Type.TRIANGLE };
                                 }
+
+                                // Filter allowed by available quota
+                                List<Seed.Type> available = new ArrayList<>();
+                                for (Seed.Type t : allowed) {
+                                        if (hasQuota(prod, t)) available.add(t);
+                                }
+                                if (available.isEmpty()) continue;
+
+                                // Pick a type (random among available for variety)
+                                Seed.Type chosen = available.get(rng.nextInt(available.size()));
 
                                 // Need a free link from this port
                                 Entity freeLink = findFreeLinkFrom(outPort);
@@ -66,7 +76,7 @@ public class ProductionSystem implements System {
 
                                 // Build seed
                                 Entity seedE = new Entity();
-                                Seed s = new Seed(type);
+                                Seed s = new Seed(chosen);
 
                                 // Per-hop kinematics based on OUT port shape used to spawn
                                 Kinematics.applyForHop(s, pinfo.shape);
@@ -84,13 +94,21 @@ public class ProductionSystem implements System {
                                 engine.incrementProduced();
 
                                 // Decrement quota if finite
-                                if (type == Seed.Type.SQUARE) {
-                                        if (prod.remainingSquare > 0) prod.remainingSquare--;
-                                } else {
-                                        if (prod.remainingTriangle > 0) prod.remainingTriangle--;
-                                }
+                                decrementQuota(prod, chosen);
                         }
                 }
+        }
+
+        private boolean hasQuota(Producer p, Seed.Type t) {
+                if (t == Seed.Type.SQUARE)   return p.remainingSquare   != 0;
+                if (t == Seed.Type.TRIANGLE) return p.remainingTriangle != 0;
+                return p.remainingInfinite != 0; // INFINITE
+        }
+
+        private void decrementQuota(Producer p, Seed.Type t) {
+                if (t == Seed.Type.SQUARE && p.remainingSquare > 0) p.remainingSquare--;
+                else if (t == Seed.Type.TRIANGLE && p.remainingTriangle > 0) p.remainingTriangle--;
+                else if (t == Seed.Type.INFINITE && p.remainingInfinite > 0) p.remainingInfinite--;
         }
 
         private List<Entity> findOutPorts(Entity systemE) {

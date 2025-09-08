@@ -5,8 +5,9 @@ public final class GameBalance {
         private GameBalance() {}
 
         // Coin rewards
-        public static final int COIN_REWARD_SQUARE   = 1;
-        public static final int COIN_REWARD_TRIANGLE = 2;
+        public static final int COIN_REWARD_SQUARE   = 2;
+        public static final int COIN_REWARD_TRIANGLE = 3;
+        public static final int COIN_REWARD_INFINITE = 1;
 
         // Shop costs
         public static final int COST_ATAR     = 3; // disable impact waves 10s

@@ -2,7 +2,7 @@ package play.model.components;
 
 /**
  * Producer component attached to a device (system).
- * Produces seeds at a fixed interval and (optionally) under per-type quotas.
+ * Produces seeds at a fixed interval and under per-type quotas. Use -1 for unlimited.
  */
 public class Producer {
         public double interval = 1.0;
@@ -11,19 +11,30 @@ public class Producer {
         /** Remaining quotas per type. Use -1 for unlimited. */
         public int remainingSquare = -1;
         public int remainingTriangle = -1;
+        public int remainingInfinite = -1; // NEW: independent INFINITE quota
 
         public Producer(double interval) {
                 this.interval = interval;
         }
 
+        /** Backward-compatible ctor (older levels without INFINITE quotas). */
         public Producer(double interval, int squareQuota, int triangleQuota) {
                 this.interval = interval;
                 this.remainingSquare = squareQuota;
                 this.remainingTriangle = triangleQuota;
+                this.remainingInfinite = -1;
+        }
+
+        /** Full ctor with all packet types. */
+        public Producer(double interval, int squareQuota, int triangleQuota, int infiniteQuota) {
+                this.interval = interval;
+                this.remainingSquare = squareQuota;
+                this.remainingTriangle = triangleQuota;
+                this.remainingInfinite = infiniteQuota;
         }
 
         /** Returns true if at least one type still has quota or quotas are unlimited. */
         public boolean hasAnyQuota() {
-                return (remainingSquare != 0) || (remainingTriangle != 0);
+                return (remainingSquare != 0) || (remainingTriangle != 0) || (remainingInfinite != 0);
         }
 }

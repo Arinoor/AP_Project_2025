@@ -255,14 +255,14 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "git-widget-placeholder": "phase2"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;phase2&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
       <recent name="C:\Users\ASUS\AP_Project1\src\main\resources\audio" />
@@ -471,7 +471,7 @@ public class BendTool {
         // Dragging state
         private Link dragLink = null;
         private int dragBendIndex = -1;
-
+        private double dragCx, dragCy;
         // Hover state
         private Link hoverLink = null;
         private int hoverBendIndex = -1;
@@ -523,8 +523,11 @@ public class BendTool {
                 if (bendHit != null) {
                         dragLink = bendHit.link;
                         dragBendIndex = bendHit.bendIndex;
+                        var b = WiringUtils.bends(dragLink).get(dragBendIndex); // NEW
+                        dragCx = b.x; dragCy = b.y;                              // NEW
                         return;
                 }
+
 
                 // Otherwise, add a bend on nearest segment
                 double tolerance = 6.0;
@@ -552,15 +555,26 @@ public class BendTool {
                         // Begin dragging newly inserted bend (snappy UX)
                         dragLink = segHit.link;
                         dragBendIndex = insertedAt;
+                        dragCx = e.getX();               // NEW: clamp center at insertion
+                        dragCy = e.getY();               // NEW
                 }
         }
 
         private void onMouseDragged(MouseEvent e) {
                 if (dragLink != null && dragBendIndex >= 0) {
+                        // Clamp to a small fixed radius around drag center
+                        double dx = e.getX() - dragCx;
+                        double dy = e.getY() - dragCy;
+                        double d  = Math.hypot(dx, dy);
+                        double r  = UiConstants.BEND_DRAG_MAX_RADIUS;
+
+                        double nx = (d > r && d > 1e-6) ? dragCx + dx * (r / d) : e.getX();
+                        double ny = (d > r && d > 1e-6) ? dragCy + dy * (r / d) : e.getY();
+
                         boolean ok = WiringUtils.moveBend(
                                 dragLink,
                                 dragBendIndex,
-                                e.getX(), e.getY(),
+                                nx, ny,
                                 entities,
                                 systemSize
                         );
@@ -569,6 +583,7 @@ public class BendTool {
                         }
                 }
         }
+
 
         private void onMouseReleased(MouseEvent e) {
                 dragLink = null;
@@ -1868,6 +1883,22 @@ public final class GlobalAudio {
 
 
 
+===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\components\Disabled.java =====
+
+
+package play.model.components;
+
+/** Marks a system as disabled (inactive) for `remaining` seconds. */
+public final class Disabled {
+        public double remaining;
+
+        public Disabled(double seconds) {
+                this.remaining = seconds;
+        }
+}
+
+
+
 ===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\components\Link.java =====
 
 
@@ -2198,6 +2229,10 @@ public class Seed {
 
         public boolean justCollided = false;
 
+        /** If true, this seed is travelling back along its currentLink toward the source. */
+        public boolean returning = false;
+
+
         // Phase 2: precise arc-length state along the currentLink polyline
         public double arcPos = 0.0; // [0..currentLink.length]
 
@@ -2262,6 +2297,11 @@ public final class GameBalance {
 
         public static final double LATERAL_DAMP              = 0.98;  // per tick factor
         public static final double IMPACT_COOLDOWN_OFF       = 0.15;  // energy threshold
+
+        // ---- Packet-entry penalties ----
+        public static final double ENTRY_SPEED_LIMIT = 300.0;     // px/s (tune as needed)
+        public static final double SYSTEM_DISABLE_SECONDS = 5.0;   // seconds a system stays inactive
+
 }
 
 
@@ -2326,7 +2366,9 @@ public class GameEngine {
         // Event bus for model events
         private final EventBus eventBus = new EventBus();
 
-        public GameEngine() {}
+        public GameEngine() {
+                coins = 7000;
+        }
 
         // --- Entities / Systems ---
         public List<Entity> entities() { return entities; }
@@ -3447,6 +3489,17 @@ public class QueueSystem implements System {
 
         @Override
         public void update(double dt) {
+                // 0) Decay "Disabled" timers on systems
+                for (Entity e : entities) {
+                        if (e.has(Disabled.class)) {
+                                Disabled d = e.get(Disabled.class);
+                                d.remaining -= dt;
+                                if (d.remaining <= 0) {
+                                        e.remove(Disabled.class);
+                                }
+                        }
+                }
+
                 // 1) Collect arrivals this frame
                 List<Entity> arrivals = new ArrayList<>();
                 for (Entity e : new ArrayList<>(entities)) {
@@ -3457,17 +3510,46 @@ public class QueueSystem implements System {
                         arrivals.add(e);
                 }
 
-                // 2) Process arrivals
+                // 2) Process arrivals (speed trap, became-disabled bounce, normal handling)
                 for (Entity seedE : arrivals) {
                         Seed s = seedE.get(Seed.class);
                         Link link = s.currentLink;
-                        Entity inPort = link.toPort;
+
+                        // Determine actual destination port for this traversal
+                        // - Normal travel enters link.toPort
+                        // - Returning travel enters link.fromPort (we traverse the same wire backwards)
+                        Entity inPort = s.returning ? link.fromPort : link.toPort;
                         PortInfo pTo = inPort.get(PortInfo.class);
                         Entity system = pTo.parentSystem;
 
-                        // snap to the IN port position
-                        Transform st = seedE.get(Transform.class);
+                        // Destination port position (used when we *do* finalize the arrival)
                         Transform tIn = inPort.get(Transform.class);
+                        Transform st  = seedE.get(Transform.class);
+
+                        // --- Speed trap: disable destination & bounce back (only on first arrival) ---
+                        if (!s.returning && s.speed > GameBalance.ENTRY_SPEED_LIMIT) {
+                                if (system.has(Disabled.class)) {
+                                        system.get(Disabled.class).remaining = GameBalance.SYSTEM_DISABLE_SECONDS;
+                                } else {
+                                        system.add(new Disabled(GameBalance.SYSTEM_DISABLE_SECONDS));
+                                }
+                                // Immediately start travelling back along the same wire.
+                                s.returning = true;
+                                s.progress  = 0.0;   // restart from the (old) destination end
+                                // Keep s.currentLink, keep speed/accel continuous; do not enqueue, no coins.
+                                continue;            // skip normal arrival handling this frame
+                        }
+
+                        // --- NEW: Destination may have become disabled while en route -> bounce back ---
+                        if (!s.returning && system.has(Disabled.class)) {
+                                s.returning = true;
+                                s.progress  = 0.0;   // restart from the destination end
+                                // Keep s.currentLink; no enqueue, no coins.
+                                continue;
+                        }
+
+                        // --- Normal arrival handling (includes finishing a return trip) ---
+                        // snap to the IN port position
                         st.x = tIn.x;
                         st.y = tIn.y;
 
@@ -3476,11 +3558,9 @@ public class QueueSystem implements System {
                         s.progress = 0.0;
                         s.lateral = 0.0;
 
-                        // coins per packet entering a system: square=1, triangle=2
-                        int reward = (s.type == Seed.Type.SQUARE)
-                                ? GameBalance.COIN_REWARD_SQUARE
-                                : GameBalance.COIN_REWARD_TRIANGLE;
-                        engine.incrementCoins(reward);
+                        // If we just finished a return trip, don't reward coins for the bounce path
+                        boolean finishedReturn = s.returning;
+                        s.returning = false;
 
                         // Reference systems consume (do not forward)
                         if (system.has(Reference.class)) {
@@ -3488,6 +3568,14 @@ public class QueueSystem implements System {
                                 engine.notifySeedDelivered(s);
                                 entities.remove(seedE);
                                 continue;
+                        }
+
+                        // coins per packet entering a system: square=1, triangle=2 (only if not from bounce)
+                        if (!finishedReturn) {
+                                int reward = (s.type == Seed.Type.SQUARE)
+                                        ? GameBalance.COIN_REWARD_SQUARE
+                                        : GameBalance.COIN_REWARD_TRIANGLE;
+                                engine.incrementCoins(reward);
                         }
 
                         // Enqueue into the device buffer
@@ -3518,6 +3606,12 @@ public class QueueSystem implements System {
                                 PortInfo pFrom = l.fromPort.get(PortInfo.class);
                                 if (pFrom.parentSystem != system) continue;
                                 if (!isLinkFree(l)) continue;
+
+                                // Do not choose links whose destination system is disabled
+                                if (l.toPort == null || !l.toPort.has(PortInfo.class)) continue;
+                                PortInfo destPi = l.toPort.get(PortInfo.class);
+                                Entity destSys = destPi.parentSystem;
+                                if (destSys != null && destSys.has(Disabled.class)) continue;
 
                                 if (pFrom.shape == PortInfo.Shape.SQUARE) freeSquare.add(e);
                                 else freeTriangle.add(e);
@@ -3571,11 +3665,14 @@ public class QueueSystem implements System {
 
                                 s.currentLink = l;
                                 s.progress = 0.0;
+                                s.returning = false; // leaving a system -> forward travel
 
                                 progressed = true;
                         }
                 }
         }
+
+
 
         private boolean isLinkFree(Link link) {
                 for (Entity e : entities) {
@@ -3597,6 +3694,9 @@ import play.model.core.Entity;
 import play.model.components.*;
 import play.model.engine.GameEngine;
 import play.utils.WiringUtils;
+import play.model.components.Disabled;
+import play.model.constants.GameBalance;
+
 
 import java.util.ArrayList;
 import java.util.List;
@@ -3630,6 +3730,15 @@ public class SeedMovementSystem implements System {
 
         @Override
         public void update(double dt) {
+
+                for (Entity sys : entities) {
+                        if (sys.has(Disabled.class)) {
+                                Disabled d = sys.get(Disabled.class);
+                                d.remaining -= dt;
+                                if (d.remaining <= 0) sys.remove(Disabled.class);
+                        }
+                }
+
                 List<Entity> toRemove = new ArrayList<>();
 
                 for (Entity e : entities) {
@@ -3671,7 +3780,9 @@ public class SeedMovementSystem implements System {
                         }
 
                         // Place on polyline
-                        WiringUtils.Pt pos = WiringUtils.pointAlongNormalized(l, s.progress);
+                        WiringUtils.Pt pos = s.returning
+                                ? WiringUtils.pointAlongNormalized(l, 1.0 - s.progress)
+                                : WiringUtils.pointAlongNormalized(l, s.progress);
                         Transform st = e.get(Transform.class);
                         st.x = pos.x;
                         st.y = pos.y;
@@ -3880,6 +3991,10 @@ import play.model.systems.System;
 import play.utils.WiringUtils;
 import play.view.PacketView;
 import play.view.UiConstants;
+import javafx.scene.shape.ArcType;
+import play.model.components.Disabled;
+import play.model.constants.GameBalance;
+
 
 import java.util.List;
 
@@ -3927,11 +4042,13 @@ public class RenderSystem implements System {
                 for (int x = 0; x < g.getCanvas().getWidth(); x += 20) g.strokeLine(x, 0, x, g.getCanvas().getHeight());
                 for (int y = 0; y < g.getCanvas().getHeight(); y += 20) g.strokeLine(0, y, g.getCanvas().getWidth(), y);
 
-                // links as polylines (colored by shape of FROM port). Crossing -> red.
+                // links as curves (colored by shape of FROM port). Crossing -> red.
                 for (Entity e : entities) {
                         if (!e.has(Link.class)) continue;
                         Link l = e.get(Link.class);
-                        var pts = WiringUtils.path(l);
+
+                        // â¬‡ï¸ CHANGED: use the smooth curve points instead of straight control path
+                        var pts = WiringUtils.curvePoints(l);
                         if (pts.size() < 2) continue;
 
                         boolean crosses = WiringUtils.crossesAnySystem(l, entities, UiConstants.SYSTEM_SIZE);
@@ -3976,16 +4093,70 @@ public class RenderSystem implements System {
                         Transform t = e.get(Transform.class);
                         double w = SYSTEM_SIZE, h = SYSTEM_SIZE;
 
+                        boolean isDisabled = e.has(Disabled.class);
+                        double remain = 0.0, ratio = 0.0;
+                        if (isDisabled) {
+                                remain = Math.max(0.0, e.get(Disabled.class).remaining);
+                                ratio = GameBalance.SYSTEM_DISABLE_SECONDS > 1e-9
+                                        ? Math.min(1.0, remain / GameBalance.SYSTEM_DISABLE_SECONDS)
+                                        : 1.0;
+                        }
+
+                        // Base body
                         g.setFill(Color.web("#2a2f3a"));
                         g.fillRoundRect(t.x - w / 2, t.y - h / 2, w, h, 8, 8);
                         g.setStroke(Color.web("#3c4452"));
+                        g.setLineWidth(1.0);
                         g.strokeRoundRect(t.x - w / 2, t.y - h / 2, w, h, 8, 8);
 
+                        // Reference ring
                         if (e.has(Reference.class)) {
                                 g.setStroke(Color.LIGHTGREEN);
+                                g.setLineWidth(1.5);
                                 g.strokeOval(t.x - 22, t.y - 22, 44, 44);
                         }
+
+                        // ---- VISUAL CLUE WHEN DISABLED ----
+                        if (isDisabled) {
+                                // 1) Red translucent overlay
+                                g.setGlobalAlpha(0.35);
+                                g.setFill(Color.web("#ff3b30"));
+                                g.fillRoundRect(t.x - w / 2, t.y - h / 2, w, h, 8, 8);
+                                g.setGlobalAlpha(1.0);
+
+                                // 2) Dashed red outline
+                                g.setStroke(Color.web("#ff3b30"));
+                                g.setLineWidth(2.0);
+                                g.setLineDashes(6, 4);
+                                g.strokeRoundRect(t.x - w / 2, t.y - h / 2, w, h, 8, 8);
+                                g.setLineDashes(0); // reset
+
+                                // 3) Cross mark
+                                g.setLineWidth(1.5);
+                                double pad = 6.0;
+                                g.strokeLine(t.x - w / 2 + pad, t.y - h / 2 + pad, t.x + w / 2 - pad, t.y + h / 2 - pad);
+                                g.strokeLine(t.x + w / 2 - pad, t.y - h / 2 + pad, t.x - w / 2 + pad, t.y + h / 2 - pad);
+
+                                // 4) Countdown ring (shows remaining disable time)
+                                double rr = (Math.max(w, h) * 0.6); // ring radius
+                                double ringW = rr + 16;
+                                double ringH = rr + 16;
+                                g.setLineWidth(3.0);
+                                // background ring
+                                g.setStroke(Color.web("#4a1010"));
+                                g.strokeOval(t.x - ringW / 2, t.y - ringH / 2, ringW, ringH);
+                                // progress arc (clockwise from top)
+                                g.setStroke(Color.web("#ffd1cc"));
+                                g.setLineWidth(4.0);
+                                g.strokeArc(
+                                        t.x - ringW / 2, t.y - ringH / 2, ringW, ringH,
+                                        90,                         // start at 12 o'clock
+                                        -360.0 * ratio,             // clockwise sweep
+                                        ArcType.OPEN
+                                );
+                        }
                 }
+
 
                 // ports
                 final double ps = UiConstants.PORT_SIZE;
@@ -4084,16 +4255,21 @@ import java.util.*;
  */
 public final class WiringUtils {
 
+
+
         private WiringUtils() {}
 
         /** Immutable point holder to avoid JavaFX dependency. */
         public static final class Pt {
-                public final double x, y;
+                public double x, y;
                 public Pt(double x, double y) { this.x = x; this.y = y; }
         }
 
         /** Identity-keyed bend store so Link stays unmodified. */
         private static final IdentityHashMap<Link, List<Pt>> BENDS = new IdentityHashMap<>();
+
+        private static final int SAMPLES_PER_SEGMENT = 20;
+
 
         /** Max bends per link (phase rule). */
         public static final int MAX_BENDS_PER_LINK = 3;
@@ -4119,13 +4295,15 @@ public final class WiringUtils {
 
         /** Total polyline length for a link. */
         public static double pathLength(Link l) {
-                List<Pt> pts = path(l);
+                List<Pt> pts = curvePoints(l);
+                if (pts.size() < 2) return 0.0;
+
                 double len = 0.0;
-                for (int i = 0; i + 1 < pts.size(); i++) {
-                        Pt p = pts.get(i), q = pts.get(i + 1);
-                        len += Math.hypot(q.x - p.x, q.y - p.y);
+                for (int i = 0; i < pts.size() - 1; i++) {
+                        Pt a = pts.get(i), b = pts.get(i + 1);
+                        len += Math.hypot(b.x - a.x, b.y - a.y);
                 }
-                return Math.max(1e-6, len);
+                return len;
         }
 
         /** Sum of polyline lengths for all Link entities in the scene. */
@@ -4203,39 +4381,43 @@ public final class WiringUtils {
          * Returns the inserted bend index in bends(), or -1 on failure.
          * Does NOT charge coins; UI/controller should handle economy.
          */
-        public static int addBend(Link l, int segmentIndex, double x, double y,
-                                  List<Entity> scene, double systemSizePx) {
-                List<Pt> bs = bends(l);
-                if (bs.size() >= MAX_BENDS_PER_LINK) return -1;
+        public static int addBend(Link link,
+                                  int segmentIndex,
+                                  double x, double y,
+                                  List<Entity> entities,
+                                  double systemSize) {
+                var bends = BENDS.computeIfAbsent(link, k -> new ArrayList<>());
+                if (bends.size() >= MAX_BENDS_PER_LINK) return -1;
 
-                // In path[A + bends + B], segment i maps to insertion at i in bends list.
-                int insertAt = Math.max(0, Math.min(bs.size(), segmentIndex));
-                bs.add(insertAt, new Pt(x, y));
+                // Clamp insert position into [0, bends.size()]
+                int insertAt = Math.max(0, Math.min(segmentIndex, bends.size()));
+                bends.add(insertAt, new Pt(x, y));
 
-                // Reject if crossing
-                if (crossesAnySystem(l, scene, systemSizePx)) {
-                        bs.remove(insertAt);
-                        return -1;
-                }
+                // NOTE: No crossing check here anymore; editor must allow fixing red/invalid wires.
                 return insertAt;
         }
+
 
         /**
          * Move an existing bend to (x,y). Returns true if kept; false if reverted
          * due to crossing a system. Economy/budget should be handled by caller.
          */
-        public static boolean moveBend(Link l, int bendIndex, double x, double y,
-                                       List<Entity> scene, double systemSizePx) {
-                List<Pt> bs = bends(l);
-                if (bendIndex < 0 || bendIndex >= bs.size()) return false;
-                Pt old = bs.get(bendIndex);
-                bs.set(bendIndex, new Pt(x, y));
-                if (crossesAnySystem(l, scene, systemSizePx)) {
-                        bs.set(bendIndex, old);
-                        return false;
-                }
+        public static boolean moveBend(Link link,
+                                       int bendIndex,
+                                       double x, double y,
+                                       List<Entity> entities,
+                                       double systemSize) {
+                var bends = BENDS.get(link);
+                if (bends == null || bendIndex < 0 || bendIndex >= bends.size()) return false;
+
+                Pt b = bends.get(bendIndex);
+                b.x = x;
+                b.y = y;
+
+                // NOTE: No crossing check here either; allow moves to fix invalid routing.
                 return true;
         }
+
 
         // ----------------- Path sampling -----------------
 
@@ -4244,32 +4426,39 @@ public final class WiringUtils {
          * Note: uses arc-length parameterization internally so packet motion is smooth.
          */
         public static Pt pointAlongNormalized(Link l, double t) {
-                t = (t < 0) ? 0 : Math.min(1, t);
-                List<Pt> pts = path(l);
+                List<Pt> pts = curvePoints(l);
+                if (pts.isEmpty()) return new Pt(0, 0);
+                if (pts.size() == 1) return pts.get(0);
 
-                double total = 0.0;
-                double[] segLen = new double[Math.max(0, pts.size() - 1)];
-                for (int i = 0; i + 1 < pts.size(); i++) {
-                        Pt a = pts.get(i), b = pts.get(i + 1);
-                        double len = Math.hypot(b.x - a.x, b.y - a.y);
-                        segLen[i] = len;
-                        total += len;
+                t = Math.max(0.0, Math.min(1.0, t));
+
+                // Build cumulative arc-length table
+                int n = pts.size();
+                double[] cum = new double[n];
+                cum[0] = 0.0;
+                for (int i = 1; i < n; i++) {
+                        Pt a = pts.get(i - 1), b = pts.get(i);
+                        cum[i] = cum[i - 1] + Math.hypot(b.x - a.x, b.y - a.y);
                 }
-                if (total <= 1e-9) {
-                        Pt a = pts.get(0);
-                        return new Pt(a.x, a.y);
-                }
+                double total = cum[n - 1];
+                if (total <= 1e-9) return pts.get(0);
+
                 double target = t * total;
-                for (int i = 0; i < segLen.length; i++) {
-                        double len = segLen[i];
-                        if (target > len) { target -= len; continue; }
-                        Pt a = pts.get(i), b = pts.get(i + 1);
-                        double u = (len <= 1e-9) ? 0 : (target / len);
-                        return new Pt(a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u);
-                }
-                Pt last = pts.get(pts.size() - 1);
-                return new Pt(last.x, last.y);
+
+                // Find segment where target falls
+                int hi = Arrays.binarySearch(cum, target);
+                if (hi < 0) hi = -hi - 1;
+                hi = Math.min(Math.max(1, hi), n - 1);
+                int lo = hi - 1;
+
+                double segLen = cum[hi] - cum[lo];
+                double local = (segLen <= 1e-9) ? 0.0 : (target - cum[lo]) / segLen;
+
+                Pt A = pts.get(lo), B = pts.get(hi);
+                return new Pt(A.x + (B.x - A.x) * local,
+                        A.y + (B.y - A.y) * local);
         }
+
 
         // ----------------- Crossing checks -----------------
 
@@ -4356,6 +4545,75 @@ public final class WiringUtils {
                 // collinear touch
                 return onSegment(cx, cy, dx, dy, ax, ay) || onSegment(cx, cy, dx, dy, bx, by)
                         || onSegment(ax, ay, bx, by, cx, cy) || onSegment(ax, ay, bx, by, dx, dy);
+        }
+
+        /** Returns control points: [fromPort, bends..., toPort] */
+        private static List<Pt> controlPoints(Link l) {
+                List<Pt> cps = new ArrayList<>();
+                Pt a = portCenter(l.fromPort);
+                Pt b = portCenter(l.toPort);
+                cps.add(a);
+                cps.addAll(bends(l)); // existing accessor to per-link bend list
+                cps.add(b);
+                return cps;
+        }
+
+        /** Helper to read a port's current world position (center). */
+        private static Pt portCenter(Entity port) {
+                Transform t = port.get(Transform.class);
+                return new Pt(t.x, t.y);
+        }
+
+        /** Standard Catmullâ€“Rom (uniform, tension = 0.5) */
+        private static Pt catmull(Pt p0, Pt p1, Pt p2, Pt p3, double u) {
+                double u2 = u * u;
+                double u3 = u2 * u;
+                double x =
+                        0.5 * ((2 * p1.x) +
+                                (-p0.x + p2.x) * u +
+                                (2*p0.x - 5*p1.x + 4*p2.x - p3.x) * u2 +
+                                (-p0.x + 3*p1.x - 3*p2.x + p3.x) * u3);
+                double y =
+                        0.5 * ((2 * p1.y) +
+                                (-p0.y + p2.y) * u +
+                                (2*p0.y - 5*p1.y + 4*p2.y - p3.y) * u2 +
+                                (-p0.y + 3*p1.y - 3*p2.y + p3.y) * u3);
+                return new Pt(x, y);
+        }
+
+        /**
+         * Duplicates end points to keep the spline clamped to endpoints,
+         * and samples per control-point segment.
+         */
+        public static List<Pt> curvePoints(Link l) {
+                List<Pt> cps = controlPoints(l);
+                List<Pt> out = new ArrayList<>();
+                if (cps.size() < 2) return out;
+
+                // Degenerate straight line
+                if (cps.size() == 2) {
+                        out.add(cps.get(0));
+                        out.add(cps.get(1));
+                        return out;
+                }
+
+                // Build padded list [P-1, P0, ..., Pn, Pn+1]
+                List<Pt> pad = new ArrayList<>(cps.size() + 2);
+                pad.add(cps.get(0));
+                pad.addAll(cps);
+                pad.add(cps.get(cps.size() - 1));
+
+                for (int i = 1; i < pad.size() - 2; i++) {
+                        Pt p0 = pad.get(i - 1), p1 = pad.get(i), p2 = pad.get(i + 1), p3 = pad.get(i + 2);
+                        for (int s = 0; s < SAMPLES_PER_SEGMENT; s++) {
+                                double u = (double) s / SAMPLES_PER_SEGMENT;
+                                if (i == 1 && s == 0) out.add(new Pt(p1.x, p1.y)); // exact hit at start of segment
+                                out.add(catmull(p0, p1, p2, p3, u));
+                        }
+                }
+                // Ensure exact last point
+                out.add(cps.get(cps.size() - 1));
+                return out;
         }
 
         private static double direction(double ax, double ay, double bx, double by, double px, double py) {

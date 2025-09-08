@@ -9,14 +9,16 @@ import play.model.physics.Kinematics;
 import java.util.*;
 
 /**
- * Handles arrivals into target systems, coins, buffering, and dispatch.
+ * Handles arrivals into systems, coins, buffering, dispatch, and:
+ *  - INFINITE mid-wire collision behavior: reverse at the exact collision position.
+ *  - Per-frame jerk application: accel += jerk * dt (for all seeds; jerk usually 0).
  */
 public class QueueSystem implements System {
 
         private final GameEngine engine;
         private final List<Entity> entities;
 
-        /** Per-device buffer (queue) of waiting seed entities. */
+        /** Per-device buffer of waiting seed entities. */
         private final Map<Entity, Deque<Entity>> deviceQueues = new HashMap<>();
 
         private final Random rng = new Random();
@@ -39,6 +41,43 @@ public class QueueSystem implements System {
                         }
                 }
 
+                // 0.25) Apply jerk each frame: accel += jerk * dt
+                // For INFINITE on incompatible wires, jerk < 0 => accel decreases over time.
+                // Clamp to avoid flipping sign (we want accel to decay toward 0).
+                for (Entity e : new ArrayList<>(entities)) {
+                        if (!e.has(Seed.class)) continue;
+                        Seed s = e.get(Seed.class);
+                        if (s.currentLink == null) continue; // only while traversing
+
+                        if (s.jerk != 0.0) {
+                                s.accel += s.jerk * dt;
+
+                                // If jerk is negative, don't let accel go below 0 (no unintended braking).
+                                if (s.jerk < 0.0 && s.accel < 0.0) {
+                                        s.accel = 0.0;
+                                }
+                        }
+                }
+
+                // 0.5) INFINITE mid-wire collision handling: reverse AT THE COLLISION POSITION
+                for (Entity e : new ArrayList<>(entities)) {
+                        if (!e.has(Seed.class)) continue;
+                        Seed s = e.get(Seed.class);
+                        if (s.type != Seed.Type.INFINITE) continue;
+
+                        // Must be on a wire and not already returning
+                        if (s.currentLink == null || s.returning) continue;
+
+                        if (s.justCollided) {
+                                double oldP = clamp01(s.progress);
+                                s.returning = true;
+                                s.progress = 1.0 - oldP;
+
+                                s.impactEnergy = Math.max(s.impactEnergy, 0.6);
+                                s.justCollided = false;
+                        }
+                }
+
                 // 1) Collect arrivals this frame
                 List<Entity> arrivals = new ArrayList<>();
                 for (Entity e : new ArrayList<>(entities)) {
@@ -55,53 +94,43 @@ public class QueueSystem implements System {
                         Link link = s.currentLink;
 
                         // Determine actual destination port for this traversal
-                        // - Normal travel enters link.toPort
-                        // - Returning travel enters link.fromPort (we traverse the same wire backwards)
                         Entity inPort = s.returning ? link.fromPort : link.toPort;
                         PortInfo pTo = inPort.get(PortInfo.class);
                         Entity system = pTo.parentSystem;
 
-                        // Destination port position (used when we *do* finalize the arrival)
+                        // Destination port position
                         Transform tIn = inPort.get(Transform.class);
                         Transform st  = seedE.get(Transform.class);
 
-                        // --- Speed trap: disable destination & bounce back (only on first arrival) ---
+                        // Speed trap: disable & bounce back (only on first arrival)
                         if (!s.returning && s.speed > GameBalance.ENTRY_SPEED_LIMIT) {
                                 if (system.has(Disabled.class)) {
                                         system.get(Disabled.class).remaining = GameBalance.SYSTEM_DISABLE_SECONDS;
                                 } else {
                                         system.add(new Disabled(GameBalance.SYSTEM_DISABLE_SECONDS));
                                 }
-                                // Immediately start travelling back along the same wire.
                                 s.returning = true;
-                                s.progress  = 0.0;   // restart from the (old) destination end
-                                // Keep s.currentLink, keep speed/accel continuous; do not enqueue, no coins.
-                                continue;            // skip normal arrival handling this frame
-                        }
-
-                        // --- NEW: Destination may have become disabled while en route -> bounce back ---
-                        if (!s.returning && system.has(Disabled.class)) {
-                                s.returning = true;
-                                s.progress  = 0.0;   // restart from the destination end
-                                // Keep s.currentLink; no enqueue, no coins.
+                                s.progress  = 0.0;
                                 continue;
                         }
 
-                        // --- Normal arrival handling (includes finishing a return trip) ---
-                        // snap to the IN port position
-                        st.x = tIn.x;
-                        st.y = tIn.y;
+                        // Destination may have become disabled while en route -> bounce back
+                        if (!s.returning && system.has(Disabled.class)) {
+                                s.returning = true;
+                                s.progress  = 0.0;
+                                continue;
+                        }
 
-                        // clear travel state (now "inside" the system)
+                        // Normal arrival handling
+                        st.x = tIn.x; st.y = tIn.y;
                         s.currentLink = null;
                         s.progress = 0.0;
-                        s.lateral = 0.0;
+                        s.lateral  = 0.0;
 
-                        // If we just finished a return trip, don't reward coins for the bounce path
                         boolean finishedReturn = s.returning;
                         s.returning = false;
 
-                        // Reference systems consume (do not forward)
+                        // Reference systems consume
                         if (system.has(Reference.class)) {
                                 engine.incrementReachedReference();
                                 engine.notifySeedDelivered(s);
@@ -109,18 +138,17 @@ public class QueueSystem implements System {
                                 continue;
                         }
 
-                        // coins per packet entering a system: square=1, triangle=2 (only if not from bounce)
+                        // Coins per packet entering a system
+                        int reward = (s.type == Seed.Type.TRIANGLE)
+                                ? GameBalance.COIN_REWARD_TRIANGLE
+                                : (s.type == Seed.Type.SQUARE ? GameBalance.COIN_REWARD_SQUARE : GameBalance.COIN_REWARD_INFINITE);
                         if (!finishedReturn) {
-                                int reward = (s.type == Seed.Type.SQUARE)
-                                        ? GameBalance.COIN_REWARD_SQUARE
-                                        : GameBalance.COIN_REWARD_TRIANGLE;
                                 engine.incrementCoins(reward);
                         }
 
                         // Enqueue into the device buffer
                         Deque<Entity> buf = deviceQueues.computeIfAbsent(system, k -> new ArrayDeque<>());
                         if (buf.size() >= GameBalance.DEVICE_CAPACITY) {
-                                // storage overflow => packet loss
                                 entities.remove(seedE);
                                 engine.incrementLost();
                                 continue;
@@ -146,7 +174,6 @@ public class QueueSystem implements System {
                                 if (pFrom.parentSystem != system) continue;
                                 if (!isLinkFree(l)) continue;
 
-                                // Do not choose links whose destination system is disabled
                                 if (l.toPort == null || !l.toPort.has(PortInfo.class)) continue;
                                 PortInfo destPi = l.toPort.get(PortInfo.class);
                                 Entity destSys = destPi.parentSystem;
@@ -165,9 +192,9 @@ public class QueueSystem implements System {
                                 if (seedE == null) break;
                                 Seed s = seedE.get(Seed.class);
 
-                                // Preferred compatible link
+                                // Preferred compatible link (INFINITE uses square links)
                                 Entity chosenLinkE = null;
-                                if (s.type == Seed.Type.SQUARE && !freeSquare.isEmpty()) {
+                                if ((s.type == Seed.Type.SQUARE || s.type == Seed.Type.INFINITE) && !freeSquare.isEmpty()) {
                                         chosenLinkE = freeSquare.remove(0);
                                 } else if (s.type == Seed.Type.TRIANGLE && !freeTriangle.isEmpty()) {
                                         chosenLinkE = freeTriangle.remove(0);
@@ -184,8 +211,7 @@ public class QueueSystem implements System {
                                         }
                                 }
 
-                                // If still nothing, stop trying this device (it's congested)
-                                if (chosenLinkE == null) break;
+                                if (chosenLinkE == null) break; // congested
 
                                 // We can dispatch this seed
                                 buf.removeFirst();
@@ -193,31 +219,34 @@ public class QueueSystem implements System {
                                 Link l = chosenLinkE.get(Link.class);
                                 PortInfo.Shape outShape = l.fromPort.get(PortInfo.class).shape;
 
-                                // per-hop kinematics
+                                // per-hop kinematics (applies new INFINITE rules)
                                 Kinematics.applyForHop(s, outShape);
 
                                 // place at OUT port and start hop
                                 Transform tFrom = l.fromPort.get(Transform.class);
                                 Transform st = seedE.get(Transform.class);
-                                st.x = tFrom.x;
-                                st.y = tFrom.y;
+                                st.x = tFrom.x; st.y = tFrom.y;
 
                                 s.currentLink = l;
                                 s.progress = 0.0;
-                                s.returning = false; // leaving a system -> forward travel
+                                s.returning = false;
 
                                 progressed = true;
                         }
                 }
         }
 
-
-
         private boolean isLinkFree(Link link) {
                 for (Entity e : entities) {
                         if (!e.has(Seed.class)) continue;
-                        if (e.get(Seed.class).currentLink == link) return false; // one seed per wire at a time
+                        if (e.get(Seed.class).currentLink == link) return false; // one seed per wire
                 }
                 return true;
+        }
+
+        private static double clamp01(double v) {
+                if (v < 0) return 0;
+                if (v > 1) return 1;
+                return v;
         }
 }

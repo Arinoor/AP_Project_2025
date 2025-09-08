@@ -1,0 +1,46 @@
+{
+  "timeLimitSeconds": 150,
+  "totalWire": 4000,
+
+  "devices": [
+    { "id": "SRC_A", "x": 200, "y": 200,
+      "producer": { "interval": 0.7, "quota": { "square": 8,  "triangle": 8,  "infinite": 12 } } },
+
+    { "id": "SRC_B", "x": 200, "y": 420,
+      "producer": { "interval": 0.8, "quota": { "square": 8,  "triangle": 6,  "infinite": 10 } } },
+
+    { "id": "MIX_1", "x": 580, "y": 200 },
+    { "id": "MIX_2", "x": 580, "y": 420 },
+
+    { "id": "REF_SQ", "x": 980, "y": 200, "reference": true },
+    { "id": "REF_TR", "x": 980, "y": 420, "reference": true }
+  ],
+
+  "ports": [
+    { "id": "SRC_A_OUT_SQ", "device": "SRC_A", "x": 220, "y": 180, "shape": "square",   "io": "out" },
+    { "id": "SRC_A_OUT_TR", "device": "SRC_A", "x": 220, "y": 220, "shape": "triangle", "io": "out" },
+
+    { "id": "SRC_B_OUT_SQ", "device": "SRC_B", "x": 220, "y": 400, "shape": "square",   "io": "out" },
+    { "id": "SRC_B_OUT_TR", "device": "SRC_B", "x": 220, "y": 440, "shape": "triangle", "io": "out" },
+
+    { "id": "MIX1_IN_SQ",  "device": "MIX_1", "x": 560, "y": 180, "shape": "square",   "io": "in"  },
+    { "id": "MIX1_OUT_SQ", "device": "MIX_1", "x": 600, "y": 180, "shape": "square",   "io": "out" },
+
+    { "id": "MIX1_IN_TR",  "device": "MIX_1", "x": 560, "y": 220, "shape": "triangle", "io": "in"  },
+    { "id": "MIX1_OUT_TR", "device": "MIX_1", "x": 600, "y": 220, "shape": "triangle", "io": "out" },
+
+    { "id": "MIX2_IN_SQ",  "device": "MIX_2", "x": 560, "y": 400, "shape": "square",   "io": "in"  },
+    { "id": "MIX2_OUT_SQ", "device": "MIX_2", "x": 600, "y": 400, "shape": "square",   "io": "out" },
+
+    { "id": "MIX2_IN_TR",  "device": "MIX_2", "x": 560, "y": 440, "shape": "triangle", "io": "in"  },
+    { "id": "MIX2_OUT_TR", "device": "MIX_2", "x": 600, "y": 440, "shape": "triangle", "io": "out" },
+
+    { "id": "REFSQ_IN_1", "device": "REF_SQ", "x": 960, "y": 180, "shape": "square", "io": "in", "reference": true },
+    { "id": "REFSQ_IN_2", "device": "REF_SQ", "x": 960, "y": 220, "shape": "square", "io": "in", "reference": true },
+
+    { "id": "REFTR_IN_1", "device": "REF_TR", "x": 960, "y": 400, "shape": "triangle", "io": "in", "reference": true },
+    { "id": "REFTR_IN_2", "device": "REF_TR", "x": 960, "y": 440, "shape": "triangle", "io": "in", "reference": true }
+  ],
+
+  "notes": "SQUARE ports can emit SQUARE or INFINITE (independent quotas). Wire SRC_A/SRC_B -> MIX_1/MIX_2 -> REF_SQ/REF_TR on matching shapes."
+}
