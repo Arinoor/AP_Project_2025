@@ -13,6 +13,7 @@ import java.util.*;
  *  - INFINITE mid-wire collision: reverse at the exact collision position.
  *  - Per-frame jerk application (accel += jerk * dt).
  *  - SECURE adaptive slowdown: if dest system has queued items, clamp speed down.
+ *  - VPN conversion: messaging packets entering a VPN become PROTECTED with hidden (random) emulation.
  */
 public class QueueSystem implements System {
 
@@ -65,7 +66,6 @@ public class QueueSystem implements System {
                         // Apply adaptive speed
                         if (targetBusy) {
                                 if (s.speed > SECURE_SLOW_SPEED) s.speed = SECURE_SLOW_SPEED;
-                                // maintain no accel/jerk for SECURE
                                 s.accel = 0.0;
                                 s.jerk  = 0.0;
                         } else {
@@ -95,14 +95,12 @@ public class QueueSystem implements System {
                         Seed s = e.get(Seed.class);
                         if (s.type != Seed.Type.INFINITE) continue;
 
-                        // Must be on a wire and not already returning
                         if (s.currentLink == null || s.returning) continue;
 
                         if (s.justCollided) {
                                 double oldP = clamp01(s.progress);
                                 s.returning = true;
                                 s.progress = 1.0 - oldP;
-
 
                                 s.impactEnergy = Math.max(s.impactEnergy, 0.6);
                                 s.justCollided = false;
@@ -161,26 +159,51 @@ public class QueueSystem implements System {
                         boolean finishedReturn = s.returning;
                         s.returning = false;
 
-                        // === Coin rewards per type ===
-                        // square:2, triangle:3, infinite:1, secure:3
-                        int reward;
-                        switch (s.type) {
-                                case SQUARE:   reward = 2; break;
-                                case TRIANGLE: reward = 3; break;
-                                case INFINITE: reward = 1; break;
-                                case SECURE:   reward = 3; break;
-                                default:       reward = 0; break;
-                        }
+                        // === Award coins on any successful arrival (including sinks) ===
+                        // square:2, triangle:3, infinite:1, secure:3, protected:5
                         if (!finishedReturn) {
+                                int reward;
+                                switch (s.type) {
+                                        case SQUARE:   reward = 2; break;
+                                        case TRIANGLE: reward = 3; break;
+                                        case INFINITE: reward = 1; break;
+                                        case SECURE:   reward = 3; break;
+                                        case PROTECTED:reward = 5; break;
+                                        default:       reward = 0; break;
+                                }
                                 engine.incrementCoins(reward);
                         }
 
-                        // Reference systems consume
+                        // === Reference systems consume ===
                         if (system.has(Reference.class)) {
                                 engine.incrementReachedReference();
                                 engine.notifySeedDelivered(s);
                                 entities.remove(seedE);
                                 continue;
+                        }
+
+                        // === VPN conversion (on entry to system) ===
+                        if (system.has(Vpn.class)) {
+                                // Only convert messaging packets (SQUARE/TRIANGLE/INFINITE). SECURE and PROTECTED passthrough.
+                                if (s.type == Seed.Type.SQUARE || s.type == Seed.Type.TRIANGLE || s.type == Seed.Type.INFINITE) {
+                                        Seed.Type base = s.type;
+                                        Seed.Type emu  = pickRandomMessengerType();
+
+                                        Seed newS = new Seed(Seed.Type.PROTECTED);
+                                        newS.protectedBaseType = base;
+                                        newS.emulateType = emu;
+                                        // Adopt base capacity (triangle=4, else 3)
+                                        newS.capacity = (base == Seed.Type.TRIANGLE) ? 4 : 3;
+                                        // Reset motion; next hop will assign kinematics
+                                        newS.speed = 0.0; newS.accel = 0.0; newS.jerk = 0.0;
+                                        newS.noise = s.noise; // carry noise forward
+                                        newS.impactEnergy = Math.max(s.impactEnergy, 0.25); // small flash on conversion
+
+                                        // Replace component on the same entity
+                                        seedE.remove(Seed.class);
+                                        seedE.add(newS);
+                                        s = newS;
+                                }
                         }
 
                         // Enqueue into the device buffer
@@ -233,11 +256,12 @@ public class QueueSystem implements System {
                                 // - SQUARE / INFINITE: square links
                                 // - TRIANGLE: triangle links
                                 // - SECURE: any available (no compatibility concept)
+                                // - PROTECTED: choose based on emulateType (hidden)
                                 Entity chosenLinkE = null;
-                                if ((s.type == Seed.Type.SQUARE || s.type == Seed.Type.INFINITE) && !freeSquare.isEmpty()) {
-                                        chosenLinkE = freeSquare.remove(0);
-                                } else if (s.type == Seed.Type.TRIANGLE && !freeTriangle.isEmpty()) {
-                                        chosenLinkE = freeTriangle.remove(0);
+                                if (s.type == Seed.Type.SQUARE || s.type == Seed.Type.INFINITE) {
+                                        if (!freeSquare.isEmpty()) chosenLinkE = freeSquare.remove(0);
+                                } else if (s.type == Seed.Type.TRIANGLE) {
+                                        if (!freeTriangle.isEmpty()) chosenLinkE = freeTriangle.remove(0);
                                 } else if (s.type == Seed.Type.SECURE) {
                                         int total = freeSquare.size() + freeTriangle.size();
                                         if (total > 0) {
@@ -246,9 +270,16 @@ public class QueueSystem implements System {
                                                         ? freeSquare.remove(idx)
                                                         : freeTriangle.remove(idx - freeSquare.size());
                                         }
+                                } else if (s.type == Seed.Type.PROTECTED) {
+                                        Seed.Type emu = (s.emulateType != null) ? s.emulateType : Seed.Type.SQUARE;
+                                        if (emu == Seed.Type.TRIANGLE) {
+                                                if (!freeTriangle.isEmpty()) chosenLinkE = freeTriangle.remove(0);
+                                        } else { // SQUARE or INFINITE emulation => use square link
+                                                if (!freeSquare.isEmpty()) chosenLinkE = freeSquare.remove(0);
+                                        }
+                                        // if none, fall through to random below
                                 }
 
-                                // If none selected yet, grab any free link
                                 if (chosenLinkE == null) {
                                         int total = freeSquare.size() + freeTriangle.size();
                                         if (total > 0) {
@@ -267,7 +298,7 @@ public class QueueSystem implements System {
                                 Link l = chosenLinkE.get(Link.class);
                                 PortInfo.Shape outShape = l.fromPort.get(PortInfo.class).shape;
 
-                                // per-hop kinematics (INFINITE/SECURE rules applied inside)
+                                // per-hop kinematics
                                 Kinematics.applyForHop(s, outShape);
 
                                 // place at OUT port and start hop
@@ -282,6 +313,11 @@ public class QueueSystem implements System {
                                 progressed = true;
                         }
                 }
+        }
+
+        private Seed.Type pickRandomMessengerType() {
+                int r = rng.nextInt(3);
+                return (r == 0) ? Seed.Type.SQUARE : (r == 1) ? Seed.Type.TRIANGLE : Seed.Type.INFINITE;
         }
 
         private boolean isLinkFree(Link link) {

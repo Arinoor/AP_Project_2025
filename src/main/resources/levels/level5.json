@@ -1,0 +1,47 @@
+{
+  "timeLimitSeconds": 180,
+  "totalWire": 4200,
+
+  "devices": [
+    { "id": "SRC_A",   "x": 200, "y": 160,
+      "producer": { "interval": 0.70, "quota": { "square": 6, "infinite": 6 } } },
+
+    { "id": "SRC_B",   "x": 200, "y": 300,
+      "producer": { "interval": 0.80, "quota": { "triangle": 8 } } },
+
+    { "id": "SRC_SEC", "x": 200, "y": 440,
+      "producer": { "interval": 0.75, "quota": { "secure": 6 } } },
+
+    { "id": "VPN_1",   "x": 580, "y": 230, "vpn": true },
+
+    { "id": "MIX",     "x": 780, "y": 230 },
+
+    { "id": "REF",     "x": 1040, "y": 230, "reference": true }
+  ],
+
+  "ports": [
+    { "id": "A_OUT_SQ",  "device": "SRC_A", "x": 220, "y": 160, "shape": "square",   "io": "out" },
+
+    { "id": "B_OUT_TR",  "device": "SRC_B", "x": 220, "y": 300, "shape": "triangle", "io": "out" },
+
+    { "id": "SEC_OUT_SQ","device": "SRC_SEC", "x": 220, "y": 420, "shape": "square",   "io": "out" },
+    { "id": "SEC_OUT_TR","device": "SRC_SEC", "x": 220, "y": 460, "shape": "triangle", "io": "out" },
+
+    { "id": "VPN_IN_SQ",  "device": "VPN_1", "x": 560, "y": 210, "shape": "square",   "io": "in"  },
+    { "id": "VPN_OUT_SQ", "device": "VPN_1", "x": 600, "y": 210, "shape": "square",   "io": "out" },
+    { "id": "VPN_IN_TR",  "device": "VPN_1", "x": 560, "y": 250, "shape": "triangle", "io": "in"  },
+    { "id": "VPN_OUT_TR", "device": "VPN_1", "x": 600, "y": 250, "shape": "triangle", "io": "out" },
+
+    { "id": "MIX_IN_SQ",  "device": "MIX",   "x": 760, "y": 210, "shape": "square",   "io": "in"  },
+    { "id": "MIX_OUT_SQ", "device": "MIX",   "x": 800, "y": 210, "shape": "square",   "io": "out" },
+    { "id": "MIX_IN_TR",  "device": "MIX",   "x": 760, "y": 250, "shape": "triangle", "io": "in"  },
+    { "id": "MIX_OUT_TR", "device": "MIX",   "x": 800, "y": 250, "shape": "triangle", "io": "out" },
+
+    { "id": "REF_IN_SQ_1", "device": "REF", "x": 1020, "y": 190, "shape": "square",   "io": "in", "reference": true },
+    { "id": "REF_IN_SQ_2", "device": "REF", "x": 1020, "y": 230, "shape": "square",   "io": "in", "reference": true },
+    { "id": "REF_IN_TR_1", "device": "REF", "x": 1020, "y": 270, "shape": "triangle", "io": "in", "reference": true },
+    { "id": "REF_IN_TR_2", "device": "REF", "x": 1020, "y": 310, "shape": "triangle", "io": "in", "reference": true }
+  ],
+
+  "notes": "Wire SRC_A (square/infinite) -> VPN_IN_SQ -> VPN_OUT_SQ -> MIX_IN_SQ -> MIX_OUT_SQ -> REF square inputs. Wire SRC_B (triangle) -> VPN_IN_TR -> VPN_OUT_TR -> MIX_IN_TR -> MIX_OUT_TR -> REF triangle inputs. Wire SECURE outs to MIX-compatible inputs to create queueing. VPN converts messaging packets (square/triangle/infinite) into PROTECTED; their travel model is hidden and randomly emulates a messenger type per hop dispatch."
+}

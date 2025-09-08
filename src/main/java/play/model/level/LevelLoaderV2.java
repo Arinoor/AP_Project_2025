@@ -15,6 +15,9 @@ import java.util.Map;
  *
  * Quotas supported:
  *  - devices[].producer.quota.{square,triangle,infinite,secure}
+ * Device flags:
+ *  - devices[].reference: true  -> adds Reference component
+ *  - devices[].vpn: true        -> adds Vpn component (+ BackgroundImage("/img/vpn_system.png"))
  */
 public final class LevelLoaderV2 {
 
@@ -51,18 +54,22 @@ public final class LevelLoaderV2 {
                                 if (d.path("reference").asBoolean(false)) {
                                         systemE.add(new Reference());
                                 }
+                                if (d.path("vpn").asBoolean(false)) {
+                                        systemE.add(new Vpn());
+                                        systemE.add(new BackgroundImage("/img/vpn_system.png"));
+                                }
 
                                 JsonNode prodNode = d.path("producer");
                                 if (!prodNode.isMissingNode() && !prodNode.isNull()) {
                                         double interval = prodNode.path("interval").asDouble(1.0);
 
-                                        int qS = -1, qT = -1, qI = -1, qC = -1;
+                                        int qS = -1, qT = -1, qI = 0, qC = 0; // default new types to 0 unless provided
                                         JsonNode quota = prodNode.path("quota");
                                         if (!quota.isMissingNode() && !quota.isNull()) {
                                                 if (quota.has("square"))   qS = quota.path("square").asInt(-1);
                                                 if (quota.has("triangle")) qT = quota.path("triangle").asInt(-1);
-                                                if (quota.has("infinite")) qI = quota.path("infinite").asInt(-1);
-                                                if (quota.has("secure"))   qC = quota.path("secure").asInt(-1);
+                                                if (quota.has("infinite")) qI = quota.path("infinite").asInt(0);
+                                                if (quota.has("secure"))   qC = quota.path("secure").asInt(0);
 
                                                 // Sum only finite quotas into planned total
                                                 if (qS > 0) out.plannedSeeds += qS;
@@ -70,7 +77,6 @@ public final class LevelLoaderV2 {
                                                 if (qI > 0) out.plannedSeeds += qI;
                                                 if (qC > 0) out.plannedSeeds += qC;
 
-                                                // Prefer full-arity ctor when SECURE quota provided
                                                 if (quota.has("secure")) {
                                                         systemE.add(new Producer(interval, qS, qT, qI, qC));
                                                 } else if (quota.has("infinite")) {
@@ -79,7 +85,11 @@ public final class LevelLoaderV2 {
                                                         systemE.add(new Producer(interval, qS, qT));
                                                 }
                                         } else {
-                                                systemE.add(new Producer(interval));
+                                                // Defaults: new types infinite/secure = 0 so they don't spawn unless declared
+                                                Producer p = new Producer(interval);
+                                                p.remainingInfinite = 0;
+                                                p.remainingSecure   = 0;
+                                                systemE.add(p);
                                         }
                                 }
 
@@ -114,7 +124,6 @@ public final class LevelLoaderV2 {
                                         portE.add(new Queue(5)); // capacity for this phase
                                 }
 
-                                // Optional: reference at port level (kept for compatibility)
                                 if (p.path("reference").asBoolean(false) && !parentSystem.has(Reference.class)) {
                                         parentSystem.add(new Reference());
                                 }
