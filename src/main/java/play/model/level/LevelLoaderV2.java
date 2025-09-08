@@ -12,10 +12,9 @@ import java.util.Map;
 
 /**
  * Loads ONLY systems and ports from JSON. No links are created here.
- * Additions:
- *  - devices[].producer.quota.{square,triangle,infinite}
- * Removed:
- *  - ports[].spawnType (no longer supported)
+ *
+ * Quotas supported:
+ *  - devices[].producer.quota.{square,triangle,infinite,secure}
  */
 public final class LevelLoaderV2 {
 
@@ -57,19 +56,28 @@ public final class LevelLoaderV2 {
                                 if (!prodNode.isMissingNode() && !prodNode.isNull()) {
                                         double interval = prodNode.path("interval").asDouble(1.0);
 
-                                        int qS = -1, qT = -1, qI = -1;
+                                        int qS = -1, qT = -1, qI = -1, qC = -1;
                                         JsonNode quota = prodNode.path("quota");
                                         if (!quota.isMissingNode() && !quota.isNull()) {
                                                 if (quota.has("square"))   qS = quota.path("square").asInt(-1);
                                                 if (quota.has("triangle")) qT = quota.path("triangle").asInt(-1);
                                                 if (quota.has("infinite")) qI = quota.path("infinite").asInt(-1);
+                                                if (quota.has("secure"))   qC = quota.path("secure").asInt(-1);
 
                                                 // Sum only finite quotas into planned total
                                                 if (qS > 0) out.plannedSeeds += qS;
                                                 if (qT > 0) out.plannedSeeds += qT;
                                                 if (qI > 0) out.plannedSeeds += qI;
+                                                if (qC > 0) out.plannedSeeds += qC;
 
-                                                systemE.add(new Producer(interval, qS, qT, qI));
+                                                // Prefer full-arity ctor when SECURE quota provided
+                                                if (quota.has("secure")) {
+                                                        systemE.add(new Producer(interval, qS, qT, qI, qC));
+                                                } else if (quota.has("infinite")) {
+                                                        systemE.add(new Producer(interval, qS, qT, qI));
+                                                } else {
+                                                        systemE.add(new Producer(interval, qS, qT));
+                                                }
                                         } else {
                                                 systemE.add(new Producer(interval));
                                         }

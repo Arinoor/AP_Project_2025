@@ -4,7 +4,7 @@ import play.model.components.Link;
 
 /** Packet (seed) travelling in the network. */
 public class Seed {
-        public enum Type { SQUARE, TRIANGLE, INFINITE }
+        public enum Type { SQUARE, TRIANGLE, INFINITE, SECURE }
 
         public final Type type;
 
@@ -24,7 +24,7 @@ public class Seed {
         public double impactEnergy = 0.0;
 
         // collision budgeting (separate from noise)
-        public int collisions = 0;
+        public int collisions;
         public int capacity;
 
         // cumulative "noise" (in PORT UNITS). If noise > sizeUnits() => loss
@@ -43,12 +43,21 @@ public class Seed {
 
         public Seed(Type type) {
                 this.type = type;
-                // Keep previous capacities: TRIANGLE=4, others=3
+                // Keep capacities: TRIANGLE=4, others=3
                 this.capacity = (type == Type.TRIANGLE) ? 4 : 3;
         }
 
-        /** Size in "port units" used for thresholds (square=2, triangle=3). INFINITE == SQUARE. */
+        /**
+         * Size in "port units" used for thresholds.
+         * square=2, triangle=3, infinite=1, secure=4
+         */
         public double sizeUnits() {
-                return (type == Type.TRIANGLE) ? 3.0 : 2.0;
+                switch (type) {
+                        case SQUARE:   return 2.0;
+                        case TRIANGLE: return 3.0;
+                        case INFINITE: return 1.0;
+                        case SECURE:   return 4.0;
+                        default:       return 2.0;
+                }
         }
 }

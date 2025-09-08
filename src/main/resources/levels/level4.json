@@ -1,0 +1,44 @@
+{
+  "timeLimitSeconds": 160,
+  "totalWire": 3800,
+
+  "devices": [
+    { "id": "SRC_SEC_1", "x": 220, "y": 180,
+      "producer": { "interval": 0.60, "quota": { "secure": 8, "square": 4 } } },
+
+    { "id": "SRC_SEC_2", "x": 220, "y": 260,
+      "producer": { "interval": 0.65, "quota": { "secure": 8, "square": 4 } } },
+
+    { "id": "SRC_INF", "x": 220, "y": 340,
+      "producer": { "interval": 0.80, "quota": { "infinite": 6 } } },
+
+    { "id": "SRC_TRI", "x": 220, "y": 460,
+      "producer": { "interval": 0.90, "quota": { "triangle": 6 } } },
+
+    { "id": "HUB", "x": 640, "y": 260 },
+
+    { "id": "REF_MAIN", "x": 1000, "y": 260, "reference": true }
+  ],
+
+  "ports": [
+    { "id": "SEC1_OUT_SQ", "device": "SRC_SEC_1", "x": 240, "y": 180, "shape": "square",   "io": "out" },
+    { "id": "SEC2_OUT_SQ", "device": "SRC_SEC_2", "x": 240, "y": 260, "shape": "square",   "io": "out" },
+    { "id": "INF_OUT_SQ",  "device": "SRC_INF",   "x": 240, "y": 340, "shape": "square",   "io": "out" },
+
+    { "id": "TRI_OUT_TR",  "device": "SRC_TRI",   "x": 240, "y": 460, "shape": "triangle", "io": "out" },
+
+    { "id": "HUB_IN_SQ",   "device": "HUB",       "x": 620, "y": 240, "shape": "square",   "io": "in"  },
+    { "id": "HUB_OUT_SQ",  "device": "HUB",       "x": 660, "y": 240, "shape": "square",   "io": "out" },
+
+    { "id": "HUB_IN_TR",   "device": "HUB",       "x": 620, "y": 280, "shape": "triangle", "io": "in"  },
+    { "id": "HUB_OUT_TR",  "device": "HUB",       "x": 660, "y": 280, "shape": "triangle", "io": "out" },
+
+    { "id": "REF_IN_SQ_1", "device": "REF_MAIN",  "x": 980, "y": 220, "shape": "square",   "io": "in", "reference": true },
+    { "id": "REF_IN_SQ_2", "device": "REF_MAIN",  "x": 980, "y": 260, "shape": "square",   "io": "in", "reference": true },
+    { "id": "REF_IN_SQ_3", "device": "REF_MAIN",  "x": 980, "y": 300, "shape": "square",   "io": "in", "reference": true },
+
+    { "id": "REF_IN_TR_1", "device": "REF_MAIN",  "x": 980, "y": 280, "shape": "triangle", "io": "in", "reference": true }
+  ],
+
+  "notes": "Wire all square sources (SEC1/SEC2/INF) -> HUB_IN_SQ -> HUB_OUT_SQ -> REF_IN_SQ_* . Wire TRI_OUT_TR -> HUB_IN_TR -> HUB_OUT_TR -> REF_IN_TR_1. HUB has both shapes, so the graph is connectable as one component. Two SECURE sources feeding one HUB square OUT will cause a queue at HUB, so any SECURE still in transit slows down before arriving (tests the 'secure' packet behavior)."
+}

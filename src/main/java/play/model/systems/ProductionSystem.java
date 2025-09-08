@@ -11,9 +11,9 @@ import java.util.Random;
 
 /**
  * Produces packets from EVERY OUT port of each system with a Producer.
- * Type is chosen by allowed types for the OUT port's shape + Producer quotas:
- *   - SQUARE ports may spawn: SQUARE or INFINITE (independent quotas)
- *   - TRIANGLE ports may spawn: TRIANGLE
+ * Allowed types by OUT port shape:
+ *   - SQUARE ports:   SQUARE, INFINITE, SECURE
+ *   - TRIANGLE ports: TRIANGLE, SECURE
  */
 public class ProductionSystem implements System {
         private final GameEngine engine;
@@ -38,7 +38,6 @@ public class ProductionSystem implements System {
                         if (!sysE.has(Producer.class)) continue;
                         Producer prod = sysE.get(Producer.class);
 
-                        // If all quotas are exactly 0, skip
                         if (!prod.hasAnyQuota()) continue;
 
                         prod.timer += dt;
@@ -55,9 +54,9 @@ public class ProductionSystem implements System {
                                 // Determine allowed seed types for this OUT port
                                 Seed.Type[] allowed;
                                 if (pinfo.shape == PortInfo.Shape.SQUARE) {
-                                        allowed = new Seed.Type[]{ Seed.Type.SQUARE, Seed.Type.INFINITE };
-                                } else {
-                                        allowed = new Seed.Type[]{ Seed.Type.TRIANGLE };
+                                        allowed = new Seed.Type[]{ Seed.Type.SQUARE, Seed.Type.INFINITE, Seed.Type.SECURE };
+                                } else { // TRIANGLE
+                                        allowed = new Seed.Type[]{ Seed.Type.TRIANGLE, Seed.Type.SECURE };
                                 }
 
                                 // Filter allowed by available quota
@@ -100,15 +99,22 @@ public class ProductionSystem implements System {
         }
 
         private boolean hasQuota(Producer p, Seed.Type t) {
-                if (t == Seed.Type.SQUARE)   return p.remainingSquare   != 0;
-                if (t == Seed.Type.TRIANGLE) return p.remainingTriangle != 0;
-                return p.remainingInfinite != 0; // INFINITE
+                switch (t) {
+                        case SQUARE:   return p.remainingSquare   != 0;
+                        case TRIANGLE: return p.remainingTriangle != 0;
+                        case INFINITE: return p.remainingInfinite != 0;
+                        case SECURE:   return p.remainingSecure   != 0;
+                }
+                return false;
         }
 
         private void decrementQuota(Producer p, Seed.Type t) {
-                if (t == Seed.Type.SQUARE && p.remainingSquare > 0) p.remainingSquare--;
-                else if (t == Seed.Type.TRIANGLE && p.remainingTriangle > 0) p.remainingTriangle--;
-                else if (t == Seed.Type.INFINITE && p.remainingInfinite > 0) p.remainingInfinite--;
+                switch (t) {
+                        case SQUARE:   if (p.remainingSquare   > 0) p.remainingSquare--;   break;
+                        case TRIANGLE: if (p.remainingTriangle > 0) p.remainingTriangle--; break;
+                        case INFINITE: if (p.remainingInfinite > 0) p.remainingInfinite--; break;
+                        case SECURE:   if (p.remainingSecure   > 0) p.remainingSecure--;   break;
+                }
         }
 
         private List<Entity> findOutPorts(Entity systemE) {

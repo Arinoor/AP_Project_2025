@@ -10,8 +10,9 @@ import java.util.*;
 
 /**
  * Handles arrivals into systems, coins, buffering, dispatch, and:
- *  - INFINITE mid-wire collision behavior: reverse at the exact collision position.
- *  - Per-frame jerk application: accel += jerk * dt (for all seeds; jerk usually 0).
+ *  - INFINITE mid-wire collision: reverse at the exact collision position.
+ *  - Per-frame jerk application (accel += jerk * dt).
+ *  - SECURE adaptive slowdown: if dest system has queued items, clamp speed down.
  */
 public class QueueSystem implements System {
 
@@ -22,6 +23,10 @@ public class QueueSystem implements System {
         private final Map<Entity, Deque<Entity>> deviceQueues = new HashMap<>();
 
         private final Random rng = new Random();
+
+        // SECURE speed policy (re-uses SQUARE base speed; slow speed floored)
+        private static final double SECURE_BASE_SPEED = GameBalance.SQUARE_BASE_SPEED;
+        private static final double SECURE_SLOW_SPEED = Math.max(40.0, SECURE_BASE_SPEED * 0.35);
 
         public QueueSystem(GameEngine engine, List<Entity> entities) {
                 this.engine = engine;
@@ -41,9 +46,36 @@ public class QueueSystem implements System {
                         }
                 }
 
-                // 0.25) Apply jerk each frame: accel += jerk * dt
-                // For INFINITE on incompatible wires, jerk < 0 => accel decreases over time.
-                // Clamp to avoid flipping sign (we want accel to decay toward 0).
+                // 0.20) SECURE adaptive slowdown: before physics/arrivals, ensure we gate speed
+                for (Entity e : new ArrayList<>(entities)) {
+                        if (!e.has(Seed.class)) continue;
+                        Seed s = e.get(Seed.class);
+                        if (s.type != Seed.Type.SECURE) continue;
+                        if (s.currentLink == null) continue; // only in-flight
+
+                        // Determine the target system for this traversal (works for returning or forward)
+                        Entity targetPort = s.returning ? s.currentLink.fromPort : s.currentLink.toPort;
+                        if (targetPort == null || !targetPort.has(PortInfo.class)) continue;
+                        Entity targetSystem = targetPort.get(PortInfo.class).parentSystem;
+
+                        // Check if target system currently has a waiting queue (exclude null)
+                        Deque<Entity> q = deviceQueues.get(targetSystem);
+                        boolean targetBusy = (q != null && !q.isEmpty());
+
+                        // Apply adaptive speed
+                        if (targetBusy) {
+                                if (s.speed > SECURE_SLOW_SPEED) s.speed = SECURE_SLOW_SPEED;
+                                // maintain no accel/jerk for SECURE
+                                s.accel = 0.0;
+                                s.jerk  = 0.0;
+                        } else {
+                                if (s.speed < SECURE_BASE_SPEED) s.speed = SECURE_BASE_SPEED;
+                                s.accel = 0.0;
+                                s.jerk  = 0.0;
+                        }
+                }
+
+                // 0.25) Apply jerk each frame: accel += jerk * dt (for all seeds; jerk usually 0)
                 for (Entity e : new ArrayList<>(entities)) {
                         if (!e.has(Seed.class)) continue;
                         Seed s = e.get(Seed.class);
@@ -51,10 +83,8 @@ public class QueueSystem implements System {
 
                         if (s.jerk != 0.0) {
                                 s.accel += s.jerk * dt;
-
-                                // If jerk is negative, don't let accel go below 0 (no unintended braking).
                                 if (s.jerk < 0.0 && s.accel < 0.0) {
-                                        s.accel = 0.0;
+                                        s.accel = 0.0; // don't flip into braking unless explicitly designed
                                 }
                         }
                 }
@@ -72,6 +102,7 @@ public class QueueSystem implements System {
                                 double oldP = clamp01(s.progress);
                                 s.returning = true;
                                 s.progress = 1.0 - oldP;
+
 
                                 s.impactEnergy = Math.max(s.impactEnergy, 0.6);
                                 s.justCollided = false;
@@ -130,20 +161,26 @@ public class QueueSystem implements System {
                         boolean finishedReturn = s.returning;
                         s.returning = false;
 
+                        // === Coin rewards per type ===
+                        // square:2, triangle:3, infinite:1, secure:3
+                        int reward;
+                        switch (s.type) {
+                                case SQUARE:   reward = 2; break;
+                                case TRIANGLE: reward = 3; break;
+                                case INFINITE: reward = 1; break;
+                                case SECURE:   reward = 3; break;
+                                default:       reward = 0; break;
+                        }
+                        if (!finishedReturn) {
+                                engine.incrementCoins(reward);
+                        }
+
                         // Reference systems consume
                         if (system.has(Reference.class)) {
                                 engine.incrementReachedReference();
                                 engine.notifySeedDelivered(s);
                                 entities.remove(seedE);
                                 continue;
-                        }
-
-                        // Coins per packet entering a system
-                        int reward = (s.type == Seed.Type.TRIANGLE)
-                                ? GameBalance.COIN_REWARD_TRIANGLE
-                                : (s.type == Seed.Type.SQUARE ? GameBalance.COIN_REWARD_SQUARE : GameBalance.COIN_REWARD_INFINITE);
-                        if (!finishedReturn) {
-                                engine.incrementCoins(reward);
                         }
 
                         // Enqueue into the device buffer
@@ -192,15 +229,26 @@ public class QueueSystem implements System {
                                 if (seedE == null) break;
                                 Seed s = seedE.get(Seed.class);
 
-                                // Preferred compatible link (INFINITE uses square links)
+                                // Preferred links:
+                                // - SQUARE / INFINITE: square links
+                                // - TRIANGLE: triangle links
+                                // - SECURE: any available (no compatibility concept)
                                 Entity chosenLinkE = null;
                                 if ((s.type == Seed.Type.SQUARE || s.type == Seed.Type.INFINITE) && !freeSquare.isEmpty()) {
                                         chosenLinkE = freeSquare.remove(0);
                                 } else if (s.type == Seed.Type.TRIANGLE && !freeTriangle.isEmpty()) {
                                         chosenLinkE = freeTriangle.remove(0);
+                                } else if (s.type == Seed.Type.SECURE) {
+                                        int total = freeSquare.size() + freeTriangle.size();
+                                        if (total > 0) {
+                                                int idx = rng.nextInt(total);
+                                                chosenLinkE = (idx < freeSquare.size())
+                                                        ? freeSquare.remove(idx)
+                                                        : freeTriangle.remove(idx - freeSquare.size());
+                                        }
                                 }
 
-                                // If no compatible link free, try any free link (random)
+                                // If none selected yet, grab any free link
                                 if (chosenLinkE == null) {
                                         int total = freeSquare.size() + freeTriangle.size();
                                         if (total > 0) {
@@ -219,7 +267,7 @@ public class QueueSystem implements System {
                                 Link l = chosenLinkE.get(Link.class);
                                 PortInfo.Shape outShape = l.fromPort.get(PortInfo.class).shape;
 
-                                // per-hop kinematics (applies new INFINITE rules)
+                                // per-hop kinematics (INFINITE/SECURE rules applied inside)
                                 Kinematics.applyForHop(s, outShape);
 
                                 // place at OUT port and start hop
