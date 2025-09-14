@@ -226,7 +226,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="cc202a8e-4f0b-4a78-9065-4a606d51ea93" name="Changes" comment="" />
+    <list default="true" id="cc202a8e-4f0b-4a78-9065-4a606d51ea93" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/src/main/java/play/view/SystemBackgroundView.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/play/render/RenderSystem.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/render/RenderSystem.java" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -1883,6 +1886,21 @@ public final class GlobalAudio {
 
 
 
+===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\components\BackgroundImage.java =====
+
+
+package play.model.components;
+
+/** Optional background sprite for a system (view consumes this). */
+public class BackgroundImage {
+        public final String resourcePath; // e.g. "/img/vpn_system.png"
+        public BackgroundImage(String resourcePath) {
+                this.resourcePath = resourcePath;
+        }
+}
+
+
+
 ===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\components\Disabled.java =====
 
 
@@ -2127,29 +2145,52 @@ package play.model.components;
 
 /**
  * Producer component attached to a device (system).
- * Produces seeds at a fixed interval and (optionally) under per-type quotas.
+ * Produces seeds at a fixed interval and under per-type quotas. Use -1 for unlimited.
  */
 public class Producer {
         public double interval = 1.0;
         public double timer = 0.0;
 
         /** Remaining quotas per type. Use -1 for unlimited. */
-        public int remainingSquare = -1;
-        public int remainingTriangle = -1;
+        public int remainingSquare   = 0;
+        public int remainingTriangle = 0;
+        public int remainingInfinite = 0;
+        public int remainingSecure   = 0; // NEW
 
         public Producer(double interval) {
                 this.interval = interval;
         }
 
+        /** Backward-compatible ctor (older levels without INFINITE/SECURE quotas). */
         public Producer(double interval, int squareQuota, int triangleQuota) {
                 this.interval = interval;
                 this.remainingSquare = squareQuota;
                 this.remainingTriangle = triangleQuota;
+                this.remainingInfinite = 0;
+                this.remainingSecure   = 0;
+        }
+
+        /** Ctor with INFINITE (older transition). */
+        public Producer(double interval, int squareQuota, int triangleQuota, int infiniteQuota) {
+                this.interval = interval;
+                this.remainingSquare = squareQuota;
+                this.remainingTriangle = triangleQuota;
+                this.remainingInfinite = infiniteQuota;
+                this.remainingSecure   = 0;
+        }
+
+        /** Full ctor with all packet types. */
+        public Producer(double interval, int squareQuota, int triangleQuota, int infiniteQuota, int secureQuota) {
+                this.interval = interval;
+                this.remainingSquare = squareQuota;
+                this.remainingTriangle = triangleQuota;
+                this.remainingInfinite = infiniteQuota;
+                this.remainingSecure   = secureQuota;
         }
 
         /** Returns true if at least one type still has quota or quotas are unlimited. */
         public boolean hasAnyQuota() {
-                return (remainingSquare != 0) || (remainingTriangle != 0);
+                return (remainingSquare != 0) || (remainingTriangle != 0) || (remainingInfinite != 0) || (remainingSecure != 0);
         }
 }
 
@@ -2199,22 +2240,27 @@ public class Reference { }
 
 package play.model.components;
 
+import play.model.components.Link;
+
+/** Packet (seed) travelling in the network. */
 public class Seed {
-        public enum Type { SQUARE, TRIANGLE }
+        public enum Type { SQUARE, TRIANGLE, INFINITE, SECURE, PROTECTED }
 
         public final Type type;
 
         // kinematics
         public double speed = 120.0;     // px/s
         public double accel = 0.0;       // px/s^2
+        /** Second acceleration (jerk), affects accel each frame: accel += jerk * dt. */
+        public double jerk  = 0.0;       // px/s^3
 
-        // LEGACY logical progress [0..1] (derived from arcPos / link.length)
+        // legacy normalized progress [0..1] (derived from arc length / link length)
         public double progress = 0.0;
 
         // lateral offset (px) relative to wire; large magnitude => loss
         public double lateral = 0.0;
 
-        // impact flash energy (decays each tick); used for short "just collided" guard
+        // brief impact flash energy (also used as a short post-collision guard)
         public double impactEnergy = 0.0;
 
         // collision budgeting (separate from noise)
@@ -2224,7 +2270,7 @@ public class Seed {
         // cumulative "noise" (in PORT UNITS). If noise > sizeUnits() => loss
         public double noise = 0.0;
 
-        // the link this seed is currently traveling on
+        // the link this seed is currently traveling on (null when queued/inside a system)
         public Link currentLink = null;
 
         public boolean justCollided = false;
@@ -2232,18 +2278,46 @@ public class Seed {
         /** If true, this seed is travelling back along its currentLink toward the source. */
         public boolean returning = false;
 
-
         // Phase 2: precise arc-length state along the currentLink polyline
         public double arcPos = 0.0; // [0..currentLink.length]
 
+        // === PROTECTED specifics ===
+        /** For PROTECTED: the original (primary) messaging type that entered the VPN (SQUARE/TRIANGLE/INFINITE). */
+        public Type protectedBaseType = null;
+        /** For PROTECTED: which messaging type's kinematics this seed emulates on each hop (SQUARE/TRIANGLE/INFINITE). */
+        public Type emulateType = null;
+
         public Seed(Type type) {
                 this.type = type;
-                this.capacity = (type == Type.SQUARE) ? 3 : 4; // tolerant
+                // Keep capacities: TRIANGLE=4, others=3 (PROTECTED adopts base capacity later if set)
+                this.capacity = (type == Type.TRIANGLE) ? 4 : 3;
         }
 
-        /** Size in "port units" used for thresholds (square=2, triangle=3). */
+        /**
+         * Size in "port units".
+         * square=2, triangle=3, infinite=1, secure=4.
+         * PROTECTED = 2x of its primary (protectedBaseType).
+         */
         public double sizeUnits() {
-                return (type == Type.SQUARE) ? 2.0 : 3.0;
+                switch (type) {
+                        case SQUARE:   return 2.0;
+                        case TRIANGLE: return 3.0;
+                        case INFINITE: return 1.0;
+                        case SECURE:   return 4.0;
+                        case PROTECTED:
+                                double base = baseSizeUnitsFor(protectedBaseType);
+                                return base * 2.0;
+                        default:
+                                return 2.0;
+                }
+        }
+
+        /** Helper: base sizeUnits for a given messaging type. */
+        public static double baseSizeUnitsFor(Type t) {
+                if (t == Type.TRIANGLE) return 3.0;
+                if (t == Type.INFINITE) return 1.0;
+                // treat null or others as square baseline
+                return 2.0;
         }
 }
 
@@ -2265,6 +2339,16 @@ public class Transform {
 
 
 
+===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\components\Vpn.java =====
+
+
+package play.model.components;
+
+/** Marker component: this system is a VPN system. */
+public class Vpn { }
+
+
+
 ===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\constants\GameBalance.java =====
 
 
@@ -2275,8 +2359,9 @@ public final class GameBalance {
         private GameBalance() {}
 
         // Coin rewards
-        public static final int COIN_REWARD_SQUARE   = 1;
-        public static final int COIN_REWARD_TRIANGLE = 2;
+        public static final int COIN_REWARD_SQUARE   = 2;
+        public static final int COIN_REWARD_TRIANGLE = 3;
+        public static final int COIN_REWARD_INFINITE = 1;
 
         // Shop costs
         public static final int COST_ATAR     = 3; // disable impact waves 10s
@@ -2659,7 +2744,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import play.model.components.*;
 import play.model.core.Entity;
-import play.model.components.*;
 import play.model.engine.GameEngine;
 
 import java.io.InputStream;
@@ -2667,25 +2751,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * LevelLoaderV2
+ * Loads ONLY systems and ports from JSON. No links are created here.
  *
- * Loads ONLY systems and ports from JSON. Does NOT create any links.
- * The player will create links at runtime via the wiring tool.
- *
- * JSON additions:
- *  - timeLimitSeconds: int, optional (default 120)
- *  - device.producer.quota.square / triangle: per-device fixed counts
- *
- * Example:
- * {
- *   "timeLimitSeconds": 90,
- *   "totalWire": 5000,
- *   "devices": [
- *     { "id":"SRC-1","x":150,"y":240,
- *       "producer":{"interval":0.6,"quota":{"square":10,"triangle":10}} }
- *   ],
- *   "ports": [ ... ]
- * }
+ * Quotas supported:
+ *  - devices[].producer.quota.{square,triangle,infinite,secure}
+ * Device flags:
+ *  - devices[].reference: true  -> adds Reference component
+ *  - devices[].vpn: true        -> adds Vpn component (+ BackgroundImage("/img/vpn_system.png"))
  */
 public final class LevelLoaderV2 {
 
@@ -2704,9 +2776,7 @@ public final class LevelLoaderV2 {
         public static Loaded loadFromResource(GameEngine engine, String path) {
                 Loaded out = new Loaded();
                 try (InputStream in = LevelLoaderV2.class.getResourceAsStream(path)) {
-                        if (in == null) {
-                                throw new IllegalArgumentException("Missing level resource: " + path);
-                        }
+                        if (in == null) throw new IllegalArgumentException("Missing level resource: " + path);
                         JsonNode root = M.readTree(in);
 
                         out.totalWire = root.path("totalWire").asDouble(3000.0);
@@ -2721,31 +2791,45 @@ public final class LevelLoaderV2 {
                                 Entity systemE = new Entity();
                                 systemE.add(new Transform(x, y));
 
-                                // reference?
                                 if (d.path("reference").asBoolean(false)) {
                                         systemE.add(new Reference());
                                 }
+                                if (d.path("vpn").asBoolean(false)) {
+                                        systemE.add(new Vpn());
+                                        systemE.add(new BackgroundImage("/img/vpn_system.png"));
+                                }
 
-                                // producer on device?
                                 JsonNode prodNode = d.path("producer");
                                 if (!prodNode.isMissingNode() && !prodNode.isNull()) {
                                         double interval = prodNode.path("interval").asDouble(1.0);
 
-                                        // optional quotas
-                                        int qS = -1;
-                                        int qT = -1;
+                                        int qS = -1, qT = -1, qI = 0, qC = 0; // default new types to 0 unless provided
                                         JsonNode quota = prodNode.path("quota");
                                         if (!quota.isMissingNode() && !quota.isNull()) {
                                                 if (quota.has("square"))   qS = quota.path("square").asInt(-1);
                                                 if (quota.has("triangle")) qT = quota.path("triangle").asInt(-1);
+                                                if (quota.has("infinite")) qI = quota.path("infinite").asInt(0);
+                                                if (quota.has("secure"))   qC = quota.path("secure").asInt(0);
 
                                                 // Sum only finite quotas into planned total
                                                 if (qS > 0) out.plannedSeeds += qS;
                                                 if (qT > 0) out.plannedSeeds += qT;
+                                                if (qI > 0) out.plannedSeeds += qI;
+                                                if (qC > 0) out.plannedSeeds += qC;
 
-                                                systemE.add(new Producer(interval, qS, qT));
+                                                if (quota.has("secure")) {
+                                                        systemE.add(new Producer(interval, qS, qT, qI, qC));
+                                                } else if (quota.has("infinite")) {
+                                                        systemE.add(new Producer(interval, qS, qT, qI));
+                                                } else {
+                                                        systemE.add(new Producer(interval, qS, qT));
+                                                }
                                         } else {
-                                                systemE.add(new Producer(interval));
+                                                // Defaults: new types infinite/secure = 0 so they don't spawn unless declared
+                                                Producer p = new Producer(interval);
+                                                p.remainingInfinite = 0;
+                                                p.remainingSecure   = 0;
+                                                systemE.add(p);
                                         }
                                 }
 
@@ -2777,27 +2861,18 @@ public final class LevelLoaderV2 {
                                 portE.add(new PortInfo(io, shape, parentSystem));
                                 portE.add(new Transform(x, y));
                                 if (io == PortInfo.IO.IN) {
-                                        portE.add(new Queue(5)); // capacity 5 for this phase
+                                        portE.add(new Queue(5)); // capacity for this phase
+                                }
+
+                                if (p.path("reference").asBoolean(false) && !parentSystem.has(Reference.class)) {
+                                        parentSystem.add(new Reference());
                                 }
 
                                 engine.entities().add(portE);
                                 out.portsById.put(id, portE);
-
-                                // Optional: producer specified at port level (rare)
-                                if (p.path("producer").asBoolean(false)) {
-                                        double interval = p.path("interval").asDouble(1.0);
-                                        if (!parentSystem.has(Producer.class) && interval > 0.0) {
-                                                parentSystem.add(new Producer(interval));
-                                        }
-                                }
-
-                                // Optional: reference specified at port level
-                                if (p.path("reference").asBoolean(false) && !parentSystem.has(Reference.class)) {
-                                        parentSystem.add(new Reference());
-                                }
                         }
 
-                        // 3) Links (ignored on load)
+                        // 3) Links: ignored on load (player wires them)
                 } catch (Exception e) {
                         throw new RuntimeException("Failed to load level from " + path, e);
                 }
@@ -2870,6 +2945,85 @@ public final class LevelParser {
                         return dto;
                 } catch (Exception e) {
                         throw new RuntimeException("Failed to parse level: " + path, e);
+                }
+        }
+}
+
+
+
+===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\physics\Kinematics.java =====
+
+
+package play.model.physics;
+
+import play.model.components.PortInfo;
+import play.model.components.Seed;
+import play.model.constants.GameBalance;
+
+/**
+ * Per-hop entry kinematics based on OUT port shape and seed type.
+ *
+ * INFINITE: custom accel/jerk rules (compatible square -> constant accel; incompatible -> decaying accel).
+ * SECURE: constant speed on all wires (accel=jerk=0); adaptive slow handled in QueueSystem.
+ * PROTECTED: delegates to its emulateType (SQUARE/TRIANGLE/INFINITE) for motion rules.
+ */
+public final class Kinematics {
+        private Kinematics() {}
+
+        private static final double SECURE_BASE_SPEED = GameBalance.SQUARE_BASE_SPEED;
+
+        public static void applyForHop(Seed s, PortInfo.Shape outShape) {
+                // === SECURE: constant speed, no accel/jerk, ignores port shape for kinematics ===
+                if (s.type == Seed.Type.SECURE) {
+                        s.speed = SECURE_BASE_SPEED;
+                        s.accel = 0.0;
+                        s.jerk  = 0.0;
+                        return;
+                }
+
+                // === PROTECTED: behave like one of the messenger types (hidden) ===
+                if (s.type == Seed.Type.PROTECTED) {
+                        Seed.Type emu = (s.emulateType != null) ? s.emulateType : Seed.Type.SQUARE;
+                        applyForHopMessenger(s, outShape, emu);
+                        return;
+                }
+
+                // === Native messenger types ===
+                applyForHopMessenger(s, outShape, s.type);
+        }
+
+        /** Apply kinematics for a specific messenger type (SQUARE/TRIANGLE/INFINITE). */
+        private static void applyForHopMessenger(Seed s, PortInfo.Shape outShape, Seed.Type messengerType) {
+                if (messengerType == Seed.Type.INFINITE) {
+                        boolean compatible = (outShape == PortInfo.Shape.SQUARE);
+                        s.speed = GameBalance.SQUARE_BASE_SPEED; // base
+
+                        if (compatible) {
+                                // Constant acceleration (no jerk) â€” like triangle on incompatible
+                                s.accel = GameBalance.TRIANGLE_INCOMPAT_ACCEL;
+                                s.jerk  = 0.0;
+                        } else {
+                                // Incompatible: acceleration decreases over time (negative jerk)
+                                double a0 = Math.abs(GameBalance.TRIANGLE_INCOMPAT_ACCEL) * 0.75;
+                                s.accel = a0;
+                                s.jerk  = -a0 * 0.5; // decays ~2s
+                        }
+                        return;
+                }
+
+                boolean compatible =
+                        (outShape == PortInfo.Shape.SQUARE   && messengerType == Seed.Type.SQUARE) ||
+                                (outShape == PortInfo.Shape.TRIANGLE && messengerType == Seed.Type.TRIANGLE);
+
+                if (messengerType == Seed.Type.TRIANGLE) {
+                        s.speed = GameBalance.TRIANGLE_BASE_SPEED;
+                        s.accel = compatible ? 0.0 : GameBalance.TRIANGLE_INCOMPAT_ACCEL;
+                        s.jerk  = 0.0;
+                } else { // SQUARE (default baseline)
+                        s.speed = compatible ? GameBalance.SQUARE_BASE_SPEED * 0.5
+                                : GameBalance.SQUARE_BASE_SPEED;
+                        s.accel = 0.0;
+                        s.jerk  = 0.0;
                 }
         }
 }
@@ -3295,38 +3449,6 @@ public class CollisionSystem implements System {
 
 
 
-===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\systems\Kinematics.java =====
-
-
-package play.model.physics;
-
-import play.model.components.PortInfo;
-import play.model.components.Seed;
-import play.model.constants.GameBalance;
-
-public final class Kinematics {
-        private Kinematics() {}
-
-        /** Apply per-hop kinematics based on the OUT port shape and seed type. */
-        public static void applyForHop(Seed s, PortInfo.Shape outShape) {
-                boolean compatible =
-                        (s.type == Seed.Type.SQUARE  && outShape == PortInfo.Shape.SQUARE) ||
-                                (s.type == Seed.Type.TRIANGLE && outShape == PortInfo.Shape.TRIANGLE);
-
-                if (s.type == Seed.Type.SQUARE) {
-                        s.speed = compatible
-                                ? GameBalance.SQUARE_BASE_SPEED * 0.5
-                                : GameBalance.SQUARE_BASE_SPEED;
-                        s.accel = 0.0;
-                } else { // TRIANGLE
-                        s.speed = GameBalance.TRIANGLE_BASE_SPEED;
-                        s.accel = compatible ? 0.0 : GameBalance.TRIANGLE_INCOMPAT_ACCEL;
-                }
-        }
-}
-
-
-
 ===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\systems\ProductionSystem.java =====
 
 
@@ -3339,19 +3461,19 @@ import play.model.physics.Kinematics;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 /**
  * Produces packets from EVERY OUT port of each system with a Producer.
- * Seed type derives from the OUT port shape. Kinematics are set for the first hop
- * based on the OUT port used (this is the "start port" for the hop).
- *
- * Honors per-device quotas in Producer.remainingSquare / remainingTriangle.
- * -1 means unlimited for that type.
+ * Allowed types by OUT port shape:
+ *   - SQUARE ports:   SQUARE, INFINITE, SECURE
+ *   - TRIANGLE ports: TRIANGLE, SECURE
  */
 public class ProductionSystem implements System {
         private final GameEngine engine;
         private final List<Entity> entities;
         private final double dtCap;
+        private final Random rng = new Random();
 
         public ProductionSystem(GameEngine engine, List<Entity> entities, double dtCap) {
                 this.engine = engine;
@@ -3363,34 +3485,43 @@ public class ProductionSystem implements System {
         public void update(double dt) {
                 if (dt > dtCap) dt = dtCap;
 
-                // Snapshot to avoid ConcurrentModification when we add seeds below
+                // Snapshot to avoid concurrent modifications while adding seeds
                 List<Entity> snapshot = new ArrayList<>(entities);
 
                 for (Entity sysE : snapshot) {
                         if (!sysE.has(Producer.class)) continue;
                         Producer prod = sysE.get(Producer.class);
 
-                        // If both quotas are exactly 0, skip producing entirely
-                        if (prod.remainingSquare == 0 && prod.remainingTriangle == 0) continue;
+                        if (!prod.hasAnyQuota()) continue;
 
                         prod.timer += dt;
                         if (prod.timer < prod.interval) continue;
                         prod.timer = 0.0;
 
-                        // find all OUT ports
+                        // all OUT ports of this system
                         List<Entity> outPorts = findOutPorts(sysE);
                         if (outPorts.isEmpty()) continue;
 
                         for (Entity outPort : outPorts) {
                                 PortInfo pinfo = outPort.get(PortInfo.class);
-                                Seed.Type type = (pinfo.shape == PortInfo.Shape.SQUARE) ? Seed.Type.SQUARE : Seed.Type.TRIANGLE;
 
-                                // Quota check per type
-                                if (type == Seed.Type.SQUARE) {
-                                        if (prod.remainingSquare == 0) continue; // no square quota left
-                                } else {
-                                        if (prod.remainingTriangle == 0) continue; // no triangle quota left
+                                // Determine allowed seed types for this OUT port
+                                Seed.Type[] allowed;
+                                if (pinfo.shape == PortInfo.Shape.SQUARE) {
+                                        allowed = new Seed.Type[]{ Seed.Type.SQUARE, Seed.Type.INFINITE, Seed.Type.SECURE };
+                                } else { // TRIANGLE
+                                        allowed = new Seed.Type[]{ Seed.Type.TRIANGLE, Seed.Type.SECURE };
                                 }
+
+                                // Filter allowed by available quota
+                                List<Seed.Type> available = new ArrayList<>();
+                                for (Seed.Type t : allowed) {
+                                        if (hasQuota(prod, t)) available.add(t);
+                                }
+                                if (available.isEmpty()) continue;
+
+                                // Pick a type (random among available for variety)
+                                Seed.Type chosen = available.get(rng.nextInt(available.size()));
 
                                 // Need a free link from this port
                                 Entity freeLink = findFreeLinkFrom(outPort);
@@ -3398,7 +3529,7 @@ public class ProductionSystem implements System {
 
                                 // Build seed
                                 Entity seedE = new Entity();
-                                Seed s = new Seed(type);
+                                Seed s = new Seed(chosen);
 
                                 // Per-hop kinematics based on OUT port shape used to spawn
                                 Kinematics.applyForHop(s, pinfo.shape);
@@ -3416,12 +3547,27 @@ public class ProductionSystem implements System {
                                 engine.incrementProduced();
 
                                 // Decrement quota if finite
-                                if (type == Seed.Type.SQUARE) {
-                                        if (prod.remainingSquare > 0) prod.remainingSquare--;
-                                } else {
-                                        if (prod.remainingTriangle > 0) prod.remainingTriangle--;
-                                }
+                                decrementQuota(prod, chosen);
                         }
+                }
+        }
+
+        private boolean hasQuota(Producer p, Seed.Type t) {
+                switch (t) {
+                        case SQUARE:   return p.remainingSquare   != 0;
+                        case TRIANGLE: return p.remainingTriangle != 0;
+                        case INFINITE: return p.remainingInfinite != 0;
+                        case SECURE:   return p.remainingSecure   != 0;
+                }
+                return false;
+        }
+
+        private void decrementQuota(Producer p, Seed.Type t) {
+                switch (t) {
+                        case SQUARE:   if (p.remainingSquare   > 0) p.remainingSquare--;   break;
+                        case TRIANGLE: if (p.remainingTriangle > 0) p.remainingTriangle--; break;
+                        case INFINITE: if (p.remainingInfinite > 0) p.remainingInfinite--; break;
+                        case SECURE:   if (p.remainingSecure   > 0) p.remainingSecure--;   break;
                 }
         }
 
@@ -3470,17 +3616,25 @@ import play.model.physics.Kinematics;
 import java.util.*;
 
 /**
- * Handles arrivals into target systems, coins, buffering, and dispatch.
+ * Handles arrivals into systems, coins, buffering, dispatch, and:
+ *  - INFINITE mid-wire collision: reverse at the exact collision position.
+ *  - Per-frame jerk application (accel += jerk * dt).
+ *  - SECURE adaptive slowdown: if dest system has queued items, clamp speed down.
+ *  - VPN conversion: messaging packets entering a VPN become PROTECTED with hidden (random) emulation.
  */
 public class QueueSystem implements System {
 
         private final GameEngine engine;
         private final List<Entity> entities;
 
-        /** Per-device buffer (queue) of waiting seed entities. */
+        /** Per-device buffer of waiting seed entities. */
         private final Map<Entity, Deque<Entity>> deviceQueues = new HashMap<>();
 
         private final Random rng = new Random();
+
+        // SECURE speed policy (re-uses SQUARE base speed; slow speed floored)
+        private static final double SECURE_BASE_SPEED = GameBalance.SQUARE_BASE_SPEED;
+        private static final double SECURE_SLOW_SPEED = Math.max(40.0, SECURE_BASE_SPEED * 0.35);
 
         public QueueSystem(GameEngine engine, List<Entity> entities) {
                 this.engine = engine;
@@ -3500,6 +3654,66 @@ public class QueueSystem implements System {
                         }
                 }
 
+                // 0.20) SECURE adaptive slowdown: before physics/arrivals, ensure we gate speed
+                for (Entity e : new ArrayList<>(entities)) {
+                        if (!e.has(Seed.class)) continue;
+                        Seed s = e.get(Seed.class);
+                        if (s.type != Seed.Type.SECURE) continue;
+                        if (s.currentLink == null) continue; // only in-flight
+
+                        // Determine the target system for this traversal (works for returning or forward)
+                        Entity targetPort = s.returning ? s.currentLink.fromPort : s.currentLink.toPort;
+                        if (targetPort == null || !targetPort.has(PortInfo.class)) continue;
+                        Entity targetSystem = targetPort.get(PortInfo.class).parentSystem;
+
+                        // Check if target system currently has a waiting queue (exclude null)
+                        Deque<Entity> q = deviceQueues.get(targetSystem);
+                        boolean targetBusy = (q != null && !q.isEmpty());
+
+                        // Apply adaptive speed
+                        if (targetBusy) {
+                                if (s.speed > SECURE_SLOW_SPEED) s.speed = SECURE_SLOW_SPEED;
+                                s.accel = 0.0;
+                                s.jerk  = 0.0;
+                        } else {
+                                if (s.speed < SECURE_BASE_SPEED) s.speed = SECURE_BASE_SPEED;
+                                s.accel = 0.0;
+                                s.jerk  = 0.0;
+                        }
+                }
+
+                // 0.25) Apply jerk each frame: accel += jerk * dt (for all seeds; jerk usually 0)
+                for (Entity e : new ArrayList<>(entities)) {
+                        if (!e.has(Seed.class)) continue;
+                        Seed s = e.get(Seed.class);
+                        if (s.currentLink == null) continue; // only while traversing
+
+                        if (s.jerk != 0.0) {
+                                s.accel += s.jerk * dt;
+                                if (s.jerk < 0.0 && s.accel < 0.0) {
+                                        s.accel = 0.0; // don't flip into braking unless explicitly designed
+                                }
+                        }
+                }
+
+                // 0.5) INFINITE mid-wire collision handling: reverse AT THE COLLISION POSITION
+                for (Entity e : new ArrayList<>(entities)) {
+                        if (!e.has(Seed.class)) continue;
+                        Seed s = e.get(Seed.class);
+                        if (s.type != Seed.Type.INFINITE) continue;
+
+                        if (s.currentLink == null || s.returning) continue;
+
+                        if (s.justCollided) {
+                                double oldP = clamp01(s.progress);
+                                s.returning = true;
+                                s.progress = 1.0 - oldP;
+
+                                s.impactEnergy = Math.max(s.impactEnergy, 0.6);
+                                s.justCollided = false;
+                        }
+                }
+
                 // 1) Collect arrivals this frame
                 List<Entity> arrivals = new ArrayList<>();
                 for (Entity e : new ArrayList<>(entities)) {
@@ -3516,53 +3730,58 @@ public class QueueSystem implements System {
                         Link link = s.currentLink;
 
                         // Determine actual destination port for this traversal
-                        // - Normal travel enters link.toPort
-                        // - Returning travel enters link.fromPort (we traverse the same wire backwards)
                         Entity inPort = s.returning ? link.fromPort : link.toPort;
                         PortInfo pTo = inPort.get(PortInfo.class);
                         Entity system = pTo.parentSystem;
 
-                        // Destination port position (used when we *do* finalize the arrival)
+                        // Destination port position
                         Transform tIn = inPort.get(Transform.class);
                         Transform st  = seedE.get(Transform.class);
 
-                        // --- Speed trap: disable destination & bounce back (only on first arrival) ---
+                        // Speed trap: disable & bounce back (only on first arrival)
                         if (!s.returning && s.speed > GameBalance.ENTRY_SPEED_LIMIT) {
                                 if (system.has(Disabled.class)) {
                                         system.get(Disabled.class).remaining = GameBalance.SYSTEM_DISABLE_SECONDS;
                                 } else {
                                         system.add(new Disabled(GameBalance.SYSTEM_DISABLE_SECONDS));
                                 }
-                                // Immediately start travelling back along the same wire.
                                 s.returning = true;
-                                s.progress  = 0.0;   // restart from the (old) destination end
-                                // Keep s.currentLink, keep speed/accel continuous; do not enqueue, no coins.
-                                continue;            // skip normal arrival handling this frame
-                        }
-
-                        // --- NEW: Destination may have become disabled while en route -> bounce back ---
-                        if (!s.returning && system.has(Disabled.class)) {
-                                s.returning = true;
-                                s.progress  = 0.0;   // restart from the destination end
-                                // Keep s.currentLink; no enqueue, no coins.
+                                s.progress  = 0.0;
                                 continue;
                         }
 
-                        // --- Normal arrival handling (includes finishing a return trip) ---
-                        // snap to the IN port position
-                        st.x = tIn.x;
-                        st.y = tIn.y;
+                        // Destination may have become disabled while en route -> bounce back
+                        if (!s.returning && system.has(Disabled.class)) {
+                                s.returning = true;
+                                s.progress  = 0.0;
+                                continue;
+                        }
 
-                        // clear travel state (now "inside" the system)
+                        // Normal arrival handling
+                        st.x = tIn.x; st.y = tIn.y;
                         s.currentLink = null;
                         s.progress = 0.0;
-                        s.lateral = 0.0;
+                        s.lateral  = 0.0;
 
-                        // If we just finished a return trip, don't reward coins for the bounce path
                         boolean finishedReturn = s.returning;
                         s.returning = false;
 
-                        // Reference systems consume (do not forward)
+                        // === Award coins on any successful arrival (including sinks) ===
+                        // square:2, triangle:3, infinite:1, secure:3, protected:5
+                        if (!finishedReturn) {
+                                int reward;
+                                switch (s.type) {
+                                        case SQUARE:   reward = 2; break;
+                                        case TRIANGLE: reward = 3; break;
+                                        case INFINITE: reward = 1; break;
+                                        case SECURE:   reward = 3; break;
+                                        case PROTECTED:reward = 5; break;
+                                        default:       reward = 0; break;
+                                }
+                                engine.incrementCoins(reward);
+                        }
+
+                        // === Reference systems consume ===
                         if (system.has(Reference.class)) {
                                 engine.incrementReachedReference();
                                 engine.notifySeedDelivered(s);
@@ -3570,18 +3789,33 @@ public class QueueSystem implements System {
                                 continue;
                         }
 
-                        // coins per packet entering a system: square=1, triangle=2 (only if not from bounce)
-                        if (!finishedReturn) {
-                                int reward = (s.type == Seed.Type.SQUARE)
-                                        ? GameBalance.COIN_REWARD_SQUARE
-                                        : GameBalance.COIN_REWARD_TRIANGLE;
-                                engine.incrementCoins(reward);
+                        // === VPN conversion (on entry to system) ===
+                        if (system.has(Vpn.class)) {
+                                // Only convert messaging packets (SQUARE/TRIANGLE/INFINITE). SECURE and PROTECTED passthrough.
+                                if (s.type == Seed.Type.SQUARE || s.type == Seed.Type.TRIANGLE || s.type == Seed.Type.INFINITE) {
+                                        Seed.Type base = s.type;
+                                        Seed.Type emu  = pickRandomMessengerType();
+
+                                        Seed newS = new Seed(Seed.Type.PROTECTED);
+                                        newS.protectedBaseType = base;
+                                        newS.emulateType = emu;
+                                        // Adopt base capacity (triangle=4, else 3)
+                                        newS.capacity = (base == Seed.Type.TRIANGLE) ? 4 : 3;
+                                        // Reset motion; next hop will assign kinematics
+                                        newS.speed = 0.0; newS.accel = 0.0; newS.jerk = 0.0;
+                                        newS.noise = s.noise; // carry noise forward
+                                        newS.impactEnergy = Math.max(s.impactEnergy, 0.25); // small flash on conversion
+
+                                        // Replace component on the same entity
+                                        seedE.remove(Seed.class);
+                                        seedE.add(newS);
+                                        s = newS;
+                                }
                         }
 
                         // Enqueue into the device buffer
                         Deque<Entity> buf = deviceQueues.computeIfAbsent(system, k -> new ArrayDeque<>());
                         if (buf.size() >= GameBalance.DEVICE_CAPACITY) {
-                                // storage overflow => packet loss
                                 entities.remove(seedE);
                                 engine.incrementLost();
                                 continue;
@@ -3607,7 +3841,6 @@ public class QueueSystem implements System {
                                 if (pFrom.parentSystem != system) continue;
                                 if (!isLinkFree(l)) continue;
 
-                                // Do not choose links whose destination system is disabled
                                 if (l.toPort == null || !l.toPort.has(PortInfo.class)) continue;
                                 PortInfo destPi = l.toPort.get(PortInfo.class);
                                 Entity destSys = destPi.parentSystem;
@@ -3626,15 +3859,34 @@ public class QueueSystem implements System {
                                 if (seedE == null) break;
                                 Seed s = seedE.get(Seed.class);
 
-                                // Preferred compatible link
+                                // Preferred links:
+                                // - SQUARE / INFINITE: square links
+                                // - TRIANGLE: triangle links
+                                // - SECURE: any available (no compatibility concept)
+                                // - PROTECTED: choose based on emulateType (hidden)
                                 Entity chosenLinkE = null;
-                                if (s.type == Seed.Type.SQUARE && !freeSquare.isEmpty()) {
-                                        chosenLinkE = freeSquare.remove(0);
-                                } else if (s.type == Seed.Type.TRIANGLE && !freeTriangle.isEmpty()) {
-                                        chosenLinkE = freeTriangle.remove(0);
+                                if (s.type == Seed.Type.SQUARE || s.type == Seed.Type.INFINITE) {
+                                        if (!freeSquare.isEmpty()) chosenLinkE = freeSquare.remove(0);
+                                } else if (s.type == Seed.Type.TRIANGLE) {
+                                        if (!freeTriangle.isEmpty()) chosenLinkE = freeTriangle.remove(0);
+                                } else if (s.type == Seed.Type.SECURE) {
+                                        int total = freeSquare.size() + freeTriangle.size();
+                                        if (total > 0) {
+                                                int idx = rng.nextInt(total);
+                                                chosenLinkE = (idx < freeSquare.size())
+                                                        ? freeSquare.remove(idx)
+                                                        : freeTriangle.remove(idx - freeSquare.size());
+                                        }
+                                } else if (s.type == Seed.Type.PROTECTED) {
+                                        Seed.Type emu = (s.emulateType != null) ? s.emulateType : Seed.Type.SQUARE;
+                                        if (emu == Seed.Type.TRIANGLE) {
+                                                if (!freeTriangle.isEmpty()) chosenLinkE = freeTriangle.remove(0);
+                                        } else { // SQUARE or INFINITE emulation => use square link
+                                                if (!freeSquare.isEmpty()) chosenLinkE = freeSquare.remove(0);
+                                        }
+                                        // if none, fall through to random below
                                 }
 
-                                // If no compatible link free, try any free link (random)
                                 if (chosenLinkE == null) {
                                         int total = freeSquare.size() + freeTriangle.size();
                                         if (total > 0) {
@@ -3645,8 +3897,7 @@ public class QueueSystem implements System {
                                         }
                                 }
 
-                                // If still nothing, stop trying this device (it's congested)
-                                if (chosenLinkE == null) break;
+                                if (chosenLinkE == null) break; // congested
 
                                 // We can dispatch this seed
                                 buf.removeFirst();
@@ -3660,26 +3911,34 @@ public class QueueSystem implements System {
                                 // place at OUT port and start hop
                                 Transform tFrom = l.fromPort.get(Transform.class);
                                 Transform st = seedE.get(Transform.class);
-                                st.x = tFrom.x;
-                                st.y = tFrom.y;
+                                st.x = tFrom.x; st.y = tFrom.y;
 
                                 s.currentLink = l;
                                 s.progress = 0.0;
-                                s.returning = false; // leaving a system -> forward travel
+                                s.returning = false;
 
                                 progressed = true;
                         }
                 }
         }
 
-
+        private Seed.Type pickRandomMessengerType() {
+                int r = rng.nextInt(3);
+                return (r == 0) ? Seed.Type.SQUARE : (r == 1) ? Seed.Type.TRIANGLE : Seed.Type.INFINITE;
+        }
 
         private boolean isLinkFree(Link link) {
                 for (Entity e : entities) {
                         if (!e.has(Seed.class)) continue;
-                        if (e.get(Seed.class).currentLink == link) return false; // one seed per wire at a time
+                        if (e.get(Seed.class).currentLink == link) return false; // one seed per wire
                 }
                 return true;
+        }
+
+        private static double clamp01(double v) {
+                if (v < 0) return 0;
+                if (v > 1) return 1;
+                return v;
         }
 }
 
@@ -3979,24 +4238,21 @@ public class HudSystem implements System {
 package play.render;
 
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
 import play.controller.BendTool;
 import play.model.core.Entity;
-import play.model.components.Link;
-import play.model.components.PortInfo;
-import play.model.components.Reference;
-import play.model.components.Seed;
-import play.model.components.Transform;
+import play.model.components.*;
 import play.model.systems.System;
 import play.utils.WiringUtils;
 import play.view.PacketView;
 import play.view.UiConstants;
 import javafx.scene.shape.ArcType;
-import play.model.components.Disabled;
 import play.model.constants.GameBalance;
 
-
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class RenderSystem implements System {
 
@@ -4010,6 +4266,12 @@ public class RenderSystem implements System {
 
         // Optional: for drawing bend hover ring
         private BendTool bendTool;
+
+        // Cache for BackgroundImage resources
+        private static final Map<String, Image> BG_CACHE = new HashMap<>();
+
+        // Scale factor for background images relative to SYSTEM_SIZE
+        private static final double IMAGE_SCALE = 1.2;
 
         public RenderSystem(List<Entity> entities, GraphicsContext g) {
                 this.entities = entities;
@@ -4047,7 +4309,6 @@ public class RenderSystem implements System {
                         if (!e.has(Link.class)) continue;
                         Link l = e.get(Link.class);
 
-                        // â¬‡ï¸ CHANGED: use the smooth curve points instead of straight control path
                         var pts = WiringUtils.curvePoints(l);
                         if (pts.size() < 2) continue;
 
@@ -4085,13 +4346,20 @@ public class RenderSystem implements System {
                         bendTool.renderHover(g);
                 }
 
-                // systems (rectangle + reference ring)
+                // systems (either background image OR default rectangle) + reference ring + disabled overlay
                 final double SYSTEM_SIZE = UiConstants.SYSTEM_SIZE;
                 for (Entity e : entities) {
                         if (!isSystemEntity(e)) continue;
 
                         Transform t = e.get(Transform.class);
                         double w = SYSTEM_SIZE, h = SYSTEM_SIZE;
+
+                        boolean hasBg = e.has(BackgroundImage.class);
+                        Image bg = null;
+                        if (hasBg) {
+                                String path = e.get(BackgroundImage.class).resourcePath;
+                                bg = loadBg(path);
+                        }
 
                         boolean isDisabled = e.has(Disabled.class);
                         double remain = 0.0, ratio = 0.0;
@@ -4102,25 +4370,38 @@ public class RenderSystem implements System {
                                         : 1.0;
                         }
 
-                        // Base body
-                        g.setFill(Color.web("#2a2f3a"));
-                        g.fillRoundRect(t.x - w / 2, t.y - h / 2, w, h, 8, 8);
-                        g.setStroke(Color.web("#3c4452"));
-                        g.setLineWidth(1.0);
-                        g.strokeRoundRect(t.x - w / 2, t.y - h / 2, w, h, 8, 8);
+                        // If we have a background image, draw it centered at the system transform and scaled to system size.
+                        // Otherwise draw the default rectangle body.
+                        if (bg != null) {
+                                double drawW = w * IMAGE_SCALE;
+                                double drawH = h * IMAGE_SCALE;
+                                double x = t.x - drawW / 2.0;
+                                double y = t.y - drawH / 2.0;
 
-                        // Reference ring
+                                try {
+                                        g.drawImage(bg, x, y, drawW, drawH);
+                                } catch (Exception ex) {
+                                        // fallback to base body if image drawing fails
+                                        drawSystemBodyAsRect(t, w, h);
+                                }
+                        } else {
+                                // Base body (rectangle)
+                                drawSystemBodyAsRect(t, w, h);
+                        }
+
+                        // Reference ring (drawn on top of the background)
                         if (e.has(Reference.class)) {
                                 g.setStroke(Color.LIGHTGREEN);
                                 g.setLineWidth(1.5);
                                 g.strokeOval(t.x - 22, t.y - 22, 44, 44);
                         }
 
-                        // ---- VISUAL CLUE WHEN DISABLED ----
+                        // ---- VISUAL CLUE WHEN DISABLED (drawn on top of the background) ----
                         if (isDisabled) {
                                 // 1) Red translucent overlay
                                 g.setGlobalAlpha(0.35);
                                 g.setFill(Color.web("#ff3b30"));
+                                // cover same rectangle area as system
                                 g.fillRoundRect(t.x - w / 2, t.y - h / 2, w, h, 8, 8);
                                 g.setGlobalAlpha(1.0);
 
@@ -4156,7 +4437,6 @@ public class RenderSystem implements System {
                                 );
                         }
                 }
-
 
                 // ports
                 final double ps = UiConstants.PORT_SIZE;
@@ -4195,6 +4475,29 @@ public class RenderSystem implements System {
                         g.setLineWidth(2.0);
                         g.strokeLine(a.x, a.y, previewX, previewY);
                 }
+        }
+
+        private void drawSystemBodyAsRect(Transform t, double w, double h) {
+                g.setFill(Color.web("#2a2f3a"));
+                g.fillRoundRect(t.x - w / 2, t.y - h / 2, w, h, 8, 8);
+                g.setStroke(Color.web("#3c4452"));
+                g.setLineWidth(1.0);
+                g.strokeRoundRect(t.x - w / 2, t.y - h / 2, w, h, 8, 8);
+        }
+
+        private Image loadBg(String path) {
+                if (path == null || path.isEmpty()) return null;
+                Image cached = BG_CACHE.get(path);
+                if (cached != null) return cached;
+                try {
+                        String normalized = path.startsWith("/") ? path : "/" + path;
+                        Image img = new Image(RenderSystem.class.getResourceAsStream(normalized));
+                        if (img != null && img.getWidth() > 0 && img.getHeight() > 0) {
+                                BG_CACHE.put(path, img);
+                                return img;
+                        }
+                } catch (Exception ignored) {}
+                return null;
         }
 
         private boolean isSystemEntity(Entity e) {
@@ -4635,64 +4938,137 @@ public final class WiringUtils {
 package play.view;
 
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
 import play.model.components.Seed;
-import play.view.UiConstants;
 
+/**
+ * Draws packets (seeds).
+ * - SQUARE/TRIANGLE are vector shapes.
+ * - INFINITE/SECURE/PROTECTED are sprites.
+ *
+ * Visual size scales with Seed.sizeUnits():
+ *   SQUARE=2 -> 1.0x, TRIANGLE=3 -> 1.5x, INFINITE=1 -> 0.5x, SECURE=4 -> 2.0x,
+ *   PROTECTED -> 2x of its primary's (hidden) sizeUnits.
+ */
 public final class PacketView {
-
         private PacketView() {}
 
-        /** Base visual size for packets (in px). */
-        private static final double SIZE = UiConstants.PACKET_SIZE; // keep your constant
+        /** Base visual size (in px) that will be scaled by sizeUnits() / 2.0. */
+        private static final double BASE_SIZE = UiConstants.PACKET_SIZE;
 
+        // Lazy-loaded, cached sprites
+        private static Image INFINITE_IMG;
+        private static Image SECURE_IMG;
+        private static Image PROTECTED_IMG;
+
+        /** Render a packet centered at (x,y). */
         public static void render(GraphicsContext g, Seed s, double x, double y) {
-                // ==== Colors ====
-                // Base fill by type (match your port palette)
+                final double sizeFactor = s.sizeUnits() / 2.0;
+                final double VISUAL_SIZE = BASE_SIZE * sizeFactor;
+
+                if (s.type == Seed.Type.INFINITE) {
+                        renderSprite(g, s, x, y, VISUAL_SIZE, getInfiniteImage(), 1.35, 0.62, 0.10, 0.70, 0.20);
+                        return;
+                }
+                if (s.type == Seed.Type.SECURE) {
+                        renderSprite(g, s, x, y, VISUAL_SIZE, getSecureImage(),   1.25, 0.58, 0.08, 0.60, 0.15);
+                        return;
+                }
+                if (s.type == Seed.Type.PROTECTED) {
+                        renderSprite(g, s, x, y, VISUAL_SIZE, getProtectedImage(),1.30, 0.60, 0.10, 0.65, 0.18);
+                        return;
+                }
+
+                // ==== Vector shapes (Square / Triangle) ====
                 final Color baseFill = (s.type == Seed.Type.SQUARE)
-                        ? Color.web("#9ad9ff")    // square
-                        : Color.web("#ffc1d0");   // triangle
+                        ? Color.web("#9ad9ff")
+                        : Color.web("#ffc1d0");
 
-                // Lateral risk glow => white bloom (outer)
-                // Risk normalized by lateral threshold (computed elsewhere); we approximate via sizeUnits
-                double lateralThresholdPx = s.sizeUnits() * UiConstants.PORT_SIZE;
-                double risk = clamp01(Math.abs(s.lateral) / Math.max(1.0, lateralThresholdPx));
+                final double lateralThresholdPx = s.sizeUnits() * UiConstants.PORT_SIZE;
+                final double risk = clamp01(Math.abs(s.lateral) / Math.max(1.0, lateralThresholdPx));
 
-                // Noise inner core => amber fill intensity grows with noise fraction
-                double noiseNorm = clamp01(s.noise / s.sizeUnits());
-                final Color noiseColor = Color.web("#ffd166", 0.15 + 0.75 * noiseNorm); // amber, brighter with noise
+                final double noiseNorm = clamp01(s.noise / s.sizeUnits());
+                final Color noiseColor = Color.web("#ffd166", 0.15 + 0.75 * noiseNorm);
 
-                // Optional flash from recent impact
-                double impactFlash = clamp01(s.impactEnergy);
-                double glowAlpha = clamp01(0.10 + 0.70 * risk + 0.20 * impactFlash);
+                final double impactFlash = clamp01(s.impactEnergy);
+                final double glowAlpha = clamp01(0.10 + 0.70 * risk + 0.20 * impactFlash);
 
-                // ==== Draw order: bloom -> base -> noise core ====
-
-                // Bloom (slightly larger, soft alpha)
                 if (glowAlpha > 0.01) {
                         g.setGlobalAlpha(glowAlpha);
-                        drawShape(g, s, x, y, SIZE * 1.35, Color.WHITE);
+                        drawShape(g, s, x, y, VISUAL_SIZE * 1.35, Color.WHITE);
                         g.setGlobalAlpha(1.0);
                 }
 
-                // Base body
-                drawShape(g, s, x, y, SIZE, baseFill);
+                drawShape(g, s, x, y, VISUAL_SIZE, baseFill);
 
-                // Inner noise core (smaller, amber)
                 if (noiseNorm > 0.01) {
-                        drawShape(g, s, x, y, SIZE * 0.62, noiseColor);
+                        drawShape(g, s, x, y, VISUAL_SIZE * 0.62, noiseColor);
                 }
         }
+
+        // ---- Sprite helpers ----
+
+        private static void renderSprite(GraphicsContext g, Seed s, double x, double y,
+                                         double visualSize, Image sprite,
+                                         double haloScale, double innerScale,
+                                         double glowBase, double glowRisk, double glowImpact) {
+                final double lateralThresholdPx = s.sizeUnits() * UiConstants.PORT_SIZE;
+                final double risk = clamp01(Math.abs(s.lateral) / Math.max(1.0, lateralThresholdPx));
+                final double impactFlash = clamp01(s.impactEnergy);
+                final double glowAlpha = clamp01(glowBase + glowRisk * risk + glowImpact * impactFlash);
+
+                if (glowAlpha > 0.01) {
+                        g.setGlobalAlpha(glowAlpha);
+                        final double r = visualSize * haloScale * 0.5;
+                        g.setFill(Color.WHITE);
+                        g.fillOval(x - r, y - r, r * 2, r * 2);
+                        g.setGlobalAlpha(1.0);
+                }
+
+                final double half = visualSize * 0.5;
+                g.drawImage(sprite, x - half, y - half, visualSize, visualSize);
+
+                final double noiseNorm = clamp01(s.noise / s.sizeUnits());
+                if (noiseNorm > 0.01) {
+                        g.setFill(Color.web("#ffd166", 0.12 + 0.60 * noiseNorm));
+                        final double r = visualSize * innerScale * 0.5;
+                        g.fillOval(x - r, y - r, r * 2, r * 2);
+                }
+        }
+
+        private static Image getInfiniteImage() {
+                if (INFINITE_IMG == null) {
+                        INFINITE_IMG = new Image(PacketView.class.getResourceAsStream("/img/infinite_packet.png"));
+                }
+                return INFINITE_IMG;
+        }
+
+        private static Image getSecureImage() {
+                if (SECURE_IMG == null) {
+                        SECURE_IMG = new Image(PacketView.class.getResourceAsStream("/img/secure_packet.png"));
+                }
+                return SECURE_IMG;
+        }
+
+        private static Image getProtectedImage() {
+                if (PROTECTED_IMG == null) {
+                        PROTECTED_IMG = new Image(PacketView.class.getResourceAsStream("/img/protected_packet.png"));
+                }
+                return PROTECTED_IMG;
+        }
+
+        // ---- Vector primitives ----
 
         private static void drawShape(GraphicsContext g, Seed s, double x, double y, double size, Color fill) {
                 g.setFill(fill);
                 if (s.type == Seed.Type.SQUARE) {
-                        double half = size * 0.5;
+                        final double half = size * 0.5;
                         g.fillRect(x - half, y - half, size, size);
-                } else {
-                        double half = size * 0.5;
-                        double[] xs = { x - half, x + half, x };
-                        double[] ys = { y + half, y + half, y - half };
+                } else { // TRIANGLE
+                        final double half = size * 0.5;
+                        final double[] xs = { x - half, x + half, x };
+                        final double[] ys = { y + half, y + half, y - half };
                         g.fillPolygon(xs, ys, 3);
                 }
         }
@@ -4889,7 +5265,19 @@ public final class StageSelectionView {
                 l2.setUserData("/levels/level2.json");
                 l2.setToggleGroup(group);
 
-                VBox box = new VBox(10, l1, l2);
+                RadioButton l3 = new RadioButton("Level 3");
+                l3.setUserData("/levels/level3.json");
+                l3.setToggleGroup(group);
+
+                RadioButton l4 = new RadioButton("Level 4");
+                l4.setUserData("/levels/level4.json");
+                l4.setToggleGroup(group);
+
+                RadioButton l5 = new RadioButton("Level 5");
+                l5.setUserData("/levels/level5.json");
+                l5.setToggleGroup(group);
+
+                VBox box = new VBox(10, l1, l2, l3, l4, l5);
                 box.setStyle("-fx-padding:16;");
                 dlg.getDialogPane().setContent(box);
                 dlg.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
@@ -4904,6 +5292,126 @@ public final class StageSelectionView {
                 dlg.showAndWait().ifPresent(path -> {
                         if (onSelected != null) onSelected.accept(path);
                 });
+        }
+}
+
+
+
+===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\view\SystemBackgroundView.java =====
+
+
+package play.view;
+
+import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.image.Image;
+import play.model.components.BackgroundImage;
+import play.model.components.PortInfo;
+import play.model.components.Transform;
+import play.model.core.Entity;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Renders per-system background sprites if present.
+ *
+ * Compatibility:
+ * - Uses world coordinates from Transform (same space as ports/packets).
+ * - Does NOT change the GraphicsContext transform; assumes caller already set camera/pan/zoom.
+ * - Draw order: call this BEFORE drawing wires/ports/packets so images appear behind them.
+ *
+ * Sizing:
+ * - If the system has ports, scales the sprite to cover the ports' bounding box with padding.
+ * - Otherwise, draws the image at its natural size, centered on the system Transform.
+ */
+public final class SystemBackgroundView {
+
+        private SystemBackgroundView() {}
+
+        // Soft padding around the ports' AABB when scaling the background
+        private static final double PAD = 48.0;
+
+        // Resource cache to avoid reloading images
+        private static final Map<String, Image> CACHE = new HashMap<>();
+
+        /**
+         * Render backgrounds for all systems that have a BackgroundImage component.
+         * @param g         Graphics context (already in world space)
+         * @param entities  All entities in the scene
+         */
+        public static void render(GraphicsContext g, Iterable<Entity> entities) {
+                // First pass: draw in a single sweep to keep it cheap
+                for (Entity sys : entities) {
+                        if (!sys.has(Transform.class) || !sys.has(BackgroundImage.class)) continue;
+
+                        Transform t = sys.get(Transform.class);
+                        BackgroundImage bg = sys.get(BackgroundImage.class);
+                        Image img = load(bg.resourcePath);
+                        if (img == null) continue;
+
+                        // Compute port AABB for this system (if any)
+                        double[] box = portsAabbForSystem(entities, sys);
+                        if (box != null) {
+                                // Expand a bit so the image comfortably frames the ports
+                                double minX = box[0] - PAD, minY = box[1] - PAD;
+                                double maxX = box[2] + PAD, maxY = box[3] + PAD;
+                                double targetW = Math.max(1.0, maxX - minX);
+                                double targetH = Math.max(1.0, maxY - minY);
+
+                                // Center the scaled image on the system transform
+                                double cx = t.x;
+                                double cy = t.y;
+                                double x = cx - targetW * 0.5;
+                                double y = cy - targetH * 0.5;
+
+                                g.drawImage(img, x, y, targetW, targetH);
+                        } else {
+                                // No ports: draw at natural size centered at system transform
+                                double w = img.getWidth();
+                                double h = img.getHeight();
+                                double x = t.x - w * 0.5;
+                                double y = t.y - h * 0.5;
+                                g.drawImage(img, x, y);
+                        }
+                }
+        }
+
+        /** Return [minX, minY, maxX, maxY] of all ports belonging to 'system', or null if none. */
+        private static double[] portsAabbForSystem(Iterable<Entity> entities, Entity system) {
+                boolean any = false;
+                double minX = Double.POSITIVE_INFINITY, minY = Double.POSITIVE_INFINITY;
+                double maxX = Double.NEGATIVE_INFINITY, maxY = Double.NEGATIVE_INFINITY;
+
+                for (Entity e : entities) {
+                        if (!e.has(PortInfo.class) || !e.has(Transform.class)) continue;
+                        PortInfo pi = e.get(PortInfo.class);
+                        if (pi.parentSystem != system) continue;
+
+                        Transform pt = e.get(Transform.class);
+                        any = true;
+                        if (pt.x < minX) minX = pt.x;
+                        if (pt.y < minY) minY = pt.y;
+                        if (pt.x > maxX) maxX = pt.x;
+                        if (pt.y > maxY) maxY = pt.y;
+                }
+                return any ? new double[]{minX, minY, maxX, maxY} : null;
+        }
+
+        private static Image load(String path) {
+                if (path == null || path.isEmpty()) return null;
+                Image cached = CACHE.get(path);
+                if (cached != null) return cached;
+                Image img = null;
+                try {
+                        // Accept both "/img/foo.png" and "img/foo.png"
+                        String normalized = path.startsWith("/") ? path : "/" + path;
+                        img = new Image(SystemBackgroundView.class.getResourceAsStream(normalized));
+                } catch (Exception ignored) {}
+                if (img != null && img.getWidth() > 0 && img.getHeight() > 0) {
+                        CACHE.put(path, img);
+                        return img;
+                }
+                return null;
         }
 }
 
@@ -5383,5 +5891,160 @@ public final class UiConstants {
     { "id": "R2:inS",  "device": "REF-2", "x": 690, "y": 310, "shape": "square",   "io": "in"  },
     { "id": "R2:inT",  "device": "REF-2", "x": 690, "y": 330, "shape": "triangle", "io": "in"  }
   ]
+}
+
+
+
+===== FILE: C:\Users\ASUS\AP_Project1\src\main\resources\levels\level3.json =====
+
+
+{
+  "timeLimitSeconds": 150,
+  "totalWire": 4000,
+
+  "devices": [
+    { "id": "SRC_A", "x": 200, "y": 200,
+      "producer": { "interval": 0.7, "quota": { "square": 8,  "triangle": 8,  "infinite": 12 } } },
+
+    { "id": "SRC_B", "x": 200, "y": 420,
+      "producer": { "interval": 0.8, "quota": { "square": 8,  "triangle": 6,  "infinite": 10 } } },
+
+    { "id": "MIX_1", "x": 580, "y": 200 },
+    { "id": "MIX_2", "x": 580, "y": 420 },
+
+    { "id": "REF_SQ", "x": 980, "y": 200, "reference": true },
+    { "id": "REF_TR", "x": 980, "y": 420, "reference": true }
+  ],
+
+  "ports": [
+    { "id": "SRC_A_OUT_SQ", "device": "SRC_A", "x": 220, "y": 180, "shape": "square",   "io": "out" },
+    { "id": "SRC_A_OUT_TR", "device": "SRC_A", "x": 220, "y": 220, "shape": "triangle", "io": "out" },
+
+    { "id": "SRC_B_OUT_SQ", "device": "SRC_B", "x": 220, "y": 400, "shape": "square",   "io": "out" },
+    { "id": "SRC_B_OUT_TR", "device": "SRC_B", "x": 220, "y": 440, "shape": "triangle", "io": "out" },
+
+    { "id": "MIX1_IN_SQ",  "device": "MIX_1", "x": 560, "y": 180, "shape": "square",   "io": "in"  },
+    { "id": "MIX1_OUT_SQ", "device": "MIX_1", "x": 600, "y": 180, "shape": "square",   "io": "out" },
+
+    { "id": "MIX1_IN_TR",  "device": "MIX_1", "x": 560, "y": 220, "shape": "triangle", "io": "in"  },
+    { "id": "MIX1_OUT_TR", "device": "MIX_1", "x": 600, "y": 220, "shape": "triangle", "io": "out" },
+
+    { "id": "MIX2_IN_SQ",  "device": "MIX_2", "x": 560, "y": 400, "shape": "square",   "io": "in"  },
+    { "id": "MIX2_OUT_SQ", "device": "MIX_2", "x": 600, "y": 400, "shape": "square",   "io": "out" },
+
+    { "id": "MIX2_IN_TR",  "device": "MIX_2", "x": 560, "y": 440, "shape": "triangle", "io": "in"  },
+    { "id": "MIX2_OUT_TR", "device": "MIX_2", "x": 600, "y": 440, "shape": "triangle", "io": "out" },
+
+    { "id": "REFSQ_IN_1", "device": "REF_SQ", "x": 960, "y": 180, "shape": "square", "io": "in", "reference": true },
+    { "id": "REFSQ_IN_2", "device": "REF_SQ", "x": 960, "y": 220, "shape": "square", "io": "in", "reference": true },
+
+    { "id": "REFTR_IN_1", "device": "REF_TR", "x": 960, "y": 400, "shape": "triangle", "io": "in", "reference": true },
+    { "id": "REFTR_IN_2", "device": "REF_TR", "x": 960, "y": 440, "shape": "triangle", "io": "in", "reference": true }
+  ],
+
+  "notes": "SQUARE ports can emit SQUARE or INFINITE (independent quotas). Wire SRC_A/SRC_B -> MIX_1/MIX_2 -> REF_SQ/REF_TR on matching shapes."
+}
+
+
+
+===== FILE: C:\Users\ASUS\AP_Project1\src\main\resources\levels\level4.json =====
+
+
+{
+  "timeLimitSeconds": 160,
+  "totalWire": 3800,
+
+  "devices": [
+    { "id": "SRC_SEC_1", "x": 220, "y": 180,
+      "producer": { "interval": 0.60, "quota": { "secure": 8, "square": 4 } } },
+
+    { "id": "SRC_SEC_2", "x": 220, "y": 260,
+      "producer": { "interval": 0.65, "quota": { "secure": 8, "square": 4 } } },
+
+    { "id": "SRC_INF", "x": 220, "y": 340,
+      "producer": { "interval": 0.80, "quota": { "infinite": 6 } } },
+
+    { "id": "SRC_TRI", "x": 220, "y": 460,
+      "producer": { "interval": 0.90, "quota": { "triangle": 6 } } },
+
+    { "id": "HUB", "x": 640, "y": 260 },
+
+    { "id": "REF_MAIN", "x": 1000, "y": 260, "reference": true }
+  ],
+
+  "ports": [
+    { "id": "SEC1_OUT_SQ", "device": "SRC_SEC_1", "x": 240, "y": 180, "shape": "square",   "io": "out" },
+    { "id": "SEC2_OUT_SQ", "device": "SRC_SEC_2", "x": 240, "y": 260, "shape": "square",   "io": "out" },
+    { "id": "INF_OUT_SQ",  "device": "SRC_INF",   "x": 240, "y": 340, "shape": "square",   "io": "out" },
+
+    { "id": "TRI_OUT_TR",  "device": "SRC_TRI",   "x": 240, "y": 460, "shape": "triangle", "io": "out" },
+
+    { "id": "HUB_IN_SQ",   "device": "HUB",       "x": 620, "y": 240, "shape": "square",   "io": "in"  },
+    { "id": "HUB_OUT_SQ",  "device": "HUB",       "x": 660, "y": 240, "shape": "square",   "io": "out" },
+
+    { "id": "HUB_IN_TR",   "device": "HUB",       "x": 620, "y": 280, "shape": "triangle", "io": "in"  },
+    { "id": "HUB_OUT_TR",  "device": "HUB",       "x": 660, "y": 280, "shape": "triangle", "io": "out" },
+
+    { "id": "REF_IN_SQ_1", "device": "REF_MAIN",  "x": 980, "y": 220, "shape": "square",   "io": "in", "reference": true },
+    { "id": "REF_IN_SQ_2", "device": "REF_MAIN",  "x": 980, "y": 260, "shape": "square",   "io": "in", "reference": true },
+    { "id": "REF_IN_SQ_3", "device": "REF_MAIN",  "x": 980, "y": 300, "shape": "square",   "io": "in", "reference": true },
+
+    { "id": "REF_IN_TR_1", "device": "REF_MAIN",  "x": 980, "y": 280, "shape": "triangle", "io": "in", "reference": true }
+  ],
+
+  "notes": "Wire all square sources (SEC1/SEC2/INF) -> HUB_IN_SQ -> HUB_OUT_SQ -> REF_IN_SQ_* . Wire TRI_OUT_TR -> HUB_IN_TR -> HUB_OUT_TR -> REF_IN_TR_1. HUB has both shapes, so the graph is connectable as one component. Two SECURE sources feeding one HUB square OUT will cause a queue at HUB, so any SECURE still in transit slows down before arriving (tests the 'secure' packet behavior)."
+}
+
+
+
+===== FILE: C:\Users\ASUS\AP_Project1\src\main\resources\levels\level5.json =====
+
+
+{
+  "timeLimitSeconds": 180,
+  "totalWire": 4200,
+
+  "devices": [
+    { "id": "SRC_A",   "x": 200, "y": 160,
+      "producer": { "interval": 0.70, "quota": { "square": 6, "infinite": 6 } } },
+
+    { "id": "SRC_B",   "x": 200, "y": 300,
+      "producer": { "interval": 0.80, "quota": { "triangle": 8 } } },
+
+    { "id": "SRC_SEC", "x": 200, "y": 440,
+      "producer": { "interval": 0.75, "quota": { "secure": 6 } } },
+
+    { "id": "VPN_1",   "x": 580, "y": 230, "vpn": true },
+
+    { "id": "MIX",     "x": 780, "y": 230 },
+
+    { "id": "REF",     "x": 1040, "y": 230, "reference": true }
+  ],
+
+  "ports": [
+    { "id": "A_OUT_SQ",  "device": "SRC_A", "x": 220, "y": 160, "shape": "square",   "io": "out" },
+
+    { "id": "B_OUT_TR",  "device": "SRC_B", "x": 220, "y": 300, "shape": "triangle", "io": "out" },
+
+    { "id": "SEC_OUT_SQ","device": "SRC_SEC", "x": 220, "y": 420, "shape": "square",   "io": "out" },
+    { "id": "SEC_OUT_TR","device": "SRC_SEC", "x": 220, "y": 460, "shape": "triangle", "io": "out" },
+
+    { "id": "VPN_IN_SQ",  "device": "VPN_1", "x": 560, "y": 210, "shape": "square",   "io": "in"  },
+    { "id": "VPN_OUT_SQ", "device": "VPN_1", "x": 600, "y": 210, "shape": "square",   "io": "out" },
+    { "id": "VPN_IN_TR",  "device": "VPN_1", "x": 560, "y": 250, "shape": "triangle", "io": "in"  },
+    { "id": "VPN_OUT_TR", "device": "VPN_1", "x": 600, "y": 250, "shape": "triangle", "io": "out" },
+
+    { "id": "MIX_IN_SQ",  "device": "MIX",   "x": 760, "y": 210, "shape": "square",   "io": "in"  },
+    { "id": "MIX_OUT_SQ", "device": "MIX",   "x": 800, "y": 210, "shape": "square",   "io": "out" },
+    { "id": "MIX_IN_TR",  "device": "MIX",   "x": 760, "y": 250, "shape": "triangle", "io": "in"  },
+    { "id": "MIX_OUT_TR", "device": "MIX",   "x": 800, "y": 250, "shape": "triangle", "io": "out" },
+
+    { "id": "REF_IN_SQ_1", "device": "REF", "x": 1020, "y": 190, "shape": "square",   "io": "in", "reference": true },
+    { "id": "REF_IN_SQ_2", "device": "REF", "x": 1020, "y": 230, "shape": "square",   "io": "in", "reference": true },
+    { "id": "REF_IN_TR_1", "device": "REF", "x": 1020, "y": 270, "shape": "triangle", "io": "in", "reference": true },
+    { "id": "REF_IN_TR_2", "device": "REF", "x": 1020, "y": 310, "shape": "triangle", "io": "in", "reference": true }
+  ],
+
+  "notes": "Wire SRC_A (square/infinite) -> VPN_IN_SQ -> VPN_OUT_SQ -> MIX_IN_SQ -> MIX_OUT_SQ -> REF square inputs. Wire SRC_B (triangle) -> VPN_IN_TR -> VPN_OUT_TR -> MIX_IN_TR -> MIX_OUT_TR -> REF triangle inputs. Wire SECURE outs to MIX-compatible inputs to create queueing. VPN converts messaging packets (square/triangle/infinite) into PROTECTED; their travel model is hidden and randomly emulates a messenger type per hop dispatch."
 }
 

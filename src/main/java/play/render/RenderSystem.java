@@ -1,24 +1,21 @@
 package play.render;
 
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
 import play.controller.BendTool;
 import play.model.core.Entity;
-import play.model.components.Link;
-import play.model.components.PortInfo;
-import play.model.components.Reference;
-import play.model.components.Seed;
-import play.model.components.Transform;
+import play.model.components.*;
 import play.model.systems.System;
 import play.utils.WiringUtils;
 import play.view.PacketView;
 import play.view.UiConstants;
 import javafx.scene.shape.ArcType;
-import play.model.components.Disabled;
 import play.model.constants.GameBalance;
 
-
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class RenderSystem implements System {
 
@@ -32,6 +29,12 @@ public class RenderSystem implements System {
 
         // Optional: for drawing bend hover ring
         private BendTool bendTool;
+
+        // Cache for BackgroundImage resources
+        private static final Map<String, Image> BG_CACHE = new HashMap<>();
+
+        // Scale factor for background images relative to SYSTEM_SIZE
+        private static final double IMAGE_SCALE = 1.2;
 
         public RenderSystem(List<Entity> entities, GraphicsContext g) {
                 this.entities = entities;
@@ -69,7 +72,6 @@ public class RenderSystem implements System {
                         if (!e.has(Link.class)) continue;
                         Link l = e.get(Link.class);
 
-                        // ⬇️ CHANGED: use the smooth curve points instead of straight control path
                         var pts = WiringUtils.curvePoints(l);
                         if (pts.size() < 2) continue;
 
@@ -107,13 +109,20 @@ public class RenderSystem implements System {
                         bendTool.renderHover(g);
                 }
 
-                // systems (rectangle + reference ring)
+                // systems (either background image OR default rectangle) + reference ring + disabled overlay
                 final double SYSTEM_SIZE = UiConstants.SYSTEM_SIZE;
                 for (Entity e : entities) {
                         if (!isSystemEntity(e)) continue;
 
                         Transform t = e.get(Transform.class);
                         double w = SYSTEM_SIZE, h = SYSTEM_SIZE;
+
+                        boolean hasBg = e.has(BackgroundImage.class);
+                        Image bg = null;
+                        if (hasBg) {
+                                String path = e.get(BackgroundImage.class).resourcePath;
+                                bg = loadBg(path);
+                        }
 
                         boolean isDisabled = e.has(Disabled.class);
                         double remain = 0.0, ratio = 0.0;
@@ -124,25 +133,38 @@ public class RenderSystem implements System {
                                         : 1.0;
                         }
 
-                        // Base body
-                        g.setFill(Color.web("#2a2f3a"));
-                        g.fillRoundRect(t.x - w / 2, t.y - h / 2, w, h, 8, 8);
-                        g.setStroke(Color.web("#3c4452"));
-                        g.setLineWidth(1.0);
-                        g.strokeRoundRect(t.x - w / 2, t.y - h / 2, w, h, 8, 8);
+                        // If we have a background image, draw it centered at the system transform and scaled to system size.
+                        // Otherwise draw the default rectangle body.
+                        if (bg != null) {
+                                double drawW = w * IMAGE_SCALE;
+                                double drawH = h * IMAGE_SCALE;
+                                double x = t.x - drawW / 2.0;
+                                double y = t.y - drawH / 2.0;
 
-                        // Reference ring
+                                try {
+                                        g.drawImage(bg, x, y, drawW, drawH);
+                                } catch (Exception ex) {
+                                        // fallback to base body if image drawing fails
+                                        drawSystemBodyAsRect(t, w, h);
+                                }
+                        } else {
+                                // Base body (rectangle)
+                                drawSystemBodyAsRect(t, w, h);
+                        }
+
+                        // Reference ring (drawn on top of the background)
                         if (e.has(Reference.class)) {
                                 g.setStroke(Color.LIGHTGREEN);
                                 g.setLineWidth(1.5);
                                 g.strokeOval(t.x - 22, t.y - 22, 44, 44);
                         }
 
-                        // ---- VISUAL CLUE WHEN DISABLED ----
+                        // ---- VISUAL CLUE WHEN DISABLED (drawn on top of the background) ----
                         if (isDisabled) {
                                 // 1) Red translucent overlay
                                 g.setGlobalAlpha(0.35);
                                 g.setFill(Color.web("#ff3b30"));
+                                // cover same rectangle area as system
                                 g.fillRoundRect(t.x - w / 2, t.y - h / 2, w, h, 8, 8);
                                 g.setGlobalAlpha(1.0);
 
@@ -178,7 +200,6 @@ public class RenderSystem implements System {
                                 );
                         }
                 }
-
 
                 // ports
                 final double ps = UiConstants.PORT_SIZE;
@@ -217,6 +238,29 @@ public class RenderSystem implements System {
                         g.setLineWidth(2.0);
                         g.strokeLine(a.x, a.y, previewX, previewY);
                 }
+        }
+
+        private void drawSystemBodyAsRect(Transform t, double w, double h) {
+                g.setFill(Color.web("#2a2f3a"));
+                g.fillRoundRect(t.x - w / 2, t.y - h / 2, w, h, 8, 8);
+                g.setStroke(Color.web("#3c4452"));
+                g.setLineWidth(1.0);
+                g.strokeRoundRect(t.x - w / 2, t.y - h / 2, w, h, 8, 8);
+        }
+
+        private Image loadBg(String path) {
+                if (path == null || path.isEmpty()) return null;
+                Image cached = BG_CACHE.get(path);
+                if (cached != null) return cached;
+                try {
+                        String normalized = path.startsWith("/") ? path : "/" + path;
+                        Image img = new Image(RenderSystem.class.getResourceAsStream(normalized));
+                        if (img != null && img.getWidth() > 0 && img.getHeight() > 0) {
+                                BG_CACHE.put(path, img);
+                                return img;
+                        }
+                } catch (Exception ignored) {}
+                return null;
         }
 
         private boolean isSystemEntity(Entity e) {

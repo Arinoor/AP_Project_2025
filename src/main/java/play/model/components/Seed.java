@@ -1,12 +1,13 @@
 package play.model.components;
 
 import play.model.components.Link;
+import play.model.core.Entity;
 
 /** Packet (seed) travelling in the network. */
 public class Seed {
         public enum Type { SQUARE, TRIANGLE, INFINITE, SECURE, PROTECTED }
 
-        public final Type type;
+        public Type type;
 
         // kinematics
         public double speed = 120.0;     // px/s
@@ -46,6 +47,9 @@ public class Seed {
         public Type protectedBaseType = null;
         /** For PROTECTED: which messaging type's kinematics this seed emulates on each hop (SQUARE/TRIANGLE/INFINITE). */
         public Type emulateType = null;
+
+        public Entity vpnConverter = null;
+
 
         public Seed(Type type) {
                 this.type = type;

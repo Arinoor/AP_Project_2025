@@ -47,6 +47,9 @@ public class QueueSystem implements System {
                         }
                 }
 
+                revertPacketsFromDisabledVpns();
+
+
                 // 0.20) SECURE adaptive slowdown: before physics/arrivals, ensure we gate speed
                 for (Entity e : new ArrayList<>(entities)) {
                         if (!e.has(Seed.class)) continue;
@@ -199,6 +202,9 @@ public class QueueSystem implements System {
                                         newS.noise = s.noise; // carry noise forward
                                         newS.impactEnergy = Math.max(s.impactEnergy, 0.25); // small flash on conversion
 
+                                        newS.vpnConverter = system;
+
+
                                         // Replace component on the same entity
                                         seedE.remove(Seed.class);
                                         seedE.add(newS);
@@ -311,6 +317,28 @@ public class QueueSystem implements System {
                                 s.returning = false;
 
                                 progressed = true;
+                        }
+                }
+        }
+
+        private void revertPacketsFromDisabledVpns() {
+                for (Entity e : entities) {
+                        if (e.has(Seed.class)) {
+                                Seed s = e.get(Seed.class);
+                                // Check if this is a protected packet from a disabled VPN
+                                if (s.type == Seed.Type.PROTECTED &&
+                                        s.vpnConverter != null &&
+                                        s.vpnConverter.has(Disabled.class)) {
+
+                                        // Revert to original type
+                                        s.type = s.protectedBaseType;
+                                        s.protectedBaseType = null;
+                                        s.emulateType = null;
+                                        s.vpnConverter = null;
+
+                                        // Reset to appropriate capacity
+                                        s.capacity = (s.type == Seed.Type.TRIANGLE) ? 4 : 3;
+                                }
                         }
                 }
         }
