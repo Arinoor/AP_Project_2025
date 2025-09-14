@@ -59,6 +59,11 @@ public final class LevelLoaderV2 {
                                         systemE.add(new BackgroundImage("/img/vpn_system.png"));
                                 }
 
+                                if (d.path("spy").asBoolean(false)) {
+                                        systemE.add(new Spy());
+                                        systemE.add(new BackgroundImage("/img/spy_system.png"));
+                                }
+
                                 JsonNode prodNode = d.path("producer");
                                 if (!prodNode.isMissingNode() && !prodNode.isNull()) {
                                         double interval = prodNode.path("interval").asDouble(1.0);

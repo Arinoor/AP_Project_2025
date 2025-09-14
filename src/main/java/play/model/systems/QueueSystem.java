@@ -14,6 +14,7 @@ import java.util.*;
  *  - Per-frame jerk application (accel += jerk * dt).
  *  - SECURE adaptive slowdown: if dest system has queued items, clamp speed down.
  *  - VPN conversion: messaging packets entering a VPN become PROTECTED with hidden (random) emulation.
+ *  - SPY systems: destroy secure packets, allow any packet to exit any spy system, don't affect protected packets.
  */
 public class QueueSystem implements System {
 
@@ -48,7 +49,6 @@ public class QueueSystem implements System {
                 }
 
                 revertPacketsFromDisabledVpns();
-
 
                 // 0.20) SECURE adaptive slowdown: before physics/arrivals, ensure we gate speed
                 for (Entity e : new ArrayList<>(entities)) {
@@ -185,6 +185,13 @@ public class QueueSystem implements System {
                                 continue;
                         }
 
+                        // === SPY system handling ===
+                        if (system.has(Spy.class)) {
+                                handleSpySystemArrival(system, seedE, s);
+                                // If the packet was destroyed, continue to next arrival
+                                if (!entities.contains(seedE)) continue;
+                        }
+
                         // === VPN conversion (on entry to system) ===
                         if (system.has(Vpn.class)) {
                                 // Only convert messaging packets (SQUARE/TRIANGLE/INFINITE). SECURE and PROTECTED passthrough.
@@ -203,7 +210,6 @@ public class QueueSystem implements System {
                                         newS.impactEnergy = Math.max(s.impactEnergy, 0.25); // small flash on conversion
 
                                         newS.vpnConverter = system;
-
 
                                         // Replace component on the same entity
                                         seedE.remove(Seed.class);
@@ -249,12 +255,41 @@ public class QueueSystem implements System {
                                 else freeTriangle.add(e);
                         }
 
+                        // For packets that have been in spy systems, add all spy system links
+                        List<Entity> spyLinks = new ArrayList<>();
+                        Entity seedE = buf.peekFirst();
+                        if (seedE != null && seedE.has(Seed.class)) {
+                                Seed s = seedE.get(Seed.class);
+                                if (s.hasBeenInSpySystem) {
+                                        for (Entity e : entities) {
+                                                if (!e.has(Link.class)) continue;
+                                                Link l = e.get(Link.class);
+                                                if (l.fromPort == null) continue;
+                                                if (!l.fromPort.has(PortInfo.class)) continue;
+                                                PortInfo pFrom = l.fromPort.get(PortInfo.class);
+                                                if (!pFrom.parentSystem.has(Spy.class)) continue;
+                                                if (!isLinkFree(l)) continue;
+
+                                                if (l.toPort == null || !l.toPort.has(PortInfo.class)) continue;
+                                                PortInfo destPi = l.toPort.get(PortInfo.class);
+                                                Entity destSys = destPi.parentSystem;
+                                                if (destSys != null && destSys.has(Disabled.class)) continue;
+
+                                                if (pFrom.shape == PortInfo.Shape.SQUARE) {
+                                                        if (!freeSquare.contains(e)) freeSquare.add(e);
+                                                } else {
+                                                        if (!freeTriangle.contains(e)) freeTriangle.add(e);
+                                                }
+                                        }
+                                }
+                        }
+
                         // While we can ship something out, do it
                         boolean progressed = true;
                         while (progressed && !buf.isEmpty()) {
                                 progressed = false;
 
-                                Entity seedE = buf.peekFirst();
+                                seedE = buf.peekFirst();
                                 if (seedE == null) break;
                                 Seed s = seedE.get(Seed.class);
 
@@ -319,6 +354,29 @@ public class QueueSystem implements System {
                                 progressed = true;
                         }
                 }
+        }
+
+        /**
+         * Handle packets arriving at spy systems
+         * - Secure packets are destroyed
+         * - Protected packets are unaffected
+         * - Other packets are marked as having been in a spy system
+         */
+        private void handleSpySystemArrival(Entity system, Entity seedE, Seed s) {
+                // Destroy secure packets
+                if (s.type == Seed.Type.SECURE) {
+                        entities.remove(seedE);
+                        engine.incrementLost();
+                        return;
+                }
+
+                // Protected packets are unaffected
+                if (s.type == Seed.Type.PROTECTED) {
+                        return;
+                }
+
+                // Mark other packets as having been in a spy system
+                s.hasBeenInSpySystem = true;
         }
 
         private void revertPacketsFromDisabledVpns() {

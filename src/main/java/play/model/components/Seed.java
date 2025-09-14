@@ -50,6 +50,9 @@ public class Seed {
 
         public Entity vpnConverter = null;
 
+        public boolean hasBeenInSpySystem = false;
+
+
 
         public Seed(Type type) {
                 this.type = type;

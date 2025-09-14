@@ -1,0 +1,147 @@
+{
+  "totalWire": 5000,
+  "timeLimitSeconds": 180,
+  "devices": [
+    {
+      "id": "producer1",
+      "x": 100,
+      "y": 100,
+      "producer": {
+        "interval": 1.5,
+        "quota": {
+          "square": 10,
+          "triangle": 8,
+          "infinite": 5,
+          "secure": 3
+        }
+      }
+    },
+    {
+      "id": "normal1",
+      "x": 300,
+      "y": 200
+    },
+    {
+      "id": "vpn1",
+      "x": 500,
+      "y": 150,
+      "vpn": true
+    },
+    {
+      "id": "spy1",
+      "x": 200,
+      "y": 350,
+      "spy": true
+    },
+    {
+      "id": "spy2",
+      "x": 400,
+      "y": 400,
+      "spy": true
+    },
+    {
+      "id": "reference1",
+      "x": 700,
+      "y": 300,
+      "reference": true
+    }
+  ],
+  "ports": [
+    {
+      "id": "producer1_out1",
+      "device": "producer1",
+      "x": 120,
+      "y": 90,
+      "shape": "square",
+      "io": "out"
+    },
+    {
+      "id": "producer1_out2",
+      "device": "producer1",
+      "x": 80,
+      "y": 110,
+      "shape": "triangle",
+      "io": "out"
+    },
+    {
+      "id": "normal1_in1",
+      "device": "normal1",
+      "x": 290,
+      "y": 200,
+      "shape": "square",
+      "io": "in"
+    },
+    {
+      "id": "normal1_out1",
+      "device": "normal1",
+      "x": 310,
+      "y": 200,
+      "shape": "square",
+      "io": "out"
+    },
+    {
+      "id": "vpn1_in1",
+      "device": "vpn1",
+      "x": 490,
+      "y": 150,
+      "shape": "square",
+      "io": "in"
+    },
+    {
+      "id": "vpn1_out1",
+      "device": "vpn1",
+      "x": 510,
+      "y": 150,
+      "shape": "square",
+      "io": "out"
+    },
+    {
+      "id": "spy1_in1",
+      "device": "spy1",
+      "x": 190,
+      "y": 350,
+      "shape": "square",
+      "io": "in"
+    },
+    {
+      "id": "spy1_out1",
+      "device": "spy1",
+      "x": 210,
+      "y": 350,
+      "shape": "square",
+      "io": "out"
+    },
+    {
+      "id": "spy2_in1",
+      "device": "spy2",
+      "x": 390,
+      "y": 400,
+      "shape": "triangle",
+      "io": "in"
+    },
+    {
+      "id": "spy2_out1",
+      "device": "spy2",
+      "x": 410,
+      "y": 400,
+      "shape": "triangle",
+      "io": "out"
+    },
+    {
+      "id": "reference1_in1",
+      "device": "reference1",
+      "x": 690,
+      "y": 300,
+      "shape": "square",
+      "io": "in"
+    },
+    {
+      "id": "reference1_in2",
+      "device": "reference1",
+      "x": 710,
+      "y": 300,
+      "shape": "triangle",
+      "io": "in"
+    }
+  ]
+}
