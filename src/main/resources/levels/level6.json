@@ -108,7 +108,7 @@
       "device": "spy1",
       "x": 210,
       "y": 350,
-      "shape": "square",
+      "shape": "triangle",
       "io": "out"
     },
     {
@@ -124,7 +124,7 @@
       "device": "spy2",
       "x": 410,
       "y": 400,
-      "shape": "triangle",
+      "shape": "square",
       "io": "out"
     },
     {

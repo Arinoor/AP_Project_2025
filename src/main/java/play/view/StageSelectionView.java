@@ -51,7 +51,11 @@ public final class StageSelectionView {
                 l6.setUserData("/levels/level6.json");
                 l6.setToggleGroup(group);
 
-                VBox box = new VBox(10, l1, l2, l3, l4, l5, l6);
+                RadioButton l7 = new RadioButton("Level 7");
+                l7.setUserData("/levels/level7.json");
+                l7.setToggleGroup(group);
+
+                VBox box = new VBox(10, l1, l2, l3, l4, l5, l6, l7);
                 box.setStyle("-fx-padding:16;");
                 dlg.getDialogPane().setContent(box);
                 dlg.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);

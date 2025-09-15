@@ -64,6 +64,11 @@ public final class LevelLoaderV2 {
                                         systemE.add(new BackgroundImage("/img/spy_system.png"));
                                 }
 
+                                if (d.path("saboteur").asBoolean(false)) {
+                                        systemE.add(new Saboteur());
+                                        systemE.add(new BackgroundImage("/img/saboteur_system.png"));
+                                }
+
                                 JsonNode prodNode = d.path("producer");
                                 if (!prodNode.isMissingNode() && !prodNode.isNull()) {
                                         double interval = prodNode.path("interval").asDouble(1.0);

@@ -15,6 +15,11 @@ import java.util.*;
  *  - SECURE adaptive slowdown: if dest system has queued items, clamp speed down.
  *  - VPN conversion: messaging packets entering a VPN become PROTECTED with hidden (random) emulation.
  *  - SPY systems: destroy secure packets, allow any packet to exit any spy system, don't affect protected packets.
+ *
+ * Added: SABOTEUR behaviour:
+ *  - Systems with Saboteur component preferentially dispatch to incompatible ports (if available).
+ *  - On arrival into a Saboteur system, if the seed is non-PROTECTED and has zero noise, add 1 unit of noise.
+ *  - PROTECTED packets are not affected by Saboteur (no injection, normal dispatch rules).
  */
 public class QueueSystem implements System {
 
@@ -218,6 +223,18 @@ public class QueueSystem implements System {
                                 }
                         }
 
+                        // === SABOTEUR arrival handling ===
+                        // If the destination system is a Saboteur:
+                        //  - For non-PROTECTED seeds: if seed.noise == 0.0 then add 1.0 noise unit.
+                        //  - PROTECTED seeds are unaffected.
+                        if (system.has(Saboteur.class)) {
+                                if (s.type != Seed.Type.PROTECTED) {
+                                        if (s.noise == 0.0) {
+                                                s.noise += 1.0;
+                                        }
+                                }
+                        }
+
                         // Enqueue into the device buffer
                         Deque<Entity> buf = deviceQueues.computeIfAbsent(system, k -> new ArrayDeque<>());
                         if (buf.size() >= GameBalance.DEVICE_CAPACITY) {
@@ -298,29 +315,70 @@ public class QueueSystem implements System {
                                 // - TRIANGLE: triangle links
                                 // - SECURE: any available (no compatibility concept)
                                 // - PROTECTED: choose based on emulateType (hidden)
+                                //
+                                // SABOTEUR modification:
+                                // If the source system (the one holding this buffer) has Saboteur component,
+                                // then prefer INCOMPATIBLE ports first (if available), otherwise fall back to normal preference.
                                 Entity chosenLinkE = null;
-                                if (s.type == Seed.Type.SQUARE || s.type == Seed.Type.INFINITE) {
-                                        if (!freeSquare.isEmpty()) chosenLinkE = freeSquare.remove(0);
-                                } else if (s.type == Seed.Type.TRIANGLE) {
-                                        if (!freeTriangle.isEmpty()) chosenLinkE = freeTriangle.remove(0);
-                                } else if (s.type == Seed.Type.SECURE) {
-                                        int total = freeSquare.size() + freeTriangle.size();
-                                        if (total > 0) {
-                                                int idx = rng.nextInt(total);
-                                                chosenLinkE = (idx < freeSquare.size())
-                                                        ? freeSquare.remove(idx)
-                                                        : freeTriangle.remove(idx - freeSquare.size());
+
+                                boolean isSaboteur = system.has(Saboteur.class);
+
+                                if (isSaboteur) {
+                                        // If PROTECTED: saboteur should not affect it (use normal rules)
+                                        if (s.type == Seed.Type.PROTECTED) {
+                                                // fall through to normal selection below
+                                        } else if (s.type == Seed.Type.SQUARE || s.type == Seed.Type.INFINITE) {
+                                                // incompatible for square/infinite is TRIANGLE
+                                                if (!freeTriangle.isEmpty()) {
+                                                        chosenLinkE = freeTriangle.remove(0);
+                                                } else if (!freeSquare.isEmpty()) {
+                                                        chosenLinkE = freeSquare.remove(0);
+                                                }
+                                        } else if (s.type == Seed.Type.TRIANGLE) {
+                                                // incompatible for triangle is SQUARE
+                                                if (!freeSquare.isEmpty()) {
+                                                        chosenLinkE = freeSquare.remove(0);
+                                                } else if (!freeTriangle.isEmpty()) {
+                                                        chosenLinkE = freeTriangle.remove(0);
+                                                }
+                                        } else if (s.type == Seed.Type.SECURE) {
+                                                // For SECURE, no compatibility concept — pick random among free links (same as normal)
+                                                int total = freeSquare.size() + freeTriangle.size();
+                                                if (total > 0) {
+                                                        int idx = rng.nextInt(total);
+                                                        chosenLinkE = (idx < freeSquare.size())
+                                                                ? freeSquare.remove(idx)
+                                                                : freeTriangle.remove(idx - freeSquare.size());
+                                                }
                                         }
-                                } else if (s.type == Seed.Type.PROTECTED) {
-                                        Seed.Type emu = (s.emulateType != null) ? s.emulateType : Seed.Type.SQUARE;
-                                        if (emu == Seed.Type.TRIANGLE) {
-                                                if (!freeTriangle.isEmpty()) chosenLinkE = freeTriangle.remove(0);
-                                        } else { // SQUARE or INFINITE emulation => use square link
-                                                if (!freeSquare.isEmpty()) chosenLinkE = freeSquare.remove(0);
-                                        }
-                                        // if none, fall through to random below
                                 }
 
+                                // Normal (non-saboteur) selection or PROTECTED/SECURE fallback
+                                if (chosenLinkE == null) {
+                                        if (s.type == Seed.Type.SQUARE || s.type == Seed.Type.INFINITE) {
+                                                if (!freeSquare.isEmpty()) chosenLinkE = freeSquare.remove(0);
+                                        } else if (s.type == Seed.Type.TRIANGLE) {
+                                                if (!freeTriangle.isEmpty()) chosenLinkE = freeTriangle.remove(0);
+                                        } else if (s.type == Seed.Type.SECURE) {
+                                                int total = freeSquare.size() + freeTriangle.size();
+                                                if (total > 0) {
+                                                        int idx = rng.nextInt(total);
+                                                        chosenLinkE = (idx < freeSquare.size())
+                                                                ? freeSquare.remove(idx)
+                                                                : freeTriangle.remove(idx - freeSquare.size());
+                                                }
+                                        } else if (s.type == Seed.Type.PROTECTED) {
+                                                Seed.Type emu = (s.emulateType != null) ? s.emulateType : Seed.Type.SQUARE;
+                                                if (emu == Seed.Type.TRIANGLE) {
+                                                        if (!freeTriangle.isEmpty()) chosenLinkE = freeTriangle.remove(0);
+                                                } else { // SQUARE or INFINITE emulation => use square link
+                                                        if (!freeSquare.isEmpty()) chosenLinkE = freeSquare.remove(0);
+                                                }
+                                                // if none, fall through to random below
+                                        }
+                                }
+
+                                // If still null — pick random among the remaining free links (mixed)
                                 if (chosenLinkE == null) {
                                         int total = freeSquare.size() + freeTriangle.size();
                                         if (total > 0) {
