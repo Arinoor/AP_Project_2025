@@ -12,42 +12,26 @@ public class Producer {
         public int remainingSquare   = 0;
         public int remainingTriangle = 0;
         public int remainingInfinite = 0;
-        public int remainingSecure   = 0; // NEW
+        public int remainingSecure   = 0;
+        public int remainingHeavy   = 0;
 
         public Producer(double interval) {
                 this.interval = interval;
         }
 
-        /** Backward-compatible ctor (older levels without INFINITE/SECURE quotas). */
-        public Producer(double interval, int squareQuota, int triangleQuota) {
-                this.interval = interval;
-                this.remainingSquare = squareQuota;
-                this.remainingTriangle = triangleQuota;
-                this.remainingInfinite = 0;
-                this.remainingSecure   = 0;
-        }
-
-        /** Ctor with INFINITE (older transition). */
-        public Producer(double interval, int squareQuota, int triangleQuota, int infiniteQuota) {
-                this.interval = interval;
-                this.remainingSquare = squareQuota;
-                this.remainingTriangle = triangleQuota;
-                this.remainingInfinite = infiniteQuota;
-                this.remainingSecure   = 0;
-        }
-
         /** Full ctor with all packet types. */
-        public Producer(double interval, int squareQuota, int triangleQuota, int infiniteQuota, int secureQuota) {
+        public Producer(double interval, int squareQuota, int triangleQuota, int infiniteQuota, int secureQuota, int heavyQuota) {
                 this.interval = interval;
                 this.remainingSquare = squareQuota;
                 this.remainingTriangle = triangleQuota;
                 this.remainingInfinite = infiniteQuota;
                 this.remainingSecure   = secureQuota;
+                this.remainingHeavy = heavyQuota;
         }
 
         /** Returns true if at least one type still has quota or quotas are unlimited. */
         public boolean hasAnyQuota() {
-                return (remainingSquare != 0) || (remainingTriangle != 0) || (remainingInfinite != 0) || (remainingSecure != 0);
+                return (remainingSquare != 0) || (remainingTriangle != 0) || (remainingInfinite != 0) || (remainingSecure != 0) || (remainingHeavy != 0);
         }
 }
 

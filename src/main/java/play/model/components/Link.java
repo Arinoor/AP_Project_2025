@@ -25,13 +25,18 @@ public class Link {
 
         private double length = 1.0;
 
-        public int heavyPasses = 0;
 
         /** Cached polyline points (start + bends + end) computed at last updateGeometry(). */
         private final List<Vec2> poly = new ArrayList<>();
 
         /** Optional validity flag set by wiring validation (e.g., crossing systems). */
         private boolean valid = true;
+
+
+        /** New: count of HEAVY packets that have passed over this link. When this reaches
+         * GameBalance.HEAVY_MAX_PASSES the link should be destroyed.
+         */
+        private int heavyPassCount = 0;
 
         public Link(Entity fromPort, Entity toPort) {
                 this.fromPort = fromPort;
@@ -190,4 +195,8 @@ public class Link {
                 double u = ((x1-x3)*(y1-y2) - (y1-y3)*(x1-x2)) / d;
                 return t >= 0 && t <= 1 && u >= 0 && u <= 1;
         }
+
+        public int heavyPassCount() { return heavyPassCount; }
+        /** Increment and return new count. */
+        public int incrementHeavyPassCount() { return ++heavyPassCount; }
 }

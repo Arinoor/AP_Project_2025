@@ -3,6 +3,7 @@ package play.model.level;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import play.model.components.*;
+import play.model.constants.GameBalance;
 import play.model.core.Entity;
 import play.model.engine.GameEngine;
 
@@ -74,31 +75,40 @@ public final class LevelLoaderV2 {
                                         systemE.add(new BackgroundImage("/img/antitrojan_packet.png"));
                                 }
 
+                                if(d.path("merge").asBoolean(false)) {
+                                        systemE.add(new Merge());
+                                        systemE.add(new BackgroundImage("/img/merge_system.png"));
+                                }
+
+                                if(d.path("distribute").asBoolean(false)) {
+                                        systemE.add(new Distribute());
+                                        systemE.add(new BackgroundImage("/img/distribute_system.png"));
+                                }
+
                                 JsonNode prodNode = d.path("producer");
                                 if (!prodNode.isMissingNode() && !prodNode.isNull()) {
                                         double interval = prodNode.path("interval").asDouble(1.0);
 
-                                        int qS = -1, qT = -1, qI = 0, qC = 0; // default new types to 0 unless provided
+                                        int qS = -1, qT = -1, qI = 0, qC = 0, qH = 0; // default new types to 0 unless provided
                                         JsonNode quota = prodNode.path("quota");
                                         if (!quota.isMissingNode() && !quota.isNull()) {
-                                                if (quota.has("square"))   qS = quota.path("square").asInt(-1);
-                                                if (quota.has("triangle")) qT = quota.path("triangle").asInt(-1);
+                                                if (quota.has("square"))   qS = quota.path("square").asInt(0);
+                                                if (quota.has("triangle")) qT = quota.path("triangle").asInt(0);
                                                 if (quota.has("infinite")) qI = quota.path("infinite").asInt(0);
                                                 if (quota.has("secure"))   qC = quota.path("secure").asInt(0);
+                                                if(quota.has("heavy")) qH = quota.path("heavy").asInt(0);
 
                                                 // Sum only finite quotas into planned total
                                                 if (qS > 0) out.plannedSeeds += qS;
                                                 if (qT > 0) out.plannedSeeds += qT;
                                                 if (qI > 0) out.plannedSeeds += qI;
                                                 if (qC > 0) out.plannedSeeds += qC;
+                                                if (qH > 0) out.plannedSeeds += qH;
 
-                                                if (quota.has("secure")) {
-                                                        systemE.add(new Producer(interval, qS, qT, qI, qC));
-                                                } else if (quota.has("infinite")) {
-                                                        systemE.add(new Producer(interval, qS, qT, qI));
-                                                } else {
-                                                        systemE.add(new Producer(interval, qS, qT));
-                                                }
+                                                System.out.println(qH);
+
+                                                systemE.add(new Producer(interval, qS, qT, qI, qC, qH));
+
                                         } else {
                                                 // Defaults: new types infinite/secure = 0 so they don't spawn unless declared
                                                 Producer p = new Producer(interval);

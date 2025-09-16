@@ -1,143 +1,99 @@
 {
-  "timeLimitSeconds": 180,
-  "totalWire": 300000,
+  "timeLimitSeconds": 240,
+  "totalWire": 48000,
 
   "devices": [
-    {
-      "id": "producer_normal",
-      "x": 120,
-      "y": 120,
-      "producer": {
-        "interval": 0.9,
-        "quota": { "square": 12, "triangle": 12 }
-      }
-    },
+    { "id": "P_HEAVY",  "x": 120, "y": 140,
+      "producer": { "interval": 4.0, "quota": { "heavy": 5 }}},
 
-    {
-      "id": "producer_protected",
-      "x": 120,
-      "y": 260,
-      "producer": {
-        "interval": 1.2,
-        "quota": { "square": 8, "triangle": 8 }
-      }
-    },
+    { "id": "DIST_A",   "x": 380, "y": 140, "distribute": true },
 
-    {
-      "id": "producer_secure",
-      "x": 120,
-      "y": 400,
-      "producer": {
-        "interval": 1.6,
-        "quota": { "square": 6, "triangle": 6, "secure": 12 }
-      }
-    },
+    { "id": "TRANS_UP",   "x": 640, "y": 80 },
+    { "id": "TRANS_DOWN", "x": 640, "y": 220 },
 
-    {
-      "id": "producer_infinite",
-      "x": 120,
-      "y": 540,
-      "producer": {
-        "interval": 0.8,
-        "quota": { "square": 0, "triangle": 0, "infinite": -1 }
-      }
-    },
+    { "id": "MERGE_HUB", "x": 920, "y": 150, "merge": true },
 
-    {
-      "id": "saboteur_center",
-      "x": 420,
-      "y": 320,
-      "saboteur": true
-    },
+    { "id": "SAB",      "x": 380, "y": 320, "saboteur": true },
 
-    {
-      "id": "antitrojan_center",
-      "x": 720,
-      "y": 220,
-      "antitrojan": true
-    },
+    { "id": "LOOP_A",   "x": 620, "y": 460 },
+    { "id": "LOOP_B",   "x": 820, "y": 460 },
 
-    {
-      "id": "vpn_center",
-      "x": 720,
-      "y": 420,
-      "vpn": true
-    },
+    { "id": "VPN_1",    "x": 1040, "y": 420, "vpn": true },
 
-    {
-      "id": "spy_far",
-      "x": 960,
-      "y": 320,
-      "spy": true
-    },
+    { "id": "REF_LEFT",   "x": 1260, "y": 120, "reference": true },
+    { "id": "REF_BOTTOM", "x": 1260, "y": 420, "reference": true },
 
-    {
-      "id": "consumer_a",
-      "x": 1100,
-      "y": 160
-    },
+    { "id": "P_SMALL",  "x": 120, "y": 320,
+      "producer": { "interval": 0.9, "quota": { "square": 4, "triangle": 3 } } },
 
-    {
-      "id": "consumer_b",
-      "x": 1100,
-      "y": 280
-    },
-
-    {
-      "id": "consumer_c",
-      "x": 1100,
-      "y": 400
-    },
-
-    {
-      "id": "consumer_d",
-      "x": 1100,
-      "y": 520
-    }
+    { "id": "P_SECURE", "x": 120, "y": 500,
+      "producer": { "interval": 1.1, "quota": { "heavy": 5, "secure": 4 } } }
   ],
 
   "ports": [
-    { "id": "p_prod_normal_sq_out",   "device": "producer_normal",   "x": 160, "y": 120, "shape": "square",   "io": "out" },
-    { "id": "p_prod_normal_tri_out",  "device": "producer_normal",   "x": 160, "y": 140, "shape": "triangle", "io": "out" },
+    { "id": "P_HEAVY_OUT", "device": "P_HEAVY",   "x": 140, "y": 140, "shape": "square",   "io": "out" },
 
-    { "id": "p_prod_prot_sq_out",     "device": "producer_protected","x": 160, "y": 260, "shape": "square",   "io": "out" },
-    { "id": "p_prod_prot_tri_out",    "device": "producer_protected","x": 160, "y": 280, "shape": "triangle", "io": "out" },
+    { "id": "DIST_IN",     "device": "DIST_A",   "x": 360, "y": 140, "shape": "square",   "io": "in"  },
+    { "id": "DIST_OUT_A",  "device": "DIST_A",   "x": 420, "y": 110, "shape": "triangle", "io": "out" },
+    { "id": "DIST_OUT_B",  "device": "DIST_A",   "x": 420, "y": 170, "shape": "square",   "io": "out" },
 
-    { "id": "p_prod_secure_sq_out",   "device": "producer_secure",   "x": 160, "y": 400, "shape": "square",   "io": "out" },
-    { "id": "p_prod_secure_tri_out",  "device": "producer_secure",   "x": 160, "y": 420, "shape": "triangle", "io": "out" },
+    { "id": "TRANS_UP_IN",  "device": "TRANS_UP",  "x": 620, "y": 80,  "shape": "triangle", "io": "in" },
+    { "id": "TRANS_UP_OUT", "device": "TRANS_UP",  "x": 660, "y": 80,  "shape": "square",   "io": "out" },
 
-    { "id": "p_prod_inf_sq_out",      "device": "producer_infinite", "x": 160, "y": 540, "shape": "square",   "io": "out" },
-    { "id": "p_prod_inf_tri_out",     "device": "producer_infinite", "x": 160, "y": 560, "shape": "triangle", "io": "out" },
+    { "id": "TRANS_DOWN_IN",  "device": "TRANS_DOWN", "x": 620, "y": 220, "shape": "square",  "io": "in" },
+    { "id": "TRANS_DOWN_OUT", "device": "TRANS_DOWN", "x": 660, "y": 220, "shape": "triangle","io": "out" },
 
-    { "id": "p_sab_in",  "device": "saboteur_center", "x": 390, "y": 320, "shape": "triangle", "io": "in"  },
-    { "id": "p_sab_out", "device": "saboteur_center", "x": 450, "y": 320, "shape": "triangle", "io": "out" },
+    { "id": "MERGE_IN",   "device": "MERGE_HUB", "x": 900, "y": 150, "shape": "triangle", "io": "in" },
+    { "id": "MERGE_OUT",  "device": "MERGE_HUB", "x": 940, "y": 150, "shape": "square",   "io": "out" },
 
-    { "id": "p_ant_in",  "device": "antitrojan_center", "x": 690, "y": 220, "shape": "square", "io": "in"  },
-    { "id": "p_ant_out", "device": "antitrojan_center", "x": 750, "y": 220, "shape": "square", "io": "out" },
+    { "id": "SAB_IN",     "device": "SAB", "x": 360, "y": 320, "shape": "square", "io": "in" },
+    { "id": "SAB_OUT",    "device": "SAB", "x": 400, "y": 320, "shape": "square", "io": "out" },
 
-    { "id": "p_vpn_in",  "device": "vpn_center", "x": 690, "y": 420, "shape": "triangle", "io": "in"  },
-    { "id": "p_vpn_out", "device": "vpn_center", "x": 750, "y": 420, "shape": "triangle", "io": "out" },
+    { "id": "LOOP_A_IN",  "device": "LOOP_A", "x": 600, "y": 460, "shape": "triangle", "io": "in" },
+    { "id": "LOOP_A_OUT", "device": "LOOP_A", "x": 640, "y": 460, "shape": "triangle", "io": "out" },
 
-    { "id": "p_spy_in",  "device": "spy_far", "x": 930, "y": 320, "shape": "triangle", "io": "in"  },
-    { "id": "p_spy_out", "device": "spy_far", "x": 990, "y": 320, "shape": "triangle", "io": "out" },
+    { "id": "LOOP_B_IN",  "device": "LOOP_B", "x": 800, "y": 460, "shape": "triangle", "io": "in" },
+    { "id": "LOOP_B_OUT", "device": "LOOP_B", "x": 840, "y": 460, "shape": "triangle", "io": "out" },
 
-    { "id": "p_cons_a_sq_in", "device": "consumer_a", "x": 1060, "y": 160, "shape": "square",   "io": "in" },
-    { "id": "p_cons_a_tri_in","device": "consumer_a", "x": 1060, "y": 180, "shape": "triangle", "io": "in" },
+    { "id": "VPN_IN",     "device": "VPN_1", "x": 1020, "y": 420, "shape": "square",   "io": "in" },
+    { "id": "VPN_OUT",    "device": "VPN_1", "x": 1060, "y": 420, "shape": "triangle", "io": "out" },
 
-    { "id": "p_cons_b_sq_in", "device": "consumer_b", "x": 1060, "y": 280, "shape": "square",   "io": "in" },
-    { "id": "p_cons_b_tri_in","device": "consumer_b", "x": 1060, "y": 300, "shape": "triangle", "io": "in" },
+    { "id": "REF_LEFT_IN",  "device": "REF_LEFT",   "x": 1240, "y": 120, "shape": "square",   "io": "in", "reference": true },
+    { "id": "REF_LEFT_IN2", "device": "REF_LEFT",   "x": 1240, "y": 140, "shape": "square",   "io": "in", "reference": true },
 
-    { "id": "p_cons_c_sq_in", "device": "consumer_c", "x": 1060, "y": 400, "shape": "square",   "io": "in" },
-    { "id": "p_cons_c_tri_in","device": "consumer_c", "x": 1060, "y": 420, "shape": "triangle", "io": "in" },
+    { "id": "REF_BOT_IN",   "device": "REF_BOTTOM", "x": 1240, "y": 420, "shape": "triangle", "io": "in", "reference": true },
+    { "id": "REF_BOT_IN2",  "device": "REF_BOTTOM", "x": 1240, "y": 440, "shape": "square",   "io": "in", "reference": true },
 
-    { "id": "p_cons_d_sq_in", "device": "consumer_d", "x": 1060, "y": 520, "shape": "square",   "io": "in" },
-    { "id": "p_cons_d_tri_in","device": "consumer_d", "x": 1060, "y": 540, "shape": "triangle", "io": "in" }
+    { "id": "P_SMALL_OUT",  "device": "P_SMALL", "x": 140, "y": 320, "shape": "square", "io": "out" },
+    { "id": "P_SECURE_OUT", "device": "P_SECURE","x": 140, "y": 500, "shape": "square", "io": "out" }
   ],
 
-  "meta": {
-    "name": "Level 9 — Compact Trojan Testbed",
-    "author": "auto-generated",
-    "difficulty": "medium",
-    "notes": "This level has balanced square/triangle ports (total ins == outs per shape). Wire producers -> systems -> consumers to exercise trojan and antitrojan behaviors."
-  }
+  "links": [
+    { "id": "L1",  "from": { "device": "P_HEAVY", "port": "P_HEAVY_OUT" }, "to": { "device": "DIST_A",   "port": "DIST_IN" }, "bends": [] },
+
+    { "id": "L2a", "from": { "device": "DIST_A", "port": "DIST_OUT_A" }, "to": { "device": "TRANS_UP",   "port": "TRANS_UP_IN" }, "bends": [] },
+    { "id": "L2b", "from": { "device": "DIST_A", "port": "DIST_OUT_B" }, "to": { "device": "TRANS_DOWN", "port": "TRANS_DOWN_IN" }, "bends": [] },
+
+    { "id": "L3a", "from": { "device": "TRANS_UP",   "port": "TRANS_UP_OUT" }, "to": { "device": "MERGE_HUB", "port": "MERGE_IN" }, "bends": [] },
+    { "id": "L3b", "from": { "device": "TRANS_DOWN", "port": "TRANS_DOWN_OUT" }, "to": { "device": "SAB",       "port": "SAB_IN" }, "bends": [] },
+
+    { "id": "L4",  "from": { "device": "SAB", "port": "SAB_OUT" }, "to": { "device": "LOOP_A", "port": "LOOP_A_IN" }, "bends": [] },
+
+    { "id": "L5",  "from": { "device": "LOOP_A", "port": "LOOP_A_OUT" }, "to": { "device": "LOOP_B", "port": "LOOP_B_IN" }, "bends": [] },
+    { "id": "L6",  "from": { "device": "LOOP_B", "port": "LOOP_B_OUT" }, "to": { "device": "TRANS_DOWN", "port": "TRANS_DOWN_IN" }, "bends": [] },
+
+    { "id": "L7",  "from": { "device": "MERGE_HUB", "port": "MERGE_OUT" }, "to": { "device": "REF_LEFT",   "port": "REF_LEFT_IN" }, "bends": [] },
+
+    { "id": "L8",  "from": { "device": "TRANS_DOWN", "port": "TRANS_DOWN_OUT" }, "to": { "device": "VPN_1", "port": "VPN_IN" }, "bends": [] },
+    { "id": "L9",  "from": { "device": "VPN_1", "port": "VPN_OUT" }, "to": { "device": "REF_BOTTOM", "port": "REF_BOT_IN" }, "bends": [] },
+
+    { "id": "L10", "from": { "device": "P_SMALL", "port": "P_SMALL_OUT" }, "to": { "device": "SAB", "port": "SAB_IN" }, "bends": [] },
+
+    { "id": "L11", "from": { "device": "P_SECURE", "port": "P_SECURE_OUT" }, "to": { "device": "TRANS_UP", "port": "TRANS_UP_IN" }, "bends": [] },
+
+    { "id": "L12", "from": { "device": "TRANS_UP", "port": "TRANS_UP_OUT" }, "to": { "device": "REF_LEFT", "port": "REF_LEFT_IN2" }, "bends": [] },
+    { "id": "L13", "from": { "device": "P_SECURE", "port": "P_SECURE_OUT" }, "to": { "device": "REF_BOTTOM", "port": "REF_BOT_IN2" }, "bends": [] }
+  ],
+
+  "notes": "Balanced-port heavy/distribute/merge test. For each port type (square and triangle) total inputs == total outputs.\n\nKey checks:\n1) P_HEAVY produces heavies (heavySize=8). Distribute (DIST_A) will split heavies into colored BITPACKETs.\n2) MERGE_HUB reassembles bitpackets arriving within MERGE_WAIT_SECONDS into HEAVY of size=k.\n3) LOOP_A ↔ LOOP_B ↔ TRANS_DOWN path encourages repeated heavy passes across same links (observe link destruction after 3 heavy passes).\n4) HEAVY arrival at a system with queued packets (SAB) should clear that system queue immediately.\n5) VPN_1 converts messaging packets into PROTECTED variants; P_SECURE and P_SMALL create queue pressure to exercise heavy destruction.\n\nTuning knobs: GameBalance.MERGE_WAIT_SECONDS, GameBalance.HEAVY_MAX_PASSES, GameBalance.HEAVY_PORT_TOGGLE_PROB, heavy speeds. Adjust coordinates if your scene uses a different origin/scale."
 }

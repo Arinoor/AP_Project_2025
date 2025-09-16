@@ -1,3 +1,4 @@
+
 package play.model.systems;
 
 import play.model.core.Entity;
@@ -66,9 +67,15 @@ public class SeedMovementSystem implements System {
                         // Polyline length (up-to-date with bends)
                         double length = Math.max(MIN_LINK_LEN, WiringUtils.pathLength(l));
 
+                        if (s.type == Seed.Type.HEAVY) {
+                                boolean hasBends = !WiringUtils.bends(l).isEmpty();
+                                s.accel = hasBends ? GameBalance.HEAVY_CURVE_ACCEL : 0.0;
+                        }
+
                         // Integrate velocity and distance
                         s.speed += s.accel * dt;
                         if (s.speed < 0) s.speed = 0;
+
                         double ds = s.speed * dt + 0.5 * s.accel * dt * dt;
 
                         // Convert to normalized progress on [0..1] via arc-length
@@ -102,7 +109,6 @@ public class SeedMovementSystem implements System {
                         st.x = pos.x;
                         st.y = pos.y;
 
-                        // TODO: if you have handoff logic on reaching end of link, keep it here when s.progress == 1.0
                 }
 
                 for (Entity e : toRemove) entities.remove(e);

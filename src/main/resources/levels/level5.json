@@ -4,7 +4,7 @@
 
   "devices": [
     { "id": "SRC_A",   "x": 200, "y": 160,
-      "producer": { "interval": 0.70, "quota": { "square": 6, "secure": 6 } } },
+      "producer": { "interval": 0.70, "quota": { "heavy": 6, "secure": 6 } } },
 
     { "id": "SRC_B",   "x": 200, "y": 300,
       "producer": { "interval": 0.80, "quota": { "triangle": 3, "secure": 6 } } },

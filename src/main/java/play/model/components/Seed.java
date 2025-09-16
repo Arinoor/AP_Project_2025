@@ -5,9 +5,17 @@ import play.model.core.Entity;
 
 /** Packet (seed) travelling in the network. */
 public class Seed {
-        public enum Type { SQUARE, TRIANGLE, INFINITE, SECURE, PROTECTED, SECURE_PROTECTED }
+        public enum Type { SQUARE, TRIANGLE, INFINITE, SECURE, PROTECTED, SECURE_PROTECTED, HEAVY, BITPACKET }
 
         public Type type;
+
+        // For HEAVY: number of units (size). Default for produced heavies is 8 (can be created smaller/larger by Merge).
+        // For other types this field is ignored.
+        public int heavySize = 8;
+
+        // A color used for BITPACKET visuals (and for heavy->bitpacket color propagation).
+        // Stored as 0xRRGGBB. 0 means unspecified (view falls back to default).
+        public int colorRgb = 0;
 
         // kinematics
         public double speed = 120.0;     // px/s
@@ -28,7 +36,8 @@ public class Seed {
         public int collisions = 0;
         public int capacity;
 
-        // cumulative "noise" (in PORT UNITS). If noise > sizeUnits() => loss
+        // cumulative "noise" (in PORT UNITS).
+        // If noise > sizeUnits() => loss
         public double noise = 0.0;
 
         // the link this seed is currently traveling on (null when queued/inside a system)
@@ -59,12 +68,25 @@ public class Seed {
                 this.type = type;
                 // Keep capacities: TRIANGLE=4, others=3 (PROTECTED adopts base capacity later if set)
                 this.capacity = (type == Type.TRIANGLE) ? 4 : 3;
+
+                // default for HEAVY: size 8, capacity can be large but keep as 3 for compatibility
+                if (type == Type.HEAVY) {
+                        this.heavySize = 8;
+                        this.capacity = 3;
+                }
+                // BITPACKET: size units 1, capacity small
+                if (type == Type.BITPACKET) {
+                        this.capacity = 1;
+                        // default speed overridden by kinematics when dispatched
+                }
         }
 
         /**
          * Size in "port units".
          * square=2, triangle=3, infinite=1, secure=4.
          * PROTECTED = 2x of its primary (protectedBaseType).
+         * HEAVY returns heavySize (variable).
+         * BITPACKET = 1.
          */
         public double sizeUnits() {
                 switch (type) {
@@ -76,6 +98,8 @@ public class Seed {
                                 double base = baseSizeUnitsFor(protectedBaseType);
                                 return base * 2.0;
                         case SECURE_PROTECTED:  return 6.0;
+                        case HEAVY:              return (double)Math.max(1, heavySize);
+                        case BITPACKET:          return 1.0;
                         default:
                                 return 2.0;
                 }
@@ -89,4 +113,3 @@ public class Seed {
                 return 2.0;
         }
 }
-

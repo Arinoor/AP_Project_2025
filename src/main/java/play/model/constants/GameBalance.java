@@ -44,5 +44,21 @@ public final class GameBalance {
         /** Seconds the Antitrojan system stays disabled after cleaning one trojan. */
         public static final double ANTITROJAN_DISABLE_SECONDS = 6.0;
 
+        /** How many heavy passes a wire tolerates before being destroyed. */
+        public static final int HEAVY_MAX_PASSES = 3;
+
+        /** Probability a HEAVY entering a system will flip the input port's shape (0..1). */
+        public static final double HEAVY_PORT_TOGGLE_PROB = 0.30;
+
+        /** Seconds Merge system waits before combining collected bitpackets. */
+        public static final double MERGE_WAIT_SECONDS = 10;
+
+        /** HEAVY default straight speed (px/s). Tune if needed. */
+        public static final double HEAVY_STRAIGHT_SPEED = 80.0;
+
+        /** HEAVY acceleration on curved links (px/s^2). */
+        public static final double HEAVY_CURVE_ACCEL = 40.0;
+
+
 }
 

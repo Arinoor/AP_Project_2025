@@ -54,9 +54,9 @@ public class ProductionSystem implements System {
                                 // Determine allowed seed types for this OUT port
                                 Seed.Type[] allowed;
                                 if (pinfo.shape == PortInfo.Shape.SQUARE) {
-                                        allowed = new Seed.Type[]{ Seed.Type.SQUARE, Seed.Type.INFINITE, Seed.Type.SECURE };
+                                        allowed = new Seed.Type[]{ Seed.Type.SQUARE, Seed.Type.INFINITE, Seed.Type.SECURE, Seed.Type.HEAVY };
                                 } else { // TRIANGLE
-                                        allowed = new Seed.Type[]{ Seed.Type.TRIANGLE, Seed.Type.SECURE };
+                                        allowed = new Seed.Type[]{ Seed.Type.TRIANGLE, Seed.Type.SECURE, Seed.Type.HEAVY };
                                 }
 
                                 // Filter allowed by available quota
@@ -104,6 +104,7 @@ public class ProductionSystem implements System {
                         case TRIANGLE: return p.remainingTriangle != 0;
                         case INFINITE: return p.remainingInfinite != 0;
                         case SECURE:   return p.remainingSecure   != 0;
+                        case HEAVY:   return p.remainingHeavy   != 0;
                 }
                 return false;
         }
@@ -114,6 +115,7 @@ public class ProductionSystem implements System {
                         case TRIANGLE: if (p.remainingTriangle > 0) p.remainingTriangle--; break;
                         case INFINITE: if (p.remainingInfinite > 0) p.remainingInfinite--; break;
                         case SECURE:   if (p.remainingSecure   > 0) p.remainingSecure--;   break;
+                        case HEAVY:   if (p.remainingHeavy   > 0) p.remainingHeavy--;   break;
                 }
         }
 

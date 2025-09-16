@@ -1,4 +1,3 @@
-
 package play.model.systems;
 
 import play.model.core.Entity;
@@ -10,12 +9,19 @@ import play.model.components.Seed;
 import play.model.components.Spy;
 import play.model.components.Vpn;
 import play.model.components.Saboteur;
+import play.model.components.Producer;
+import play.model.components.Queue;
+import play.model.components.Merge;
+import play.model.components.Distribute;
+import play.model.components.Transform;
 import play.model.engine.GameEngine;
 import play.model.constants.GameBalance;
+import play.model.components.*;
 import play.model.physics.Kinematics;
-import play.model.components.Transform;
+import play.model.components.Link;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * QueueSystem
@@ -28,10 +34,12 @@ import java.util.*;
  *  - Apply per-frame physics adjustments (jerk -> accel) and SECURE adaptive slowdown
  *  - Revert PROTECTED seeds when their source VPN becomes disabled
  *
- * Design notes:
- *  - Large update() is decomposed into small private methods: each has a focused responsibility.
- *  - Data structures are intentionally straightforward: Map<SystemEntity, Deque<SeedEntity>> deviceQueues.
+ * Extended here:
+ *  - HEAVY arrival effects (destroy queued packets, flip port shape, heavy pass counting and link destruction)
+ *  - Distribute system: split HEAVY into BITPACKETs
+ *  - Merge system: buffer BITPACKETs and after MERGE_WAIT_SECONDS merge into HEAVY
  */
+
 public final class QueueSystem implements System {
 
         private final GameEngine engine;
@@ -39,9 +47,19 @@ public final class QueueSystem implements System {
         private final Map<Entity, Deque<Entity>> deviceQueues = new HashMap<>();
         private final Random rng = new Random();
 
+        // Merge buffers: per-merge-system list of (seed entity + arrivalTime)
+        private final Map<Entity, List<MergeEntry>> mergeBuffers = new HashMap<>();
+        private double time = 0.0;
+
         // SECURE speed constants
         private static final double SECURE_BASE_SPEED = GameBalance.SQUARE_BASE_SPEED;
         private static final double SECURE_SLOW_SPEED = Math.max(40.0, SECURE_BASE_SPEED * 0.35);
+
+        private static class MergeEntry {
+                final Entity seedEntity;
+                final double arrivedAt;
+                MergeEntry(Entity e, double t) { seedEntity = e; arrivedAt = t; }
+        }
 
         public QueueSystem(GameEngine engine, List<Entity> entities) {
                 this.engine = Objects.requireNonNull(engine, "engine");
@@ -50,8 +68,10 @@ public final class QueueSystem implements System {
 
         @Override
         public void update(double dt) {
+                time += dt;
+
                 processDisabledTimers(dt);
-                runAntitrojanSweep();   // <-- NEW: scan and clean trojans nearby
+                runAntitrojanSweep();   // <-- existing
                 revertPacketsFromDisabledVpns();
 
                 applySecureAdaptiveSlowdown();
@@ -61,7 +81,56 @@ public final class QueueSystem implements System {
                 List<Entity> arrivals = collectArrivals();
                 processArrivals(arrivals);
 
+                // Process merge buffers: if enough time passed since first arrival, merge into HEAVY
+                processMergeBuffers();
+
                 flushAllDeviceQueues();
+        }
+
+        // ---------------------------
+        // Merge processing
+        // ---------------------------
+
+        private void processMergeBuffers() {
+                List<Entity> toEmit = new ArrayList<>();
+                for (Map.Entry<Entity, List<MergeEntry>> e : new ArrayList<>(mergeBuffers.entrySet())) {
+                        Entity mergeSystem = e.getKey();
+                        List<MergeEntry> buffer = e.getValue();
+                        if (buffer.isEmpty()) {
+                                mergeBuffers.remove(mergeSystem);
+                                continue;
+                        }
+                        double firstT = buffer.get(0).arrivedAt;
+                        if (time >= firstT + GameBalance.MERGE_WAIT_SECONDS) {
+                                // create HEAVY of size k
+                                int k = buffer.size();
+                                // remove buffered seed entities (bitpackets) from world
+                                int color = 0;
+                                List<Entity> removed = new ArrayList<>();
+                                for (MergeEntry me : buffer) {
+                                        Entity se = me.seedEntity;
+                                        if (!entities.contains(se)) continue;
+                                        if (se.has(Seed.class)) {
+                                                Seed s = se.get(Seed.class);
+                                                if (s.type == Seed.Type.BITPACKET && s.colorRgb != 0) color = s.colorRgb;
+                                                entities.remove(se);
+                                        }
+                                }
+                                // build heavy entity
+                                Entity heavyE = new Entity();
+                                Seed heavy = new Seed(Seed.Type.HEAVY);
+                                heavy.heavySize = k;
+                                heavy.colorRgb = (color != 0) ? color : rng.nextInt(0xFFFFFF);
+                                heavy.speed = GameBalance.HEAVY_STRAIGHT_SPEED;
+                                heavyE.add(new Transform(mergeSystem.get(Transform.class).x, mergeSystem.get(Transform.class).y));
+                                heavyE.add(heavy);
+                                // Put heavy into the system device queue so it will be dispatched normally
+                                Deque<Entity> q = deviceQueues.computeIfAbsent(mergeSystem, k2 -> new ArrayDeque<>());
+                                q.addLast(heavyE);
+                                entities.add(heavyE);
+                                mergeBuffers.remove(mergeSystem);
+                        }
+                }
         }
 
         // ---------------------------
@@ -165,6 +234,12 @@ public final class QueueSystem implements System {
         /**
          * Process each arriving seed entity: bounce on disabled or speed-limit, award coins,
          * apply VPN conversion, spy behavior, saboteur arrival injection and finally enqueue.
+         *
+         * EXTENSIONS:
+         *  - HEAVY: destroys queued packets in the target system, toggles port shape with prob,
+         *           increments link heavy-pass and destroys link if needed.
+         *  - Distribute: when HEAVY arrives at Distribute system, split into bitpackets and enqueue them.
+         *  - Merge: when BITPACKET arrives at Merge system, buffer it for MERGE_WAIT_SECONDS then combined.
          */
         private void processArrivals(List<Entity> arrivals) {
                 for (Entity seedEntity : arrivals) {
@@ -204,6 +279,10 @@ public final class QueueSystem implements System {
                                 seedTransform.x = portTransform.x;
                                 seedTransform.y = portTransform.y;
                         }
+
+                        // Keep reference to the link entity before we null it
+                        Link arrivedLink = link;
+
                         s.currentLink = null;
                         s.progress = 0.0;
                         s.lateral = 0.0;
@@ -240,7 +319,91 @@ public final class QueueSystem implements System {
                                 handleSaboteurArrival(system, s);
                         }
 
-                        // Enqueue into device buffer (respect capacity)
+                        // -------------------
+                        // HEAVY specific effects
+                        // -------------------
+                        if (s.type == Seed.Type.HEAVY) {
+                                // 1) destroy queued packets in this deviceQueues entry (if any)
+                                Deque<Entity> q = deviceQueues.get(system);
+                                if (q != null && !q.isEmpty()) {
+                                        int removed = 0;
+                                        while (!q.isEmpty()) {
+                                                Entity qE = q.pollFirst();
+                                                if (qE != null && entities.contains(qE)) {
+                                                        entities.remove(qE);
+                                                        engine.incrementLost();
+                                                        removed++;
+                                                }
+                                        }
+                                        // also ensure map entry removed
+                                        deviceQueues.remove(system);
+                                }
+
+                                // 2) increment heavy pass on the arrived link and remove link entity if reached max
+                                // find the link entity wrapper
+                                Entity linkEntity = null;
+                                for (Entity e : entities) {
+                                        if (!e.has(Link.class)) continue;
+                                        if (e.get(Link.class) == arrivedLink) { linkEntity = e; break; }
+                                }
+                                if (linkEntity != null) {
+                                        int passes = arrivedLink.incrementHeavyPassCount();
+                                        if (passes >= GameBalance.HEAVY_MAX_PASSES) {
+                                                // remove the link entity immediately
+                                                entities.remove(linkEntity);
+                                        }
+                                }
+
+                                // 3) toggle port shape with probability
+                                if (rng.nextDouble() < GameBalance.HEAVY_PORT_TOGGLE_PROB) {
+                                        PortInfo pi = inPort.get(PortInfo.class);
+                                        if (pi != null) {
+                                                if (pi.shape == PortInfo.Shape.SQUARE)
+                                                        pi.shape = PortInfo.Shape.TRIANGLE;
+                                                else
+                                                        pi.shape = PortInfo.Shape.SQUARE;
+                                        }
+                                }
+
+                                // 4) Distribute behavior: if system is a Distribute system, split into BITPACKETs
+                                if (system != null && system.has(Distribute.class)) {
+                                        int parts = Math.max(1, s.heavySize);
+                                        int color = (s.colorRgb != 0) ? s.colorRgb : rng.nextInt(0xFFFFFF);
+                                        // remove the heavy seed (we'll create bitpackets)
+                                        entities.remove(seedEntity);
+                                        engine.incrementLostBy(0); // no change to counters for conversion itself
+
+                                        for (int i = 0; i < parts; i++) {
+                                                Entity bp = new Entity();
+                                                Seed bit = new Seed(Seed.Type.BITPACKET);
+                                                bit.colorRgb = color;
+                                                // bitpackets move at constant speed (tunable)
+                                                bit.speed = 120.0;
+                                                bp.add(new Transform(portTransform.x, portTransform.y));
+                                                bp.add(bit);
+                                                entities.add(bp);
+                                                // enqueue into this device queue for dispatching like normal packets
+                                                Deque<Entity> dq = deviceQueues.computeIfAbsent(system, k -> new ArrayDeque<>());
+                                                dq.addLast(bp);
+                                        }
+                                        continue; // heavy converted to bitpackets -> already handled
+                                }
+                        }
+
+                        // -------------------
+                        // BITPACKET arriving to Merge
+                        // -------------------
+                        if (s.type == Seed.Type.BITPACKET && system != null && system.has(Merge.class)) {
+                                // buffer the bitpacket for this merge system
+                                mergeBuffers.computeIfAbsent(system, k -> new ArrayList<>()).add(new MergeEntry(seedEntity, time));
+                                // we remove the bitpacket entity from world while buffered
+                                entities.remove(seedEntity);
+                                continue;
+                        }
+
+                        // -------------------
+                        // Default: enqueue into device buffer (respect capacity)
+                        // -------------------
                         enqueueToDevice(system, seedEntity);
                 }
         }
@@ -271,6 +434,8 @@ public final class QueueSystem implements System {
                         case INFINITE: reward = 1; break;
                         case SECURE: reward = 3; break;
                         case PROTECTED: reward = 5; break;
+                        case HEAVY: reward = Math.max(1, s.heavySize); break;
+                        case BITPACKET: reward = 1; break;
                         default: reward = 0; break;
                 }
                 engine.incrementCoins(reward);
@@ -540,7 +705,12 @@ public final class QueueSystem implements System {
                                 if (!freeTriangle.isEmpty()) return freeTriangle.remove(0);
                                 break;
                         case SECURE:
-                                return removeRandomFromLists(freeSquare, freeTriangle);
+                        case SECURE_PROTECTED:
+                        case HEAVY:
+                        case BITPACKET:
+                                if (!freeSquare.isEmpty() || !freeTriangle.isEmpty()) {
+                                        return removeRandomFromLists(freeSquare, freeTriangle);
+                                }
                         case PROTECTED:
                                 // PROTECTED emulateType determines preference
                                 Seed.Type emu = (s.emulateType != null) ? s.emulateType : Seed.Type.SQUARE;
@@ -550,10 +720,6 @@ public final class QueueSystem implements System {
                                         if (!freeSquare.isEmpty()) return freeSquare.remove(0);
                                 }
                                 break;
-                        case SECURE_PROTECTED:
-                                if (!freeSquare.isEmpty() || !freeTriangle.isEmpty()) {
-                                        return removeRandomFromLists(freeSquare, freeTriangle);
-                                }
                         default:
                                 break;
                 }

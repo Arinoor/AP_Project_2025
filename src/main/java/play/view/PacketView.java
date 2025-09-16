@@ -1,10 +1,15 @@
 
 package play.view;
 
+import javafx.geometry.Pos;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
+import play.model.components.BitPacket;
+import play.model.components.HeavyPacket;
 import play.model.components.Seed;
+import play.model.core.Entity;
 
 /**
  * Draws packets (seeds).
@@ -26,6 +31,8 @@ public final class PacketView {
         private static Image SECURE_IMG;
         private static Image PROTECTED_IMG;
         private static Image SECURE_PROTECTED_IMG;
+        private static Image HEAVY_IMG;
+
 
         /** Render a packet centered at (x,y). */
         public static void render(GraphicsContext g, Seed s, double x, double y) {
@@ -48,6 +55,30 @@ public final class PacketView {
                         renderSprite(g, s, x, y, VISUAL_SIZE, getSecureProtectedImage(), 1.35, 0.62, 0.10, 0.70, 0.20);
                         return;
                 }
+
+                if (s.type == Seed.Type.HEAVY) {
+                        renderSprite(g, s, x, y, VISUAL_SIZE, getHeavyImage(), 1.25, 0.58, 0.08, 0.60, 0.15);
+                        return;
+                }
+                if (s.type == Seed.Type.BITPACKET) {
+                        // render as a colored circle
+                        double r = VISUAL_SIZE * 0.5;
+                        Color col = Color.web("#cccccc");
+                        if (s.colorRgb != 0) {
+                                int rgb = s.colorRgb & 0xFFFFFF;
+                                int rr = (rgb >> 16) & 0xFF;
+                                int gg = (rgb >> 8) & 0xFF;
+                                int bb = rgb & 0xFF;
+                                col = Color.rgb(rr, gg, bb);
+                        }
+                        g.setFill(col);
+                        g.fillOval(x - r, y - r, r * 2, r * 2);
+                        // inner highlight
+                        g.setFill(Color.rgb(255,255,255,0.18));
+                        g.fillOval(x - r*0.5, y - r*0.5, r, r);
+                        return;
+                }
+
 
                 // ==== Vector shapes (Square / Triangle) ====
                 final Color baseFill = (s.type == Seed.Type.SQUARE)
@@ -143,6 +174,13 @@ public final class PacketView {
                         SECURE_PROTECTED_IMG = new Image(PacketView.class.getResourceAsStream("/img/secure_protected_packet.png"));
                 }
                 return SECURE_PROTECTED_IMG;
+        }
+
+        private static Image getHeavyImage() {
+                if (HEAVY_IMG == null) {
+                        HEAVY_IMG = new Image(PacketView.class.getResourceAsStream("/img/heavy_packet.png"));
+                }
+                return HEAVY_IMG;
         }
 
         // ---- Vector primitives ----

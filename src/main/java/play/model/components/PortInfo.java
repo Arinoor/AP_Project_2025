@@ -7,7 +7,7 @@ public class PortInfo {
         public enum Shape { SQUARE, TRIANGLE }
 
         public final IO io;
-        public final Shape shape;
+        public Shape shape;
         public final Entity parentSystem;
 
         public PortInfo(IO io, Shape shape, Entity parentSystem) {

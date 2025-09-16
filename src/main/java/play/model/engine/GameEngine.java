@@ -1,10 +1,13 @@
+
 package play.model.engine;
 
 import play.model.core.Entity;
 import play.model.events.*;
 import play.model.systems.System;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 public class GameEngine {
 
@@ -17,10 +20,6 @@ public class GameEngine {
         private int lostCount = 0;
         private int coins = 0;
         private int plannedTotal = 0;
-
-        private Map<Long, Integer> originalHeavySizes = new HashMap<>();
-        private Map<Long, List<Integer>> arrivedHeavySizes = new HashMap<>();
-        private long nextOriginId = 0;
 
         // Event bus for model events
         private final EventBus eventBus = new EventBus();
@@ -39,33 +38,6 @@ public class GameEngine {
                 // iterate over a copy in case systems mutate the list
                 List<System> snapshot = new ArrayList<>(systems);
                 for (System s : snapshot) s.update(dt);
-        }
-
-        public void addOriginalHeavy(long id, int size) {
-                originalHeavySizes.put(id, size);
-        }
-
-        public void addArrivedHeavySize(long id, int size) {
-                arrivedHeavySizes.computeIfAbsent(id, k -> new ArrayList<>()).add(size);
-        }
-
-        public int calculateHeavyLoss() {
-                int heavyLoss = 0;
-                for (Map.Entry<Long, Integer> entry : originalHeavySizes.entrySet()) {
-                        long id = entry.getKey();
-                        int N = entry.getValue();
-                        List<Integer> ns = arrivedHeavySizes.getOrDefault(id, Collections.emptyList());
-                        int t = ns.size();
-                        if (t == 0) {
-                                heavyLoss += N;
-                        } else {
-                                double sum = ns.stream().mapToDouble(Integer::intValue).sum();
-                                double geom = Math.pow(sum, 1.0 / t);
-                                int score = (int) Math.floor(t * geom);
-                                heavyLoss += N - score;
-                        }
-                }
-                return heavyLoss;
         }
 
         // --- Meta / counters (kept for compatibility) ---
@@ -127,8 +99,4 @@ public class GameEngine {
 
         // Optional read-only views if you need them
         public List<System> systemsView() { return Collections.unmodifiableList(systems); }
-
-        public List<Entity> getEntities() {
-                return entities;
-        }
 }

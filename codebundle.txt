@@ -1,4 +1,6 @@
-﻿===== FILE: C:\Users\ASUS\AP_Project1\.idea\compiler.xml =====
+﻿
+
+===== FILE: C:\Users\ASUS\AP_Project1\.idea\compiler.xml =====
 
 
 <?xml version="1.0" encoding="UTF-8"?>
@@ -225,18 +227,30 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="cc202a8e-4f0b-4a78-9065-4a606d51ea93" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/src/main/java/play/model/components/Antitrojan.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/img/antitrojan_packet.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/play/model/components/BitPacket.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/play/model/components/Merge.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/codebundle.txt" beforeDir="false" afterPath="$PROJECT_DIR$/codebundle.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/components/Distribute.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/components/Distribute.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/components/DistributorSystem.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/components/HeavyPacket.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/components/HeavyPacket.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/components/Link.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/components/Link.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/components/PortInfo.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/components/PortInfo.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/components/Producer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/components/Producer.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/play/model/components/Seed.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/components/Seed.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/play/model/constants/GameBalance.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/constants/GameBalance.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/engine/GameEngine.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/engine/GameEngine.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/level/LevelDto.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/level/LevelFactory.java" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/play/model/level/LevelLoaderV2.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/level/LevelLoaderV2.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/level/LevelParser.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/services/GameService.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/services/LevelRepository.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/systems/HeavyPacketSystem.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/systems/ProductionSystem.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/systems/ProductionSystem.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/play/model/systems/QueueSystem.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/systems/QueueSystem.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/play/model/systems/SeedMovementSystem.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/systems/SeedMovementSystem.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/play/view/PacketView.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/view/PacketView.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/audio/bgm/game_over_theme.wav" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/audio/bgm/gameover_theme.wav" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/levels/level5.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/levels/level5.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/levels/level6.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/levels/level6.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/levels/level7.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/levels/level7.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -983,7 +997,7 @@ public class MainController {
                         () -> timeRemaining
                 );
 
-                // Bend tool (attach to canvas) â€” use three functional params
+                // Bend tool (attach to canvas) Ã¢â‚¬â€ use three functional params
                 bendTool = new BendTool(
                         engine,
                         engine.entities(),
@@ -1924,6 +1938,25 @@ public class BackgroundImage {
 
 
 
+===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\components\BitPacket.java =====
+
+
+package play.model.components;
+
+public class BitPacket {
+        public final String color;
+        public final String sourceId; // Track original heavy packet source
+        public final int originalHeavyPacketSize;
+
+        public BitPacket(String color, String sourceId, int originalHeavyPacketSize) {
+                this.color = color;
+                this.sourceId = sourceId;
+                this.originalHeavyPacketSize = originalHeavyPacketSize;
+        }
+}
+
+
+
 ===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\components\Disabled.java =====
 
 
@@ -1935,6 +1968,40 @@ public final class Disabled {
 
         public Disabled(double seconds) {
                 this.remaining = seconds;
+        }
+}
+
+
+
+===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\components\Distribute.java =====
+
+
+package play.model.components;
+
+/**
+ * Marker component: this system takes incoming HEAVY packets and splits them
+ * into multiple BITPACKETs (count = heavySize). Implemented in QueueSystem.
+ */
+public class Distribute { }
+
+
+
+===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\components\HeavyPacket.java =====
+
+
+package play.model.components;
+
+public class HeavyPacket {
+        public final int size;
+        public final String color;
+        public final int originalSize; // For loss calculation
+        public final String sourceId; // To track which producer created it
+
+        public HeavyPacket(int size, String color, int originalSize, String sourceId) {
+                this.size = size;
+                this.color = color;
+                this.originalSize = originalSize;
+                this.sourceId = sourceId;
         }
 }
 
@@ -1970,11 +2037,18 @@ public class Link {
 
         private double length = 1.0;
 
+
         /** Cached polyline points (start + bends + end) computed at last updateGeometry(). */
         private final List<Vec2> poly = new ArrayList<>();
 
         /** Optional validity flag set by wiring validation (e.g., crossing systems). */
         private boolean valid = true;
+
+
+        /** New: count of HEAVY packets that have passed over this link. When this reaches
+         * GameBalance.HEAVY_MAX_PASSES the link should be destroyed.
+         */
+        private int heavyPassCount = 0;
 
         public Link(Entity fromPort, Entity toPort) {
                 this.fromPort = fromPort;
@@ -2133,7 +2207,26 @@ public class Link {
                 double u = ((x1-x3)*(y1-y2) - (y1-y3)*(x1-x2)) / d;
                 return t >= 0 && t <= 1 && u >= 0 && u <= 1;
         }
+
+        public int heavyPassCount() { return heavyPassCount; }
+        /** Increment and return new count. */
+        public int incrementHeavyPassCount() { return ++heavyPassCount; }
 }
+
+
+
+===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\components\Merge.java =====
+
+
+package play.model.components;
+
+/**
+ * Marker component: this system collects BITPACKET arrivals and, after a short wait,
+ * merges them into a HEAVY packet of size = number of bitpackets received.
+ *
+ * Behavior implemented in QueueSystem (merge buffering + emit).
+ */
+public class Merge { }
 
 
 
@@ -2149,7 +2242,7 @@ public class PortInfo {
         public enum Shape { SQUARE, TRIANGLE }
 
         public final IO io;
-        public final Shape shape;
+        public Shape shape;
         public final Entity parentSystem;
 
         public PortInfo(IO io, Shape shape, Entity parentSystem) {
@@ -2178,44 +2271,29 @@ public class Producer {
         public int remainingSquare   = 0;
         public int remainingTriangle = 0;
         public int remainingInfinite = 0;
-        public int remainingSecure   = 0; // NEW
+        public int remainingSecure   = 0;
+        public int remainingHeavy   = 0;
 
         public Producer(double interval) {
                 this.interval = interval;
         }
 
-        /** Backward-compatible ctor (older levels without INFINITE/SECURE quotas). */
-        public Producer(double interval, int squareQuota, int triangleQuota) {
-                this.interval = interval;
-                this.remainingSquare = squareQuota;
-                this.remainingTriangle = triangleQuota;
-                this.remainingInfinite = 0;
-                this.remainingSecure   = 0;
-        }
-
-        /** Ctor with INFINITE (older transition). */
-        public Producer(double interval, int squareQuota, int triangleQuota, int infiniteQuota) {
-                this.interval = interval;
-                this.remainingSquare = squareQuota;
-                this.remainingTriangle = triangleQuota;
-                this.remainingInfinite = infiniteQuota;
-                this.remainingSecure   = 0;
-        }
-
         /** Full ctor with all packet types. */
-        public Producer(double interval, int squareQuota, int triangleQuota, int infiniteQuota, int secureQuota) {
+        public Producer(double interval, int squareQuota, int triangleQuota, int infiniteQuota, int secureQuota, int heavyQuota) {
                 this.interval = interval;
                 this.remainingSquare = squareQuota;
                 this.remainingTriangle = triangleQuota;
                 this.remainingInfinite = infiniteQuota;
                 this.remainingSecure   = secureQuota;
+                this.remainingHeavy = heavyQuota;
         }
 
         /** Returns true if at least one type still has quota or quotas are unlimited. */
         public boolean hasAnyQuota() {
-                return (remainingSquare != 0) || (remainingTriangle != 0) || (remainingInfinite != 0) || (remainingSecure != 0);
+                return (remainingSquare != 0) || (remainingTriangle != 0) || (remainingInfinite != 0) || (remainingSecure != 0) || (remainingHeavy != 0);
         }
 }
+
 
 
 
@@ -2282,9 +2360,17 @@ import play.model.core.Entity;
 
 /** Packet (seed) travelling in the network. */
 public class Seed {
-        public enum Type { SQUARE, TRIANGLE, INFINITE, SECURE, PROTECTED, SECURE_PROTECTED }
+        public enum Type { SQUARE, TRIANGLE, INFINITE, SECURE, PROTECTED, SECURE_PROTECTED, HEAVY, BITPACKET }
 
         public Type type;
+
+        // For HEAVY: number of units (size). Default for produced heavies is 8 (can be created smaller/larger by Merge).
+        // For other types this field is ignored.
+        public int heavySize = 8;
+
+        // A color used for BITPACKET visuals (and for heavy->bitpacket color propagation).
+        // Stored as 0xRRGGBB. 0 means unspecified (view falls back to default).
+        public int colorRgb = 0;
 
         // kinematics
         public double speed = 120.0;     // px/s
@@ -2305,7 +2391,8 @@ public class Seed {
         public int collisions = 0;
         public int capacity;
 
-        // cumulative "noise" (in PORT UNITS). If noise > sizeUnits() => loss
+        // cumulative "noise" (in PORT UNITS).
+        // If noise > sizeUnits() => loss
         public double noise = 0.0;
 
         // the link this seed is currently traveling on (null when queued/inside a system)
@@ -2336,12 +2423,25 @@ public class Seed {
                 this.type = type;
                 // Keep capacities: TRIANGLE=4, others=3 (PROTECTED adopts base capacity later if set)
                 this.capacity = (type == Type.TRIANGLE) ? 4 : 3;
+
+                // default for HEAVY: size 8, capacity can be large but keep as 3 for compatibility
+                if (type == Type.HEAVY) {
+                        this.heavySize = 8;
+                        this.capacity = 3;
+                }
+                // BITPACKET: size units 1, capacity small
+                if (type == Type.BITPACKET) {
+                        this.capacity = 1;
+                        // default speed overridden by kinematics when dispatched
+                }
         }
 
         /**
          * Size in "port units".
          * square=2, triangle=3, infinite=1, secure=4.
          * PROTECTED = 2x of its primary (protectedBaseType).
+         * HEAVY returns heavySize (variable).
+         * BITPACKET = 1.
          */
         public double sizeUnits() {
                 switch (type) {
@@ -2353,6 +2453,8 @@ public class Seed {
                                 double base = baseSizeUnitsFor(protectedBaseType);
                                 return base * 2.0;
                         case SECURE_PROTECTED:  return 6.0;
+                        case HEAVY:              return (double)Math.max(1, heavySize);
+                        case BITPACKET:          return 1.0;
                         default:
                                 return 2.0;
                 }
@@ -2459,7 +2561,24 @@ public final class GameBalance {
         /** Seconds the Antitrojan system stays disabled after cleaning one trojan. */
         public static final double ANTITROJAN_DISABLE_SECONDS = 6.0;
 
+        /** How many heavy passes a wire tolerates before being destroyed. */
+        public static final int HEAVY_MAX_PASSES = 3;
+
+        /** Probability a HEAVY entering a system will flip the input port's shape (0..1). */
+        public static final double HEAVY_PORT_TOGGLE_PROB = 0.30;
+
+        /** Seconds Merge system waits before combining collected bitpackets. */
+        public static final double MERGE_WAIT_SECONDS = 10;
+
+        /** HEAVY default straight speed (px/s). Tune if needed. */
+        public static final double HEAVY_STRAIGHT_SPEED = 80.0;
+
+        /** HEAVY acceleration on curved links (px/s^2). */
+        public static final double HEAVY_CURVE_ACCEL = 40.0;
+
+
 }
+
 
 
 
@@ -2496,6 +2615,7 @@ public class Entity {
 
 
 ===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\engine\GameEngine.java =====
+
 
 
 package play.model.engine;
@@ -2676,137 +2796,6 @@ public record SeedLostEvent(int lostDelta, int lostTotal) {}
 
 
 
-===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\level\LevelDto.java =====
-
-
-package play.model.level;
-
-import java.util.ArrayList;
-import java.util.List;
-
-public final class LevelDto {
-        public double totalWire = 3000;
-        public int timeLimitSeconds = 120;
-        public final List<DeviceDto> devices = new ArrayList<>();
-        public final List<PortDto> ports = new ArrayList<>();
-
-        public static final class DeviceDto {
-                public String id;
-                public double x;
-                public double y;
-                public boolean reference = false;
-
-                // Producer (optional)
-                public ProducerDto producer; // null if absent
-        }
-
-        public static final class ProducerDto {
-                public double interval = 1.0;
-                public Integer quotaSquare;   // null => unlimited
-                public Integer quotaTriangle; // null => unlimited
-        }
-
-        public static final class PortDto {
-                public String id;
-                public String deviceId;
-                public double x;
-                public double y;
-                public String shape = "square"; // "square" or "triangle"
-                public String io = "in";        // "in" or "out"
-                public boolean reference = false; // optional, rare
-                public boolean producer = false;  // optional, rare
-                public Double interval;           // if producer=true and no device-level producer
-        }
-}
-
-
-
-===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\level\LevelFactory.java =====
-
-
-package play.model.level;
-
-import play.model.components.*;
-import play.model.core.Entity;
-import play.model.engine.GameEngine;
-
-import java.util.HashMap;
-import java.util.Map;
-
-/** Builds engine entities from a LevelDto. No links are created. */
-public final class LevelFactory {
-        private LevelFactory() {}
-
-        public static Result applyToEngine(GameEngine engine, LevelDto dto) {
-                engine.resetForLevel();
-
-                Map<String, Entity> systemsById = new HashMap<>();
-                Map<String, Entity> portsById   = new HashMap<>();
-
-                int plannedSeeds = 0;
-
-                // Devices
-                for (LevelDto.DeviceDto d : dto.devices) {
-                        Entity systemE = new Entity();
-                        systemE.add(new Transform(d.x, d.y));
-                        if (d.reference) systemE.add(new Reference());
-
-                        if (d.producer != null) {
-                                int qS = d.producer.quotaSquare == null ? -1 : d.producer.quotaSquare;
-                                int qT = d.producer.quotaTriangle == null ? -1 : d.producer.quotaTriangle;
-                                if (qS > 0) plannedSeeds += qS;
-                                if (qT > 0) plannedSeeds += qT;
-                                systemE.add(new Producer(d.producer.interval, qS, qT));
-                        }
-
-                        engine.entities().add(systemE);
-                        systemsById.put(d.id, systemE);
-                }
-
-                // Ports
-                for (LevelDto.PortDto p : dto.ports) {
-                        Entity parentSystem = systemsById.get(p.deviceId);
-                        if (parentSystem == null) {
-                                System.err.println("[LevelFactory] Unknown device for port " + p.id + ": " + p.deviceId);
-                                continue;
-                        }
-
-                        PortInfo.Shape shape = "triangle".equalsIgnoreCase(p.shape) ? PortInfo.Shape.TRIANGLE : PortInfo.Shape.SQUARE;
-                        PortInfo.IO io = "out".equalsIgnoreCase(p.io) ? PortInfo.IO.OUT : PortInfo.IO.IN;
-
-                        Entity portE = new Entity();
-                        portE.add(new PortInfo(io, shape, parentSystem));
-                        portE.add(new Transform(p.x, p.y));
-                        if (io == PortInfo.IO.IN) {
-                                portE.add(new Queue(5)); // capacity is still 5 (phase rule); can be parameterized later
-                        }
-
-                        engine.entities().add(portE);
-                        portsById.put(p.id, portE);
-
-                        // Optional: port-level producer
-                        if (p.producer) {
-                                double interval = (p.interval != null) ? p.interval : 1.0;
-                                if (!parentSystem.has(Producer.class) && interval > 0.0) {
-                                        parentSystem.add(new Producer(interval));
-                                }
-                        }
-
-                        // Optional: port-level reference
-                        if (p.reference && !parentSystem.has(Reference.class)) {
-                                parentSystem.add(new Reference());
-                        }
-                }
-
-                // No links created here by design
-                return new Result(dto.totalWire, dto.timeLimitSeconds, plannedSeeds);
-        }
-
-        public record Result(double totalWire, int timeLimitSeconds, int plannedSeeds) {}
-}
-
-
-
 ===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\level\LevelLoaderV2.java =====
 
 
@@ -2815,6 +2804,7 @@ package play.model.level;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import play.model.components.*;
+import play.model.constants.GameBalance;
 import play.model.core.Entity;
 import play.model.engine.GameEngine;
 
@@ -2886,31 +2876,40 @@ public final class LevelLoaderV2 {
                                         systemE.add(new BackgroundImage("/img/antitrojan_packet.png"));
                                 }
 
+                                if(d.path("merge").asBoolean(false)) {
+                                        systemE.add(new Merge());
+                                        systemE.add(new BackgroundImage("/img/merge_system.png"));
+                                }
+
+                                if(d.path("distribute").asBoolean(false)) {
+                                        systemE.add(new Distribute());
+                                        systemE.add(new BackgroundImage("/img/distribute_system.png"));
+                                }
+
                                 JsonNode prodNode = d.path("producer");
                                 if (!prodNode.isMissingNode() && !prodNode.isNull()) {
                                         double interval = prodNode.path("interval").asDouble(1.0);
 
-                                        int qS = -1, qT = -1, qI = 0, qC = 0; // default new types to 0 unless provided
+                                        int qS = -1, qT = -1, qI = 0, qC = 0, qH = 0; // default new types to 0 unless provided
                                         JsonNode quota = prodNode.path("quota");
                                         if (!quota.isMissingNode() && !quota.isNull()) {
-                                                if (quota.has("square"))   qS = quota.path("square").asInt(-1);
-                                                if (quota.has("triangle")) qT = quota.path("triangle").asInt(-1);
+                                                if (quota.has("square"))   qS = quota.path("square").asInt(0);
+                                                if (quota.has("triangle")) qT = quota.path("triangle").asInt(0);
                                                 if (quota.has("infinite")) qI = quota.path("infinite").asInt(0);
                                                 if (quota.has("secure"))   qC = quota.path("secure").asInt(0);
+                                                if(quota.has("heavy")) qH = quota.path("heavy").asInt(0);
 
                                                 // Sum only finite quotas into planned total
                                                 if (qS > 0) out.plannedSeeds += qS;
                                                 if (qT > 0) out.plannedSeeds += qT;
                                                 if (qI > 0) out.plannedSeeds += qI;
                                                 if (qC > 0) out.plannedSeeds += qC;
+                                                if (qH > 0) out.plannedSeeds += qH;
 
-                                                if (quota.has("secure")) {
-                                                        systemE.add(new Producer(interval, qS, qT, qI, qC));
-                                                } else if (quota.has("infinite")) {
-                                                        systemE.add(new Producer(interval, qS, qT, qI));
-                                                } else {
-                                                        systemE.add(new Producer(interval, qS, qT));
-                                                }
+                                                System.out.println(qH);
+
+                                                systemE.add(new Producer(interval, qS, qT, qI, qC, qH));
+
                                         } else {
                                                 // Defaults: new types infinite/secure = 0 so they don't spawn unless declared
                                                 Producer p = new Producer(interval);
@@ -2967,74 +2966,6 @@ public final class LevelLoaderV2 {
         }
 }
 
-
-
-===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\level\LevelParser.java =====
-
-
-package play.model.level;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import java.io.InputStream;
-
-public final class LevelParser {
-        private static final ObjectMapper M = new ObjectMapper();
-
-        private LevelParser() {}
-
-        public static LevelDto parseFromResource(String path) {
-                try (InputStream in = LevelParser.class.getResourceAsStream(path)) {
-                        if (in == null) throw new IllegalArgumentException("Missing level resource: " + path);
-                        JsonNode root = M.readTree(in);
-                        LevelDto dto = new LevelDto();
-                        dto.totalWire = root.path("totalWire").asDouble(3000.0);
-                        dto.timeLimitSeconds = root.path("timeLimitSeconds").asInt(120);
-
-                        for (JsonNode d : root.path("devices")) {
-                                LevelDto.DeviceDto dev = new LevelDto.DeviceDto();
-                                dev.id = d.path("id").asText();
-                                dev.x = d.path("x").asDouble(0);
-                                dev.y = d.path("y").asDouble(0);
-                                dev.reference = d.path("reference").asBoolean(false);
-
-                                JsonNode prodNode = d.path("producer");
-                                if (!prodNode.isMissingNode() && !prodNode.isNull()) {
-                                        LevelDto.ProducerDto p = new LevelDto.ProducerDto();
-                                        p.interval = prodNode.path("interval").asDouble(1.0);
-                                        JsonNode q = prodNode.path("quota");
-                                        if (!q.isMissingNode() && !q.isNull()) {
-                                                if (q.has("square"))   p.quotaSquare = q.path("square").isNull() ? null : q.path("square").asInt();
-                                                if (q.has("triangle")) p.quotaTriangle = q.path("triangle").isNull() ? null : q.path("triangle").asInt();
-                                        }
-                                        dev.producer = p;
-                                }
-                                dto.devices.add(dev);
-                        }
-
-                        for (JsonNode p : root.path("ports")) {
-                                LevelDto.PortDto port = new LevelDto.PortDto();
-                                port.id = p.path("id").asText();
-                                port.deviceId = p.path("device").asText();
-                                port.x = p.path("x").asDouble(0);
-                                port.y = p.path("y").asDouble(0);
-                                port.shape = p.path("shape").asText("square");
-                                port.io = p.path("io").asText("in");
-                                port.reference = p.path("reference").asBoolean(false);
-                                port.producer = p.path("producer").asBoolean(false);
-                                if (port.producer) {
-                                        port.interval = p.path("interval").isMissingNode() ? null : p.path("interval").asDouble(1.0);
-                                }
-                                dto.ports.add(port);
-                        }
-
-                        return dto;
-                } catch (Exception e) {
-                        throw new RuntimeException("Failed to parse level: " + path, e);
-                }
-        }
-}
 
 
 
@@ -3112,64 +3043,6 @@ public final class Kinematics {
                         s.accel = 0.0;
                         s.jerk  = 0.0;
                 }
-        }
-}
-
-
-
-===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\services\GameService.java =====
-
-
-package play.model.services;
-
-import play.model.engine.GameEngine;
-import play.model.level.LevelDto;
-import play.model.level.LevelFactory;
-import play.model.level.LevelParser;
-
-public final class GameService {
-        private final GameEngine engine = new GameEngine();
-
-        private double totalWire = 3000;
-        private int timeLimitSeconds = 120;
-        private int plannedSeeds = 0;
-        private String currentPath = null;
-
-        public void loadLevel(String resourcePath) {
-                currentPath = resourcePath;
-                LevelDto dto = LevelParser.parseFromResource(resourcePath);
-                LevelFactory.Result res = LevelFactory.applyToEngine(engine, dto);
-                this.totalWire = res.totalWire();
-                this.timeLimitSeconds = res.timeLimitSeconds();
-                this.plannedSeeds = res.plannedSeeds();
-                engine.setPlannedTotal(plannedSeeds);
-        }
-
-        public GameEngine engine() { return engine; }
-        public double totalWire() { return totalWire; }
-        public int timeLimitSeconds() { return timeLimitSeconds; }
-        public int plannedSeeds() { return plannedSeeds; }
-        public String currentLevelPath() { return currentPath; }
-}
-
-
-
-===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\services\LevelRepository.java =====
-
-
-package play.model.services;
-
-import java.util.List;
-
-public class LevelRepository {
-        private static final List<String> ORDER = List.of(
-                "/levels/level1.json",
-                "/levels/level2.json"
-        );
-        public List<String> all() { return ORDER; }
-        public String next(String current) {
-                int i = ORDER.indexOf(current);
-                return (i >= 0 && i + 1 < ORDER.size()) ? ORDER.get(i + 1) : null;
         }
 }
 
@@ -3595,9 +3468,9 @@ public class ProductionSystem implements System {
                                 // Determine allowed seed types for this OUT port
                                 Seed.Type[] allowed;
                                 if (pinfo.shape == PortInfo.Shape.SQUARE) {
-                                        allowed = new Seed.Type[]{ Seed.Type.SQUARE, Seed.Type.INFINITE, Seed.Type.SECURE };
+                                        allowed = new Seed.Type[]{ Seed.Type.SQUARE, Seed.Type.INFINITE, Seed.Type.SECURE, Seed.Type.HEAVY };
                                 } else { // TRIANGLE
-                                        allowed = new Seed.Type[]{ Seed.Type.TRIANGLE, Seed.Type.SECURE };
+                                        allowed = new Seed.Type[]{ Seed.Type.TRIANGLE, Seed.Type.SECURE, Seed.Type.HEAVY };
                                 }
 
                                 // Filter allowed by available quota
@@ -3645,6 +3518,7 @@ public class ProductionSystem implements System {
                         case TRIANGLE: return p.remainingTriangle != 0;
                         case INFINITE: return p.remainingInfinite != 0;
                         case SECURE:   return p.remainingSecure   != 0;
+                        case HEAVY:   return p.remainingHeavy   != 0;
                 }
                 return false;
         }
@@ -3655,6 +3529,7 @@ public class ProductionSystem implements System {
                         case TRIANGLE: if (p.remainingTriangle > 0) p.remainingTriangle--; break;
                         case INFINITE: if (p.remainingInfinite > 0) p.remainingInfinite--; break;
                         case SECURE:   if (p.remainingSecure   > 0) p.remainingSecure--;   break;
+                        case HEAVY:   if (p.remainingHeavy   > 0) p.remainingHeavy--;   break;
                 }
         }
 
@@ -3688,7 +3563,6 @@ public class ProductionSystem implements System {
 }
 
 
-
 ===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\systems\QueueSystem.java =====
 
 
@@ -3703,12 +3577,19 @@ import play.model.components.Seed;
 import play.model.components.Spy;
 import play.model.components.Vpn;
 import play.model.components.Saboteur;
+import play.model.components.Producer;
+import play.model.components.Queue;
+import play.model.components.Merge;
+import play.model.components.Distribute;
+import play.model.components.Transform;
 import play.model.engine.GameEngine;
 import play.model.constants.GameBalance;
+import play.model.components.*;
 import play.model.physics.Kinematics;
-import play.model.components.Transform;
+import play.model.components.Link;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * QueueSystem
@@ -3721,10 +3602,12 @@ import java.util.*;
  *  - Apply per-frame physics adjustments (jerk -> accel) and SECURE adaptive slowdown
  *  - Revert PROTECTED seeds when their source VPN becomes disabled
  *
- * Design notes:
- *  - Large update() is decomposed into small private methods: each has a focused responsibility.
- *  - Data structures are intentionally straightforward: Map<SystemEntity, Deque<SeedEntity>> deviceQueues.
+ * Extended here:
+ *  - HEAVY arrival effects (destroy queued packets, flip port shape, heavy pass counting and link destruction)
+ *  - Distribute system: split HEAVY into BITPACKETs
+ *  - Merge system: buffer BITPACKETs and after MERGE_WAIT_SECONDS merge into HEAVY
  */
+
 public final class QueueSystem implements System {
 
         private final GameEngine engine;
@@ -3732,9 +3615,19 @@ public final class QueueSystem implements System {
         private final Map<Entity, Deque<Entity>> deviceQueues = new HashMap<>();
         private final Random rng = new Random();
 
+        // Merge buffers: per-merge-system list of (seed entity + arrivalTime)
+        private final Map<Entity, List<MergeEntry>> mergeBuffers = new HashMap<>();
+        private double time = 0.0;
+
         // SECURE speed constants
         private static final double SECURE_BASE_SPEED = GameBalance.SQUARE_BASE_SPEED;
         private static final double SECURE_SLOW_SPEED = Math.max(40.0, SECURE_BASE_SPEED * 0.35);
+
+        private static class MergeEntry {
+                final Entity seedEntity;
+                final double arrivedAt;
+                MergeEntry(Entity e, double t) { seedEntity = e; arrivedAt = t; }
+        }
 
         public QueueSystem(GameEngine engine, List<Entity> entities) {
                 this.engine = Objects.requireNonNull(engine, "engine");
@@ -3743,8 +3636,10 @@ public final class QueueSystem implements System {
 
         @Override
         public void update(double dt) {
+                time += dt;
+
                 processDisabledTimers(dt);
-                runAntitrojanSweep();   // <-- NEW: scan and clean trojans nearby
+                runAntitrojanSweep();   // <-- existing
                 revertPacketsFromDisabledVpns();
 
                 applySecureAdaptiveSlowdown();
@@ -3754,7 +3649,56 @@ public final class QueueSystem implements System {
                 List<Entity> arrivals = collectArrivals();
                 processArrivals(arrivals);
 
+                // Process merge buffers: if enough time passed since first arrival, merge into HEAVY
+                processMergeBuffers();
+
                 flushAllDeviceQueues();
+        }
+
+        // ---------------------------
+        // Merge processing
+        // ---------------------------
+
+        private void processMergeBuffers() {
+                List<Entity> toEmit = new ArrayList<>();
+                for (Map.Entry<Entity, List<MergeEntry>> e : new ArrayList<>(mergeBuffers.entrySet())) {
+                        Entity mergeSystem = e.getKey();
+                        List<MergeEntry> buffer = e.getValue();
+                        if (buffer.isEmpty()) {
+                                mergeBuffers.remove(mergeSystem);
+                                continue;
+                        }
+                        double firstT = buffer.get(0).arrivedAt;
+                        if (time >= firstT + GameBalance.MERGE_WAIT_SECONDS) {
+                                // create HEAVY of size k
+                                int k = buffer.size();
+                                // remove buffered seed entities (bitpackets) from world
+                                int color = 0;
+                                List<Entity> removed = new ArrayList<>();
+                                for (MergeEntry me : buffer) {
+                                        Entity se = me.seedEntity;
+                                        if (!entities.contains(se)) continue;
+                                        if (se.has(Seed.class)) {
+                                                Seed s = se.get(Seed.class);
+                                                if (s.type == Seed.Type.BITPACKET && s.colorRgb != 0) color = s.colorRgb;
+                                                entities.remove(se);
+                                        }
+                                }
+                                // build heavy entity
+                                Entity heavyE = new Entity();
+                                Seed heavy = new Seed(Seed.Type.HEAVY);
+                                heavy.heavySize = k;
+                                heavy.colorRgb = (color != 0) ? color : rng.nextInt(0xFFFFFF);
+                                heavy.speed = GameBalance.HEAVY_STRAIGHT_SPEED;
+                                heavyE.add(new Transform(mergeSystem.get(Transform.class).x, mergeSystem.get(Transform.class).y));
+                                heavyE.add(heavy);
+                                // Put heavy into the system device queue so it will be dispatched normally
+                                Deque<Entity> q = deviceQueues.computeIfAbsent(mergeSystem, k2 -> new ArrayDeque<>());
+                                q.addLast(heavyE);
+                                entities.add(heavyE);
+                                mergeBuffers.remove(mergeSystem);
+                        }
+                }
         }
 
         // ---------------------------
@@ -3858,6 +3802,12 @@ public final class QueueSystem implements System {
         /**
          * Process each arriving seed entity: bounce on disabled or speed-limit, award coins,
          * apply VPN conversion, spy behavior, saboteur arrival injection and finally enqueue.
+         *
+         * EXTENSIONS:
+         *  - HEAVY: destroys queued packets in the target system, toggles port shape with prob,
+         *           increments link heavy-pass and destroys link if needed.
+         *  - Distribute: when HEAVY arrives at Distribute system, split into bitpackets and enqueue them.
+         *  - Merge: when BITPACKET arrives at Merge system, buffer it for MERGE_WAIT_SECONDS then combined.
          */
         private void processArrivals(List<Entity> arrivals) {
                 for (Entity seedEntity : arrivals) {
@@ -3897,6 +3847,10 @@ public final class QueueSystem implements System {
                                 seedTransform.x = portTransform.x;
                                 seedTransform.y = portTransform.y;
                         }
+
+                        // Keep reference to the link entity before we null it
+                        Link arrivedLink = link;
+
                         s.currentLink = null;
                         s.progress = 0.0;
                         s.lateral = 0.0;
@@ -3933,7 +3887,91 @@ public final class QueueSystem implements System {
                                 handleSaboteurArrival(system, s);
                         }
 
-                        // Enqueue into device buffer (respect capacity)
+                        // -------------------
+                        // HEAVY specific effects
+                        // -------------------
+                        if (s.type == Seed.Type.HEAVY) {
+                                // 1) destroy queued packets in this deviceQueues entry (if any)
+                                Deque<Entity> q = deviceQueues.get(system);
+                                if (q != null && !q.isEmpty()) {
+                                        int removed = 0;
+                                        while (!q.isEmpty()) {
+                                                Entity qE = q.pollFirst();
+                                                if (qE != null && entities.contains(qE)) {
+                                                        entities.remove(qE);
+                                                        engine.incrementLost();
+                                                        removed++;
+                                                }
+                                        }
+                                        // also ensure map entry removed
+                                        deviceQueues.remove(system);
+                                }
+
+                                // 2) increment heavy pass on the arrived link and remove link entity if reached max
+                                // find the link entity wrapper
+                                Entity linkEntity = null;
+                                for (Entity e : entities) {
+                                        if (!e.has(Link.class)) continue;
+                                        if (e.get(Link.class) == arrivedLink) { linkEntity = e; break; }
+                                }
+                                if (linkEntity != null) {
+                                        int passes = arrivedLink.incrementHeavyPassCount();
+                                        if (passes >= GameBalance.HEAVY_MAX_PASSES) {
+                                                // remove the link entity immediately
+                                                entities.remove(linkEntity);
+                                        }
+                                }
+
+                                // 3) toggle port shape with probability
+                                if (rng.nextDouble() < GameBalance.HEAVY_PORT_TOGGLE_PROB) {
+                                        PortInfo pi = inPort.get(PortInfo.class);
+                                        if (pi != null) {
+                                                if (pi.shape == PortInfo.Shape.SQUARE)
+                                                        pi.shape = PortInfo.Shape.TRIANGLE;
+                                                else
+                                                        pi.shape = PortInfo.Shape.SQUARE;
+                                        }
+                                }
+
+                                // 4) Distribute behavior: if system is a Distribute system, split into BITPACKETs
+                                if (system != null && system.has(Distribute.class)) {
+                                        int parts = Math.max(1, s.heavySize);
+                                        int color = (s.colorRgb != 0) ? s.colorRgb : rng.nextInt(0xFFFFFF);
+                                        // remove the heavy seed (we'll create bitpackets)
+                                        entities.remove(seedEntity);
+                                        engine.incrementLostBy(0); // no change to counters for conversion itself
+
+                                        for (int i = 0; i < parts; i++) {
+                                                Entity bp = new Entity();
+                                                Seed bit = new Seed(Seed.Type.BITPACKET);
+                                                bit.colorRgb = color;
+                                                // bitpackets move at constant speed (tunable)
+                                                bit.speed = 120.0;
+                                                bp.add(new Transform(portTransform.x, portTransform.y));
+                                                bp.add(bit);
+                                                entities.add(bp);
+                                                // enqueue into this device queue for dispatching like normal packets
+                                                Deque<Entity> dq = deviceQueues.computeIfAbsent(system, k -> new ArrayDeque<>());
+                                                dq.addLast(bp);
+                                        }
+                                        continue; // heavy converted to bitpackets -> already handled
+                                }
+                        }
+
+                        // -------------------
+                        // BITPACKET arriving to Merge
+                        // -------------------
+                        if (s.type == Seed.Type.BITPACKET && system != null && system.has(Merge.class)) {
+                                // buffer the bitpacket for this merge system
+                                mergeBuffers.computeIfAbsent(system, k -> new ArrayList<>()).add(new MergeEntry(seedEntity, time));
+                                // we remove the bitpacket entity from world while buffered
+                                entities.remove(seedEntity);
+                                continue;
+                        }
+
+                        // -------------------
+                        // Default: enqueue into device buffer (respect capacity)
+                        // -------------------
                         enqueueToDevice(system, seedEntity);
                 }
         }
@@ -3964,6 +4002,8 @@ public final class QueueSystem implements System {
                         case INFINITE: reward = 1; break;
                         case SECURE: reward = 3; break;
                         case PROTECTED: reward = 5; break;
+                        case HEAVY: reward = Math.max(1, s.heavySize); break;
+                        case BITPACKET: reward = 1; break;
                         default: reward = 0; break;
                 }
                 engine.incrementCoins(reward);
@@ -4233,7 +4273,12 @@ public final class QueueSystem implements System {
                                 if (!freeTriangle.isEmpty()) return freeTriangle.remove(0);
                                 break;
                         case SECURE:
-                                return removeRandomFromLists(freeSquare, freeTriangle);
+                        case SECURE_PROTECTED:
+                        case HEAVY:
+                        case BITPACKET:
+                                if (!freeSquare.isEmpty() || !freeTriangle.isEmpty()) {
+                                        return removeRandomFromLists(freeSquare, freeTriangle);
+                                }
                         case PROTECTED:
                                 // PROTECTED emulateType determines preference
                                 Seed.Type emu = (s.emulateType != null) ? s.emulateType : Seed.Type.SQUARE;
@@ -4243,10 +4288,6 @@ public final class QueueSystem implements System {
                                         if (!freeSquare.isEmpty()) return freeSquare.remove(0);
                                 }
                                 break;
-                        case SECURE_PROTECTED:
-                                if (!freeSquare.isEmpty() || !freeTriangle.isEmpty()) {
-                                        return removeRandomFromLists(freeSquare, freeTriangle);
-                                }
                         default:
                                 break;
                 }
@@ -4377,7 +4418,9 @@ public final class QueueSystem implements System {
 
 
 
+
 ===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\systems\SeedMovementSystem.java =====
+
 
 
 package play.model.systems;
@@ -4523,6 +4566,7 @@ public class SeedMovementSystem implements System {
                 s.speed = Math.max(-BASE_SPEED * 2, Math.min(BASE_SPEED * 2, s.speed));
         }
 }
+
 
 
 
@@ -5406,12 +5450,18 @@ public final class WiringUtils {
 ===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\view\PacketView.java =====
 
 
+
 package play.view;
 
+import javafx.geometry.Pos;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
+import play.model.components.BitPacket;
+import play.model.components.HeavyPacket;
 import play.model.components.Seed;
+import play.model.core.Entity;
 
 /**
  * Draws packets (seeds).
@@ -5433,6 +5483,8 @@ public final class PacketView {
         private static Image SECURE_IMG;
         private static Image PROTECTED_IMG;
         private static Image SECURE_PROTECTED_IMG;
+        private static Image HEAVY_IMG;
+
 
         /** Render a packet centered at (x,y). */
         public static void render(GraphicsContext g, Seed s, double x, double y) {
@@ -5455,6 +5507,30 @@ public final class PacketView {
                         renderSprite(g, s, x, y, VISUAL_SIZE, getSecureProtectedImage(), 1.35, 0.62, 0.10, 0.70, 0.20);
                         return;
                 }
+
+                if (s.type == Seed.Type.HEAVY) {
+                        renderSprite(g, s, x, y, VISUAL_SIZE, getHeavyImage(), 1.25, 0.58, 0.08, 0.60, 0.15);
+                        return;
+                }
+                if (s.type == Seed.Type.BITPACKET) {
+                        // render as a colored circle
+                        double r = VISUAL_SIZE * 0.5;
+                        Color col = Color.web("#cccccc");
+                        if (s.colorRgb != 0) {
+                                int rgb = s.colorRgb & 0xFFFFFF;
+                                int rr = (rgb >> 16) & 0xFF;
+                                int gg = (rgb >> 8) & 0xFF;
+                                int bb = rgb & 0xFF;
+                                col = Color.rgb(rr, gg, bb);
+                        }
+                        g.setFill(col);
+                        g.fillOval(x - r, y - r, r * 2, r * 2);
+                        // inner highlight
+                        g.setFill(Color.rgb(255,255,255,0.18));
+                        g.fillOval(x - r*0.5, y - r*0.5, r, r);
+                        return;
+                }
+
 
                 // ==== Vector shapes (Square / Triangle) ====
                 final Color baseFill = (s.type == Seed.Type.SQUARE)
@@ -5552,6 +5628,13 @@ public final class PacketView {
                 return SECURE_PROTECTED_IMG;
         }
 
+        private static Image getHeavyImage() {
+                if (HEAVY_IMG == null) {
+                        HEAVY_IMG = new Image(PacketView.class.getResourceAsStream("/img/heavy_packet.png"));
+                }
+                return HEAVY_IMG;
+        }
+
         // ---- Vector primitives ----
 
         private static void drawShape(GraphicsContext g, Seed s, double x, double y, double size, Color fill) {
@@ -5571,6 +5654,7 @@ public final class PacketView {
                 return (v < 0) ? 0 : (v > 1) ? 1 : v;
         }
 }
+
 
 
 
@@ -6508,7 +6592,7 @@ public final class UiConstants {
 
   "devices": [
     { "id": "SRC_A",   "x": 200, "y": 160,
-      "producer": { "interval": 0.70, "quota": { "square": 6, "secure": 6 } } },
+      "producer": { "interval": 0.70, "quota": { "heavy": 6, "secure": 6 } } },
 
     { "id": "SRC_B",   "x": 200, "y": 300,
       "producer": { "interval": 0.80, "quota": { "triangle": 3, "secure": 6 } } },
@@ -6708,146 +6792,102 @@ public final class UiConstants {
 
 
 {
-  "timeLimitSeconds": 180,
-  "totalWire": 300000,
+  "timeLimitSeconds": 240,
+  "totalWire": 48000,
 
   "devices": [
-    {
-      "id": "producer_normal",
-      "x": 120,
-      "y": 120,
-      "producer": {
-        "interval": 0.9,
-        "quota": { "square": 12, "triangle": 12 }
-      }
-    },
+    { "id": "P_HEAVY",  "x": 120, "y": 140,
+      "producer": { "interval": 4.0, "quota": { "heavy": 5 }}},
 
-    {
-      "id": "producer_protected",
-      "x": 120,
-      "y": 260,
-      "producer": {
-        "interval": 1.2,
-        "quota": { "square": 8, "triangle": 8 }
-      }
-    },
+    { "id": "DIST_A",   "x": 380, "y": 140, "distribute": true },
 
-    {
-      "id": "producer_secure",
-      "x": 120,
-      "y": 400,
-      "producer": {
-        "interval": 1.6,
-        "quota": { "square": 6, "triangle": 6, "secure": 12 }
-      }
-    },
+    { "id": "TRANS_UP",   "x": 640, "y": 80 },
+    { "id": "TRANS_DOWN", "x": 640, "y": 220 },
 
-    {
-      "id": "producer_infinite",
-      "x": 120,
-      "y": 540,
-      "producer": {
-        "interval": 0.8,
-        "quota": { "square": 0, "triangle": 0, "infinite": -1 }
-      }
-    },
+    { "id": "MERGE_HUB", "x": 920, "y": 150, "merge": true },
 
-    {
-      "id": "saboteur_center",
-      "x": 420,
-      "y": 320,
-      "saboteur": true
-    },
+    { "id": "SAB",      "x": 380, "y": 320, "saboteur": true },
 
-    {
-      "id": "antitrojan_center",
-      "x": 720,
-      "y": 220,
-      "antitrojan": true
-    },
+    { "id": "LOOP_A",   "x": 620, "y": 460 },
+    { "id": "LOOP_B",   "x": 820, "y": 460 },
 
-    {
-      "id": "vpn_center",
-      "x": 720,
-      "y": 420,
-      "vpn": true
-    },
+    { "id": "VPN_1",    "x": 1040, "y": 420, "vpn": true },
 
-    {
-      "id": "spy_far",
-      "x": 960,
-      "y": 320,
-      "spy": true
-    },
+    { "id": "REF_LEFT",   "x": 1260, "y": 120, "reference": true },
+    { "id": "REF_BOTTOM", "x": 1260, "y": 420, "reference": true },
 
-    {
-      "id": "consumer_a",
-      "x": 1100,
-      "y": 160
-    },
+    { "id": "P_SMALL",  "x": 120, "y": 320,
+      "producer": { "interval": 0.9, "quota": { "square": 4, "triangle": 3 } } },
 
-    {
-      "id": "consumer_b",
-      "x": 1100,
-      "y": 280
-    },
-
-    {
-      "id": "consumer_c",
-      "x": 1100,
-      "y": 400
-    },
-
-    {
-      "id": "consumer_d",
-      "x": 1100,
-      "y": 520
-    }
+    { "id": "P_SECURE", "x": 120, "y": 500,
+      "producer": { "interval": 1.1, "quota": { "heavy": 5, "secure": 4 } } }
   ],
 
   "ports": [
-    { "id": "p_prod_normal_sq_out",   "device": "producer_normal",   "x": 160, "y": 120, "shape": "square",   "io": "out" },
-    { "id": "p_prod_normal_tri_out",  "device": "producer_normal",   "x": 160, "y": 140, "shape": "triangle", "io": "out" },
+    { "id": "P_HEAVY_OUT", "device": "P_HEAVY",   "x": 140, "y": 140, "shape": "square",   "io": "out" },
 
-    { "id": "p_prod_prot_sq_out",     "device": "producer_protected","x": 160, "y": 260, "shape": "square",   "io": "out" },
-    { "id": "p_prod_prot_tri_out",    "device": "producer_protected","x": 160, "y": 280, "shape": "triangle", "io": "out" },
+    { "id": "DIST_IN",     "device": "DIST_A",   "x": 360, "y": 140, "shape": "square",   "io": "in"  },
+    { "id": "DIST_OUT_A",  "device": "DIST_A",   "x": 420, "y": 110, "shape": "triangle", "io": "out" },
+    { "id": "DIST_OUT_B",  "device": "DIST_A",   "x": 420, "y": 170, "shape": "square",   "io": "out" },
 
-    { "id": "p_prod_secure_sq_out",   "device": "producer_secure",   "x": 160, "y": 400, "shape": "square",   "io": "out" },
-    { "id": "p_prod_secure_tri_out",  "device": "producer_secure",   "x": 160, "y": 420, "shape": "triangle", "io": "out" },
+    { "id": "TRANS_UP_IN",  "device": "TRANS_UP",  "x": 620, "y": 80,  "shape": "triangle", "io": "in" },
+    { "id": "TRANS_UP_OUT", "device": "TRANS_UP",  "x": 660, "y": 80,  "shape": "square",   "io": "out" },
 
-    { "id": "p_prod_inf_sq_out",      "device": "producer_infinite", "x": 160, "y": 540, "shape": "square",   "io": "out" },
-    { "id": "p_prod_inf_tri_out",     "device": "producer_infinite", "x": 160, "y": 560, "shape": "triangle", "io": "out" },
+    { "id": "TRANS_DOWN_IN",  "device": "TRANS_DOWN", "x": 620, "y": 220, "shape": "square",  "io": "in" },
+    { "id": "TRANS_DOWN_OUT", "device": "TRANS_DOWN", "x": 660, "y": 220, "shape": "triangle","io": "out" },
 
-    { "id": "p_sab_in",  "device": "saboteur_center", "x": 390, "y": 320, "shape": "triangle", "io": "in"  },
-    { "id": "p_sab_out", "device": "saboteur_center", "x": 450, "y": 320, "shape": "triangle", "io": "out" },
+    { "id": "MERGE_IN",   "device": "MERGE_HUB", "x": 900, "y": 150, "shape": "triangle", "io": "in" },
+    { "id": "MERGE_OUT",  "device": "MERGE_HUB", "x": 940, "y": 150, "shape": "square",   "io": "out" },
 
-    { "id": "p_ant_in",  "device": "antitrojan_center", "x": 690, "y": 220, "shape": "square", "io": "in"  },
-    { "id": "p_ant_out", "device": "antitrojan_center", "x": 750, "y": 220, "shape": "square", "io": "out" },
+    { "id": "SAB_IN",     "device": "SAB", "x": 360, "y": 320, "shape": "square", "io": "in" },
+    { "id": "SAB_OUT",    "device": "SAB", "x": 400, "y": 320, "shape": "square", "io": "out" },
 
-    { "id": "p_vpn_in",  "device": "vpn_center", "x": 690, "y": 420, "shape": "triangle", "io": "in"  },
-    { "id": "p_vpn_out", "device": "vpn_center", "x": 750, "y": 420, "shape": "triangle", "io": "out" },
+    { "id": "LOOP_A_IN",  "device": "LOOP_A", "x": 600, "y": 460, "shape": "triangle", "io": "in" },
+    { "id": "LOOP_A_OUT", "device": "LOOP_A", "x": 640, "y": 460, "shape": "triangle", "io": "out" },
 
-    { "id": "p_spy_in",  "device": "spy_far", "x": 930, "y": 320, "shape": "triangle", "io": "in"  },
-    { "id": "p_spy_out", "device": "spy_far", "x": 990, "y": 320, "shape": "triangle", "io": "out" },
+    { "id": "LOOP_B_IN",  "device": "LOOP_B", "x": 800, "y": 460, "shape": "triangle", "io": "in" },
+    { "id": "LOOP_B_OUT", "device": "LOOP_B", "x": 840, "y": 460, "shape": "triangle", "io": "out" },
 
-    { "id": "p_cons_a_sq_in", "device": "consumer_a", "x": 1060, "y": 160, "shape": "square",   "io": "in" },
-    { "id": "p_cons_a_tri_in","device": "consumer_a", "x": 1060, "y": 180, "shape": "triangle", "io": "in" },
+    { "id": "VPN_IN",     "device": "VPN_1", "x": 1020, "y": 420, "shape": "square",   "io": "in" },
+    { "id": "VPN_OUT",    "device": "VPN_1", "x": 1060, "y": 420, "shape": "triangle", "io": "out" },
 
-    { "id": "p_cons_b_sq_in", "device": "consumer_b", "x": 1060, "y": 280, "shape": "square",   "io": "in" },
-    { "id": "p_cons_b_tri_in","device": "consumer_b", "x": 1060, "y": 300, "shape": "triangle", "io": "in" },
+    { "id": "REF_LEFT_IN",  "device": "REF_LEFT",   "x": 1240, "y": 120, "shape": "square",   "io": "in", "reference": true },
+    { "id": "REF_LEFT_IN2", "device": "REF_LEFT",   "x": 1240, "y": 140, "shape": "square",   "io": "in", "reference": true },
 
-    { "id": "p_cons_c_sq_in", "device": "consumer_c", "x": 1060, "y": 400, "shape": "square",   "io": "in" },
-    { "id": "p_cons_c_tri_in","device": "consumer_c", "x": 1060, "y": 420, "shape": "triangle", "io": "in" },
+    { "id": "REF_BOT_IN",   "device": "REF_BOTTOM", "x": 1240, "y": 420, "shape": "triangle", "io": "in", "reference": true },
+    { "id": "REF_BOT_IN2",  "device": "REF_BOTTOM", "x": 1240, "y": 440, "shape": "square",   "io": "in", "reference": true },
 
-    { "id": "p_cons_d_sq_in", "device": "consumer_d", "x": 1060, "y": 520, "shape": "square",   "io": "in" },
-    { "id": "p_cons_d_tri_in","device": "consumer_d", "x": 1060, "y": 540, "shape": "triangle", "io": "in" }
+    { "id": "P_SMALL_OUT",  "device": "P_SMALL", "x": 140, "y": 320, "shape": "square", "io": "out" },
+    { "id": "P_SECURE_OUT", "device": "P_SECURE","x": 140, "y": 500, "shape": "square", "io": "out" }
   ],
 
-  "meta": {
-    "name": "Level 9 â€” Compact Trojan Testbed",
-    "author": "auto-generated",
-    "difficulty": "medium",
-    "notes": "This level has balanced square/triangle ports (total ins == outs per shape). Wire producers -> systems -> consumers to exercise trojan and antitrojan behaviors."
-  }
+  "links": [
+    { "id": "L1",  "from": { "device": "P_HEAVY", "port": "P_HEAVY_OUT" }, "to": { "device": "DIST_A",   "port": "DIST_IN" }, "bends": [] },
+
+    { "id": "L2a", "from": { "device": "DIST_A", "port": "DIST_OUT_A" }, "to": { "device": "TRANS_UP",   "port": "TRANS_UP_IN" }, "bends": [] },
+    { "id": "L2b", "from": { "device": "DIST_A", "port": "DIST_OUT_B" }, "to": { "device": "TRANS_DOWN", "port": "TRANS_DOWN_IN" }, "bends": [] },
+
+    { "id": "L3a", "from": { "device": "TRANS_UP",   "port": "TRANS_UP_OUT" }, "to": { "device": "MERGE_HUB", "port": "MERGE_IN" }, "bends": [] },
+    { "id": "L3b", "from": { "device": "TRANS_DOWN", "port": "TRANS_DOWN_OUT" }, "to": { "device": "SAB",       "port": "SAB_IN" }, "bends": [] },
+
+    { "id": "L4",  "from": { "device": "SAB", "port": "SAB_OUT" }, "to": { "device": "LOOP_A", "port": "LOOP_A_IN" }, "bends": [] },
+
+    { "id": "L5",  "from": { "device": "LOOP_A", "port": "LOOP_A_OUT" }, "to": { "device": "LOOP_B", "port": "LOOP_B_IN" }, "bends": [] },
+    { "id": "L6",  "from": { "device": "LOOP_B", "port": "LOOP_B_OUT" }, "to": { "device": "TRANS_DOWN", "port": "TRANS_DOWN_IN" }, "bends": [] },
+
+    { "id": "L7",  "from": { "device": "MERGE_HUB", "port": "MERGE_OUT" }, "to": { "device": "REF_LEFT",   "port": "REF_LEFT_IN" }, "bends": [] },
+
+    { "id": "L8",  "from": { "device": "TRANS_DOWN", "port": "TRANS_DOWN_OUT" }, "to": { "device": "VPN_1", "port": "VPN_IN" }, "bends": [] },
+    { "id": "L9",  "from": { "device": "VPN_1", "port": "VPN_OUT" }, "to": { "device": "REF_BOTTOM", "port": "REF_BOT_IN" }, "bends": [] },
+
+    { "id": "L10", "from": { "device": "P_SMALL", "port": "P_SMALL_OUT" }, "to": { "device": "SAB", "port": "SAB_IN" }, "bends": [] },
+
+    { "id": "L11", "from": { "device": "P_SECURE", "port": "P_SECURE_OUT" }, "to": { "device": "TRANS_UP", "port": "TRANS_UP_IN" }, "bends": [] },
+
+    { "id": "L12", "from": { "device": "TRANS_UP", "port": "TRANS_UP_OUT" }, "to": { "device": "REF_LEFT", "port": "REF_LEFT_IN2" }, "bends": [] },
+    { "id": "L13", "from": { "device": "P_SECURE", "port": "P_SECURE_OUT" }, "to": { "device": "REF_BOTTOM", "port": "REF_BOT_IN2" }, "bends": [] }
+  ],
+
+  "notes": "Balanced-port heavy/distribute/merge test. For each port type (square and triangle) total inputs == total outputs.\n\nKey checks:\n1) P_HEAVY produces heavies (heavySize=8). Distribute (DIST_A) will split heavies into colored BITPACKETs.\n2) MERGE_HUB reassembles bitpackets arriving within MERGE_WAIT_SECONDS into HEAVY of size=k.\n3) LOOP_A â†” LOOP_B â†” TRANS_DOWN path encourages repeated heavy passes across same links (observe link destruction after 3 heavy passes).\n4) HEAVY arrival at a system with queued packets (SAB) should clear that system queue immediately.\n5) VPN_1 converts messaging packets into PROTECTED variants; P_SECURE and P_SMALL create queue pressure to exercise heavy destruction.\n\nTuning knobs: GameBalance.MERGE_WAIT_SECONDS, GameBalance.HEAVY_MAX_PASSES, GameBalance.HEAVY_PORT_TOGGLE_PROB, heavy speeds. Adjust coordinates if your scene uses a different origin/scale."
 }
 
