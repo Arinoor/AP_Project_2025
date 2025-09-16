@@ -13,6 +13,8 @@ public class Producer {
         public int remainingTriangle = 0;
         public int remainingInfinite = 0;
         public int remainingSecure   = 0; // NEW
+        public int remainingHeavy = 0;
+
 
         public Producer(double interval) {
                 this.interval = interval;

@@ -5,7 +5,7 @@ import play.model.core.Entity;
 
 /** Packet (seed) travelling in the network. */
 public class Seed {
-        public enum Type { SQUARE, TRIANGLE, INFINITE, SECURE, PROTECTED }
+        public enum Type { SQUARE, TRIANGLE, INFINITE, SECURE, PROTECTED, HEAVY, BITPACKET }
 
         public Type type;
 
