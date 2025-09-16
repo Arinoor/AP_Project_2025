@@ -8,6 +8,7 @@ public final class GameBalance {
         public static final int COIN_REWARD_SQUARE   = 2;
         public static final int COIN_REWARD_TRIANGLE = 3;
         public static final int COIN_REWARD_INFINITE = 1;
+        public static final int COIN_REWARD_SECURE_PROTECTED = 4;
 
         // Shop costs
         public static final int COST_ATAR     = 3; // disable impact waves 10s
@@ -33,4 +34,15 @@ public final class GameBalance {
         public static final double ENTRY_SPEED_LIMIT = 300.0;     // px/s (tune as needed)
         public static final double SYSTEM_DISABLE_SECONDS = 5.0;   // seconds a system stays inactive
 
+        // --- Trojan / Antitrojan knobs
+        /** Probability that a saboteur will tag an (unprotected) arriving packet as trojan. */
+        public static final double SABOTEUR_TROJAN_PROB = 0.30; // tune: 0.0..1.0
+
+        /** Antitrojan AoE radius (pixels) to inspect packets. */
+        public static final double ANTITROJAN_RADIUS = 120.0;
+
+        /** Seconds the Antitrojan system stays disabled after cleaning one trojan. */
+        public static final double ANTITROJAN_DISABLE_SECONDS = 6.0;
+
 }
+

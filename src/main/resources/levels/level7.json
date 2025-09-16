@@ -1,77 +1,143 @@
 {
-  "totalWire": 1800,
-  "timeLimitSeconds": 120,
+  "timeLimitSeconds": 180,
+  "totalWire": 300000,
+
   "devices": [
     {
-      "id": "P1",
-      "x": 80,
+      "id": "producer_normal",
+      "x": 120,
       "y": 120,
       "producer": {
-        "interval": 0.8,
-        "quota": {
-          "square": 6,
-          "triangle": 4,
-          "infinite": 2,
-          "secure": 2
-        }
+        "interval": 0.9,
+        "quota": { "square": 12, "triangle": 12 }
       }
     },
+
     {
-      "id": "SAB1",
-      "x": 320,
-      "y": 100,
+      "id": "producer_protected",
+      "x": 120,
+      "y": 260,
+      "producer": {
+        "interval": 1.2,
+        "quota": { "square": 8, "triangle": 8 }
+      }
+    },
+
+    {
+      "id": "producer_secure",
+      "x": 120,
+      "y": 400,
+      "producer": {
+        "interval": 1.6,
+        "quota": { "square": 6, "triangle": 6, "secure": 12 }
+      }
+    },
+
+    {
+      "id": "producer_infinite",
+      "x": 120,
+      "y": 540,
+      "producer": {
+        "interval": 0.8,
+        "quota": { "square": 0, "triangle": 0, "infinite": -1 }
+      }
+    },
+
+    {
+      "id": "saboteur_center",
+      "x": 420,
+      "y": 320,
       "saboteur": true
     },
+
     {
-      "id": "MID1",
-      "x": 320,
-      "y": 240
+      "id": "antitrojan_center",
+      "x": 720,
+      "y": 220,
+      "antitrojan": true
     },
+
     {
-      "id": "VPN1",
-      "x": 520,
-      "y": 100,
+      "id": "vpn_center",
+      "x": 720,
+      "y": 420,
       "vpn": true
     },
+
     {
-      "id": "SPY1",
-      "x": 520,
-      "y": 240,
+      "id": "spy_far",
+      "x": 960,
+      "y": 320,
       "spy": true
     },
+
     {
-      "id": "REF1",
-      "x": 760,
-      "y": 160,
-      "reference": true
+      "id": "consumer_a",
+      "x": 1100,
+      "y": 160
     },
+
     {
-      "id": "REF2",
-      "x": 760,
-      "y": 280,
-      "reference": true
+      "id": "consumer_b",
+      "x": 1100,
+      "y": 280
+    },
+
+    {
+      "id": "consumer_c",
+      "x": 1100,
+      "y": 400
+    },
+
+    {
+      "id": "consumer_d",
+      "x": 1100,
+      "y": 520
     }
   ],
 
   "ports": [
-    { "id": "p1-out-sq", "device": "P1", "x": 150, "y": 100, "shape": "square", "io": "out" },
-    { "id": "p1-out-tr", "device": "P1", "x": 150, "y": 140, "shape": "triangle", "io": "out" },
+    { "id": "p_prod_normal_sq_out",   "device": "producer_normal",   "x": 160, "y": 120, "shape": "square",   "io": "out" },
+    { "id": "p_prod_normal_tri_out",  "device": "producer_normal",   "x": 160, "y": 140, "shape": "triangle", "io": "out" },
 
-    { "id": "sab1-in", "device": "SAB1", "x": 260, "y": 100, "shape": "square", "io": "in" },
-    { "id": "sab1-out-s", "device": "SAB1", "x": 380, "y": 80,  "shape": "square", "io": "out" },
-    { "id": "sab1-out-t", "device": "SAB1", "x": 380, "y": 120, "shape": "triangle", "io": "out" },
+    { "id": "p_prod_prot_sq_out",     "device": "producer_protected","x": 160, "y": 260, "shape": "square",   "io": "out" },
+    { "id": "p_prod_prot_tri_out",    "device": "producer_protected","x": 160, "y": 280, "shape": "triangle", "io": "out" },
 
-    { "id": "mid1-in-1", "device": "MID1", "x": 260, "y": 240, "shape": "square", "io": "in" },
-    { "id": "mid1-out-s", "device": "MID1", "x": 380, "y": 220, "shape": "square", "io": "out" },
-    { "id": "mid1-out-t", "device": "MID1", "x": 380, "y": 260, "shape": "triangle","io": "in" },
+    { "id": "p_prod_secure_sq_out",   "device": "producer_secure",   "x": 160, "y": 400, "shape": "square",   "io": "out" },
+    { "id": "p_prod_secure_tri_out",  "device": "producer_secure",   "x": 160, "y": 420, "shape": "triangle", "io": "out" },
 
-    { "id": "vpn1-in", "device": "VPN1", "x": 460, "y": 100, "shape": "triangle", "io": "in" },
-    { "id": "vpn1-out", "device": "VPN1", "x": 600, "y": 100, "shape": "square", "io": "out" },
+    { "id": "p_prod_inf_sq_out",      "device": "producer_infinite", "x": 160, "y": 540, "shape": "square",   "io": "out" },
+    { "id": "p_prod_inf_tri_out",     "device": "producer_infinite", "x": 160, "y": 560, "shape": "triangle", "io": "out" },
 
-    { "id": "spy1-in", "device": "SPY1", "x": 460, "y": 240, "shape": "square", "io": "in" },
-    { "id": "spy1-out", "device": "SPY1", "x": 600, "y": 240, "shape": "triangle", "io": "out" },
+    { "id": "p_sab_in",  "device": "saboteur_center", "x": 390, "y": 320, "shape": "triangle", "io": "in"  },
+    { "id": "p_sab_out", "device": "saboteur_center", "x": 450, "y": 320, "shape": "triangle", "io": "out" },
 
-    { "id": "ref1-in", "device": "REF1", "x": 720, "y": 160, "shape": "square", "io": "in",  "reference": true },
-    { "id": "ref2-in", "device": "REF2", "x": 720, "y": 280, "shape": "triangle","io": "in",  "reference": true }
-  ]
+    { "id": "p_ant_in",  "device": "antitrojan_center", "x": 690, "y": 220, "shape": "square", "io": "in"  },
+    { "id": "p_ant_out", "device": "antitrojan_center", "x": 750, "y": 220, "shape": "square", "io": "out" },
+
+    { "id": "p_vpn_in",  "device": "vpn_center", "x": 690, "y": 420, "shape": "triangle", "io": "in"  },
+    { "id": "p_vpn_out", "device": "vpn_center", "x": 750, "y": 420, "shape": "triangle", "io": "out" },
+
+    { "id": "p_spy_in",  "device": "spy_far", "x": 930, "y": 320, "shape": "triangle", "io": "in"  },
+    { "id": "p_spy_out", "device": "spy_far", "x": 990, "y": 320, "shape": "triangle", "io": "out" },
+
+    { "id": "p_cons_a_sq_in", "device": "consumer_a", "x": 1060, "y": 160, "shape": "square",   "io": "in" },
+    { "id": "p_cons_a_tri_in","device": "consumer_a", "x": 1060, "y": 180, "shape": "triangle", "io": "in" },
+
+    { "id": "p_cons_b_sq_in", "device": "consumer_b", "x": 1060, "y": 280, "shape": "square",   "io": "in" },
+    { "id": "p_cons_b_tri_in","device": "consumer_b", "x": 1060, "y": 300, "shape": "triangle", "io": "in" },
+
+    { "id": "p_cons_c_sq_in", "device": "consumer_c", "x": 1060, "y": 400, "shape": "square",   "io": "in" },
+    { "id": "p_cons_c_tri_in","device": "consumer_c", "x": 1060, "y": 420, "shape": "triangle", "io": "in" },
+
+    { "id": "p_cons_d_sq_in", "device": "consumer_d", "x": 1060, "y": 520, "shape": "square",   "io": "in" },
+    { "id": "p_cons_d_tri_in","device": "consumer_d", "x": 1060, "y": 540, "shape": "triangle", "io": "in" }
+  ],
+
+  "meta": {
+    "name": "Level 9 — Compact Trojan Testbed",
+    "author": "auto-generated",
+    "difficulty": "medium",
+    "notes": "This level has balanced square/triangle ports (total ins == outs per shape). Wire producers -> systems -> consumers to exercise trojan and antitrojan behaviors."
+  }
 }

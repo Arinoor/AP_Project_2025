@@ -1,6 +1,4 @@
-﻿
-
-===== FILE: C:\Users\ASUS\AP_Project1\.idea\compiler.xml =====
+﻿===== FILE: C:\Users\ASUS\AP_Project1\.idea\compiler.xml =====
 
 
 <?xml version="1.0" encoding="UTF-8"?>
@@ -227,12 +225,19 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="cc202a8e-4f0b-4a78-9065-4a606d51ea93" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/src/main/java/play/model/components/Saboteur.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/levels/level7.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/play/model/components/Antitrojan.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/img/antitrojan_packet.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/codebundle.txt" beforeDir="false" afterPath="$PROJECT_DIR$/codebundle.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/components/Seed.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/components/Seed.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/constants/GameBalance.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/constants/GameBalance.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/play/model/level/LevelLoaderV2.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/level/LevelLoaderV2.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/play/model/systems/QueueSystem.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/systems/QueueSystem.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/view/StageSelectionView.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/view/StageSelectionView.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/systems/SeedMovementSystem.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/systems/SeedMovementSystem.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/play/view/PacketView.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/view/PacketView.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/audio/bgm/game_over_theme.wav" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/audio/bgm/gameover_theme.wav" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/levels/level5.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/levels/level5.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/levels/level6.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/levels/level6.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/levels/level7.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/levels/level7.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -1890,6 +1895,20 @@ public final class GlobalAudio {
 
 
 
+===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\components\Antitrojan.java =====
+
+
+package play.model.components;
+
+/**
+ * Marker component: this system is an Anti-Trojan system.
+ * Behavior implemented in QueueSystem:
+ *  - Scans nearby seeds and removes their trojan flag.
+ *  - After a successful removal, the system is disabled for a cooldown period.
+ */
+public class Antitrojan { }
+
+
 ===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\components\BackgroundImage.java =====
 
 
@@ -2263,7 +2282,7 @@ import play.model.core.Entity;
 
 /** Packet (seed) travelling in the network. */
 public class Seed {
-        public enum Type { SQUARE, TRIANGLE, INFINITE, SECURE, PROTECTED }
+        public enum Type { SQUARE, TRIANGLE, INFINITE, SECURE, PROTECTED, SECURE_PROTECTED }
 
         public Type type;
 
@@ -2310,6 +2329,7 @@ public class Seed {
 
         public boolean hasBeenInSpySystem = false;
 
+        public boolean trojan = false;
 
 
         public Seed(Type type) {
@@ -2332,6 +2352,7 @@ public class Seed {
                         case PROTECTED:
                                 double base = baseSizeUnitsFor(protectedBaseType);
                                 return base * 2.0;
+                        case SECURE_PROTECTED:  return 6.0;
                         default:
                                 return 2.0;
                 }
@@ -2402,6 +2423,7 @@ public final class GameBalance {
         public static final int COIN_REWARD_SQUARE   = 2;
         public static final int COIN_REWARD_TRIANGLE = 3;
         public static final int COIN_REWARD_INFINITE = 1;
+        public static final int COIN_REWARD_SECURE_PROTECTED = 4;
 
         // Shop costs
         public static final int COST_ATAR     = 3; // disable impact waves 10s
@@ -2426,6 +2448,16 @@ public final class GameBalance {
         // ---- Packet-entry penalties ----
         public static final double ENTRY_SPEED_LIMIT = 300.0;     // px/s (tune as needed)
         public static final double SYSTEM_DISABLE_SECONDS = 5.0;   // seconds a system stays inactive
+
+        // --- Trojan / Antitrojan knobs
+        /** Probability that a saboteur will tag an (unprotected) arriving packet as trojan. */
+        public static final double SABOTEUR_TROJAN_PROB = 0.30; // tune: 0.0..1.0
+
+        /** Antitrojan AoE radius (pixels) to inspect packets. */
+        public static final double ANTITROJAN_RADIUS = 120.0;
+
+        /** Seconds the Antitrojan system stays disabled after cleaning one trojan. */
+        public static final double ANTITROJAN_DISABLE_SECONDS = 6.0;
 
 }
 
@@ -2847,6 +2879,11 @@ public final class LevelLoaderV2 {
                                 if (d.path("saboteur").asBoolean(false)) {
                                         systemE.add(new Saboteur());
                                         systemE.add(new BackgroundImage("/img/saboteur_system.png"));
+                                }
+
+                                if (d.path("antitrojan").asBoolean(false)) {
+                                        systemE.add(new Antitrojan());
+                                        systemE.add(new BackgroundImage("/img/antitrojan_packet.png"));
                                 }
 
                                 JsonNode prodNode = d.path("producer");
@@ -3658,427 +3695,686 @@ public class ProductionSystem implements System {
 package play.model.systems;
 
 import play.model.core.Entity;
-import play.model.components.*;
+import play.model.components.Disabled;
+import play.model.components.Link;
+import play.model.components.PortInfo;
+import play.model.components.Reference;
+import play.model.components.Seed;
+import play.model.components.Spy;
+import play.model.components.Vpn;
+import play.model.components.Saboteur;
 import play.model.engine.GameEngine;
 import play.model.constants.GameBalance;
 import play.model.physics.Kinematics;
+import play.model.components.Transform;
 
 import java.util.*;
 
 /**
- * Handles arrivals into systems, coins, buffering, dispatch, and:
- *  - INFINITE mid-wire collision: reverse at the exact collision position.
- *  - Per-frame jerk application (accel += jerk * dt).
- *  - SECURE adaptive slowdown: if dest system has queued items, clamp speed down.
- *  - VPN conversion: messaging packets entering a VPN become PROTECTED with hidden (random) emulation.
- *  - SPY systems: destroy secure packets, allow any packet to exit any spy system, don't affect protected packets.
+ * QueueSystem
+ *
+ * Responsibilities:
+ *  - Buffer seeds when they arrive at systems
+ *  - Apply special per-system arrival effects (VPN, Spy, Saboteur)
+ *  - Select and dispatch seeds to available outbound links using system rules
+ *  - Handle INFINITE mid-wire collision reversal
+ *  - Apply per-frame physics adjustments (jerk -> accel) and SECURE adaptive slowdown
+ *  - Revert PROTECTED seeds when their source VPN becomes disabled
+ *
+ * Design notes:
+ *  - Large update() is decomposed into small private methods: each has a focused responsibility.
+ *  - Data structures are intentionally straightforward: Map<SystemEntity, Deque<SeedEntity>> deviceQueues.
  */
-public class QueueSystem implements System {
+public final class QueueSystem implements System {
 
         private final GameEngine engine;
         private final List<Entity> entities;
-
-        /** Per-device buffer of waiting seed entities. */
         private final Map<Entity, Deque<Entity>> deviceQueues = new HashMap<>();
-
         private final Random rng = new Random();
 
-        // SECURE speed policy (re-uses SQUARE base speed; slow speed floored)
+        // SECURE speed constants
         private static final double SECURE_BASE_SPEED = GameBalance.SQUARE_BASE_SPEED;
         private static final double SECURE_SLOW_SPEED = Math.max(40.0, SECURE_BASE_SPEED * 0.35);
 
         public QueueSystem(GameEngine engine, List<Entity> entities) {
-                this.engine = engine;
-                this.entities = entities;
+                this.engine = Objects.requireNonNull(engine, "engine");
+                this.entities = Objects.requireNonNull(entities, "entities");
         }
 
         @Override
         public void update(double dt) {
-                // 0) Decay "Disabled" timers on systems
-                for (Entity e : entities) {
-                        if (e.has(Disabled.class)) {
-                                Disabled d = e.get(Disabled.class);
-                                d.remaining -= dt;
-                                if (d.remaining <= 0) {
-                                        e.remove(Disabled.class);
-                                }
-                        }
-                }
-
+                processDisabledTimers(dt);
+                runAntitrojanSweep();   // <-- NEW: scan and clean trojans nearby
                 revertPacketsFromDisabledVpns();
 
-                // 0.20) SECURE adaptive slowdown: before physics/arrivals, ensure we gate speed
+                applySecureAdaptiveSlowdown();
+                applyPerFrameJerk(dt);
+                handleInfiniteWireCollisions();
+
+                List<Entity> arrivals = collectArrivals();
+                processArrivals(arrivals);
+
+                flushAllDeviceQueues();
+        }
+
+        // ---------------------------
+        // Top-level helper methods
+        // ---------------------------
+
+        private void processDisabledTimers(double dt) {
                 for (Entity e : new ArrayList<>(entities)) {
-                        if (!e.has(Seed.class)) continue;
-                        Seed s = e.get(Seed.class);
-                        if (s.type != Seed.Type.SECURE) continue;
-                        if (s.currentLink == null) continue; // only in-flight
-
-                        // Determine the target system for this traversal (works for returning or forward)
-                        Entity targetPort = s.returning ? s.currentLink.fromPort : s.currentLink.toPort;
-                        if (targetPort == null || !targetPort.has(PortInfo.class)) continue;
-                        Entity targetSystem = targetPort.get(PortInfo.class).parentSystem;
-
-                        // Check if target system currently has a waiting queue (exclude null)
-                        Deque<Entity> q = deviceQueues.get(targetSystem);
-                        boolean targetBusy = (q != null && !q.isEmpty());
-
-                        // Apply adaptive speed
-                        if (targetBusy) {
-                                if (s.speed > SECURE_SLOW_SPEED) s.speed = SECURE_SLOW_SPEED;
-                                s.accel = 0.0;
-                                s.jerk  = 0.0;
-                        } else {
-                                if (s.speed < SECURE_BASE_SPEED) s.speed = SECURE_BASE_SPEED;
-                                s.accel = 0.0;
-                                s.jerk  = 0.0;
-                        }
-                }
-
-                // 0.25) Apply jerk each frame: accel += jerk * dt (for all seeds; jerk usually 0)
-                for (Entity e : new ArrayList<>(entities)) {
-                        if (!e.has(Seed.class)) continue;
-                        Seed s = e.get(Seed.class);
-                        if (s.currentLink == null) continue; // only while traversing
-
-                        if (s.jerk != 0.0) {
-                                s.accel += s.jerk * dt;
-                                if (s.jerk < 0.0 && s.accel < 0.0) {
-                                        s.accel = 0.0; // don't flip into braking unless explicitly designed
-                                }
-                        }
-                }
-
-                // 0.5) INFINITE mid-wire collision handling: reverse AT THE COLLISION POSITION
-                for (Entity e : new ArrayList<>(entities)) {
-                        if (!e.has(Seed.class)) continue;
-                        Seed s = e.get(Seed.class);
-                        if (s.type != Seed.Type.INFINITE) continue;
-
-                        if (s.currentLink == null || s.returning) continue;
-
-                        if (s.justCollided) {
-                                double oldP = clamp01(s.progress);
-                                s.returning = true;
-                                s.progress = 1.0 - oldP;
-
-                                s.impactEnergy = Math.max(s.impactEnergy, 0.6);
-                                s.justCollided = false;
-                        }
-                }
-
-                // 1) Collect arrivals this frame
-                List<Entity> arrivals = new ArrayList<>();
-                for (Entity e : new ArrayList<>(entities)) {
-                        if (!e.has(Seed.class)) continue;
-                        Seed s = e.get(Seed.class);
-                        if (s.currentLink == null) continue;
-                        if (s.progress < 1.0) continue;
-                        arrivals.add(e);
-                }
-
-                // 2) Process arrivals (speed trap, became-disabled bounce, normal handling)
-                for (Entity seedE : arrivals) {
-                        Seed s = seedE.get(Seed.class);
-                        Link link = s.currentLink;
-
-                        // Determine actual destination port for this traversal
-                        Entity inPort = s.returning ? link.fromPort : link.toPort;
-                        PortInfo pTo = inPort.get(PortInfo.class);
-                        Entity system = pTo.parentSystem;
-
-                        // Destination port position
-                        Transform tIn = inPort.get(Transform.class);
-                        Transform st  = seedE.get(Transform.class);
-
-                        // Speed trap: disable & bounce back (only on first arrival)
-                        if (!s.returning && s.speed > GameBalance.ENTRY_SPEED_LIMIT) {
-                                if (system.has(Disabled.class)) {
-                                        system.get(Disabled.class).remaining = GameBalance.SYSTEM_DISABLE_SECONDS;
-                                } else {
-                                        system.add(new Disabled(GameBalance.SYSTEM_DISABLE_SECONDS));
-                                }
-                                s.returning = true;
-                                s.progress  = 0.0;
-                                continue;
-                        }
-
-                        // Destination may have become disabled while en route -> bounce back
-                        if (!s.returning && system.has(Disabled.class)) {
-                                s.returning = true;
-                                s.progress  = 0.0;
-                                continue;
-                        }
-
-                        // Normal arrival handling
-                        st.x = tIn.x; st.y = tIn.y;
-                        s.currentLink = null;
-                        s.progress = 0.0;
-                        s.lateral  = 0.0;
-
-                        boolean finishedReturn = s.returning;
-                        s.returning = false;
-
-                        // === Award coins on any successful arrival (including sinks) ===
-                        // square:2, triangle:3, infinite:1, secure:3, protected:5
-                        if (!finishedReturn) {
-                                int reward;
-                                switch (s.type) {
-                                        case SQUARE:   reward = 2; break;
-                                        case TRIANGLE: reward = 3; break;
-                                        case INFINITE: reward = 1; break;
-                                        case SECURE:   reward = 3; break;
-                                        case PROTECTED:reward = 5; break;
-                                        default:       reward = 0; break;
-                                }
-                                engine.incrementCoins(reward);
-                        }
-
-                        // === Reference systems consume ===
-                        if (system.has(Reference.class)) {
-                                engine.incrementReachedReference();
-                                engine.notifySeedDelivered(s);
-                                entities.remove(seedE);
-                                continue;
-                        }
-
-                        // === SPY system handling ===
-                        if (system.has(Spy.class)) {
-                                handleSpySystemArrival(system, seedE, s);
-                                // If the packet was destroyed, continue to next arrival
-                                if (!entities.contains(seedE)) continue;
-                        }
-
-                        // === VPN conversion (on entry to system) ===
-                        if (system.has(Vpn.class)) {
-                                // Only convert messaging packets (SQUARE/TRIANGLE/INFINITE). SECURE and PROTECTED passthrough.
-                                if (s.type == Seed.Type.SQUARE || s.type == Seed.Type.TRIANGLE || s.type == Seed.Type.INFINITE) {
-                                        Seed.Type base = s.type;
-                                        Seed.Type emu  = pickRandomMessengerType();
-
-                                        Seed newS = new Seed(Seed.Type.PROTECTED);
-                                        newS.protectedBaseType = base;
-                                        newS.emulateType = emu;
-                                        // Adopt base capacity (triangle=4, else 3)
-                                        newS.capacity = (base == Seed.Type.TRIANGLE) ? 4 : 3;
-                                        // Reset motion; next hop will assign kinematics
-                                        newS.speed = 0.0; newS.accel = 0.0; newS.jerk = 0.0;
-                                        newS.noise = s.noise; // carry noise forward
-                                        newS.impactEnergy = Math.max(s.impactEnergy, 0.25); // small flash on conversion
-
-                                        newS.vpnConverter = system;
-
-                                        // Replace component on the same entity
-                                        seedE.remove(Seed.class);
-                                        seedE.add(newS);
-                                        s = newS;
-                                }
-                        }
-
-
-
-                        // Enqueue into the device buffer
-                        Deque<Entity> buf = deviceQueues.computeIfAbsent(system, k -> new ArrayDeque<>());
-                        if (buf.size() >= GameBalance.DEVICE_CAPACITY) {
-                                entities.remove(seedE);
-                                engine.incrementLost();
-                                continue;
-                        }
-                        buf.addLast(seedE);
-                }
-
-                // 3) Try to flush each device's queue to an available OUT link
-                for (Map.Entry<Entity, Deque<Entity>> entry : deviceQueues.entrySet()) {
-                        Entity system = entry.getKey();
-                        Deque<Entity> buf = entry.getValue();
-                        if (buf.isEmpty()) continue;
-
-                        // Build lists of free OUT links from this system, grouped by shape
-                        List<Entity> freeSquare = new ArrayList<>();
-                        List<Entity> freeTriangle = new ArrayList<>();
-                        for (Entity e : entities) {
-                                if (!e.has(Link.class)) continue;
-                                Link l = e.get(Link.class);
-                                if (l.fromPort == null) continue;
-                                if (!l.fromPort.has(PortInfo.class)) continue;
-                                PortInfo pFrom = l.fromPort.get(PortInfo.class);
-                                if (pFrom.parentSystem != system) continue;
-                                if (!isLinkFree(l)) continue;
-
-                                if (l.toPort == null || !l.toPort.has(PortInfo.class)) continue;
-                                PortInfo destPi = l.toPort.get(PortInfo.class);
-                                Entity destSys = destPi.parentSystem;
-                                if (destSys != null && destSys.has(Disabled.class)) continue;
-
-                                if (pFrom.shape == PortInfo.Shape.SQUARE) freeSquare.add(e);
-                                else freeTriangle.add(e);
-                        }
-
-                        // For packets that have been in spy systems, add all spy system links
-                        List<Entity> spyLinks = new ArrayList<>();
-                        Entity seedE = buf.peekFirst();
-                        if (seedE != null && seedE.has(Seed.class)) {
-                                Seed s = seedE.get(Seed.class);
-                                if (s.hasBeenInSpySystem) {
-                                        for (Entity e : entities) {
-                                                if (!e.has(Link.class)) continue;
-                                                Link l = e.get(Link.class);
-                                                if (l.fromPort == null) continue;
-                                                if (!l.fromPort.has(PortInfo.class)) continue;
-                                                PortInfo pFrom = l.fromPort.get(PortInfo.class);
-                                                if (!pFrom.parentSystem.has(Spy.class)) continue;
-                                                if (!isLinkFree(l)) continue;
-
-                                                if (l.toPort == null || !l.toPort.has(PortInfo.class)) continue;
-                                                PortInfo destPi = l.toPort.get(PortInfo.class);
-                                                Entity destSys = destPi.parentSystem;
-                                                if (destSys != null && destSys.has(Disabled.class)) continue;
-
-                                                if (pFrom.shape == PortInfo.Shape.SQUARE) {
-                                                        if (!freeSquare.contains(e)) freeSquare.add(e);
-                                                } else {
-                                                        if (!freeTriangle.contains(e)) freeTriangle.add(e);
-                                                }
-                                        }
-                                }
-                        }
-
-                        // While we can ship something out, do it
-                        boolean progressed = true;
-                        while (progressed && !buf.isEmpty()) {
-                                progressed = false;
-
-                                seedE = buf.peekFirst();
-                                if (seedE == null) break;
-                                Seed s = seedE.get(Seed.class);
-
-                                // Preferred links:
-                                // - SQUARE / INFINITE: square links
-                                // - TRIANGLE: triangle links
-                                // - SECURE: any available (no compatibility concept)
-                                // - PROTECTED: choose based on emulateType (hidden)
-                                Entity chosenLinkE = null;
-                                if (s.type == Seed.Type.SQUARE || s.type == Seed.Type.INFINITE) {
-                                        if (!freeSquare.isEmpty()) chosenLinkE = freeSquare.remove(0);
-                                } else if (s.type == Seed.Type.TRIANGLE) {
-                                        if (!freeTriangle.isEmpty()) chosenLinkE = freeTriangle.remove(0);
-                                } else if (s.type == Seed.Type.SECURE) {
-                                        int total = freeSquare.size() + freeTriangle.size();
-                                        if (total > 0) {
-                                                int idx = rng.nextInt(total);
-                                                chosenLinkE = (idx < freeSquare.size())
-                                                        ? freeSquare.remove(idx)
-                                                        : freeTriangle.remove(idx - freeSquare.size());
-                                        }
-                                } else if (s.type == Seed.Type.PROTECTED) {
-                                        Seed.Type emu = (s.emulateType != null) ? s.emulateType : Seed.Type.SQUARE;
-                                        if (emu == Seed.Type.TRIANGLE) {
-                                                if (!freeTriangle.isEmpty()) chosenLinkE = freeTriangle.remove(0);
-                                        } else { // SQUARE or INFINITE emulation => use square link
-                                                if (!freeSquare.isEmpty()) chosenLinkE = freeSquare.remove(0);
-                                        }
-                                        // if none, fall through to random below
-                                }
-
-                                if (chosenLinkE == null) {
-                                        int total = freeSquare.size() + freeTriangle.size();
-                                        if (total > 0) {
-                                                int idx = rng.nextInt(total);
-                                                chosenLinkE = (idx < freeSquare.size())
-                                                        ? freeSquare.remove(idx)
-                                                        : freeTriangle.remove(idx - freeSquare.size());
-                                        }
-                                }
-
-                                if (chosenLinkE == null) break; // congested
-
-                                // We can dispatch this seed
-                                buf.removeFirst();
-
-                                Link l = chosenLinkE.get(Link.class);
-                                PortInfo.Shape outShape = l.fromPort.get(PortInfo.class).shape;
-
-                                // per-hop kinematics
-                                Kinematics.applyForHop(s, outShape);
-
-                                // place at OUT port and start hop
-                                Transform tFrom = l.fromPort.get(Transform.class);
-                                Transform st = seedE.get(Transform.class);
-                                st.x = tFrom.x; st.y = tFrom.y;
-
-                                s.currentLink = l;
-                                s.progress = 0.0;
-                                s.returning = false;
-
-                                progressed = true;
+                        if (!e.has(Disabled.class)) continue;
+                        Disabled d = e.get(Disabled.class);
+                        d.remaining -= dt;
+                        if (d.remaining <= 0) {
+                                e.remove(Disabled.class);
                         }
                 }
         }
 
         /**
-         * Handle packets arriving at spy systems
-         * - Secure packets are destroyed
-         * - Protected packets are unaffected
-         * - Other packets are marked as having been in a spy system
+         * For all SECURE seeds that are currently in-flight, if their destination system
+         * has queued items, clamp speed to SECURE_SLOW_SPEED. Otherwise ensure base speed.
          */
-        private void handleSpySystemArrival(Entity system, Entity seedE, Seed s) {
-                // Destroy secure packets
+        private void applySecureAdaptiveSlowdown() {
+                for (Entity e : new ArrayList<>(entities)) {
+                        if (!e.has(Seed.class)) continue;
+                        Seed s = e.get(Seed.class);
+                        if (s.type != Seed.Type.SECURE) continue;
+                        Link link = s.currentLink;
+                        if (link == null) continue;
+
+                        // determine destination system for this hop
+                        Entity destPort = s.returning ? link.fromPort : link.toPort;
+                        if (destPort == null || !destPort.has(PortInfo.class)) continue;
+                        Entity destSystem = destPort.get(PortInfo.class).parentSystem;
+                        if (destSystem == null) continue;
+
+                        Deque<Entity> q = deviceQueues.get(destSystem);
+                        boolean busy = q != null && !q.isEmpty();
+                        if (busy) {
+                                if (s.speed > SECURE_SLOW_SPEED) s.speed = SECURE_SLOW_SPEED;
+                                s.accel = 0.0;
+                                s.jerk = 0.0;
+                        } else {
+                                if (s.speed < SECURE_BASE_SPEED) s.speed = SECURE_BASE_SPEED;
+                                s.accel = 0.0;
+                                s.jerk = 0.0;
+                        }
+                }
+        }
+
+
+        private void applyPerFrameJerk(double dt) {
+                if (dt <= 0) return;
+                for (Entity e : new ArrayList<>(entities)) {
+                        if (!e.has(Seed.class)) continue;
+                        Seed s = e.get(Seed.class);
+                        if (s.currentLink == null) continue;
+                        if (s.jerk == 0.0) continue;
+
+                        s.accel += s.jerk * dt;
+                        // safety: do not allow negative accel from jerk (preserve expected behavior)
+                        if (s.jerk < 0.0 && s.accel < 0.0) {
+                                s.accel = 0.0;
+                        }
+                }
+        }
+
+        /**
+         * INFINITE seeds: when they had a collision flagged (justCollided), flip returning
+         * status and adjust progress so reversal occurs exactly at collision point.
+         */
+        private void handleInfiniteWireCollisions() {
+                for (Entity e : new ArrayList<>(entities)) {
+                        if (!e.has(Seed.class)) continue;
+                        Seed s = e.get(Seed.class);
+                        if (s.type != Seed.Type.INFINITE) continue;
+                        if (s.currentLink == null || s.returning) continue;
+                        if (!s.justCollided) continue;
+
+                        double oldP = clamp01(s.progress);
+                        s.returning = true;
+                        s.progress = 1.0 - oldP;
+                        s.impactEnergy = Math.max(s.impactEnergy, 0.6);
+                        s.justCollided = false;
+                }
+        }
+
+        /**
+         * Collect entities that have completed their hop this frame (progress >= 1.0).
+         */
+        private List<Entity> collectArrivals() {
+                List<Entity> arrivals = new ArrayList<>();
+                for (Entity e : new ArrayList<>(entities)) {
+                        if (!e.has(Seed.class)) continue;
+                        Seed s = e.get(Seed.class);
+                        if (s.currentLink == null) continue;
+                        if (s.progress >= 1.0) arrivals.add(e);
+                }
+                return arrivals;
+        }
+
+        /**
+         * Process each arriving seed entity: bounce on disabled or speed-limit, award coins,
+         * apply VPN conversion, spy behavior, saboteur arrival injection and finally enqueue.
+         */
+        private void processArrivals(List<Entity> arrivals) {
+                for (Entity seedEntity : arrivals) {
+                        // defensive: seed may have been removed by previous arrival handling
+                        if (!entities.contains(seedEntity) || !seedEntity.has(Seed.class)) continue;
+                        Seed s = seedEntity.get(Seed.class);
+                        Link link = s.currentLink;
+                        if (link == null) continue;
+
+                        Entity inPort = s.returning ? link.fromPort : link.toPort;
+                        if (inPort == null || !inPort.has(PortInfo.class)) {
+                                // safety: if malformed port, remove seed to avoid stuck state
+                                entities.remove(seedEntity);
+                                engine.incrementLost();
+                                continue;
+                        }
+
+                        Entity system = inPort.get(PortInfo.class).parentSystem;
+                        Transform seedTransform = seedEntity.get(Transform.class);
+                        Transform portTransform = inPort.get(Transform.class);
+
+                        // Speed trap: if entry speed excessive, disable target and bounce
+                        if (!s.returning && s.speed > GameBalance.ENTRY_SPEED_LIMIT) {
+                                ensureSystemDisabled(system, GameBalance.SYSTEM_DISABLE_SECONDS);
+                                bounceSeedBack(s);
+                                continue;
+                        }
+
+                        // If target became disabled while in-flight, bounce back
+                        if (!s.returning && system != null && system.has(Disabled.class)) {
+                                bounceSeedBack(s);
+                                continue;
+                        }
+
+                        // Normal arrival - place seed at port coordinates and clear link
+                        if (seedTransform != null && portTransform != null) {
+                                seedTransform.x = portTransform.x;
+                                seedTransform.y = portTransform.y;
+                        }
+                        s.currentLink = null;
+                        s.progress = 0.0;
+                        s.lateral = 0.0;
+                        boolean wasReturn = s.returning;
+                        s.returning = false;
+
+                        // award coins on successful arrival (only for forward arrivals)
+                        if (!wasReturn) awardArrivalCoins(s);
+
+                        // Reference system consumes packet
+                        if (system != null && system.has(Reference.class)) {
+                                engine.incrementReachedReference();
+                                engine.notifySeedDelivered(s);
+                                entities.remove(seedEntity);
+                                continue;
+                        }
+
+                        // Spy system handling - can remove seed or mark it
+                        if (system != null && system.has(Spy.class)) {
+                                boolean destroyed = handleSpySystemArrival(system, seedEntity, s);
+                                if (destroyed) continue;
+                        }
+
+                        // VPN conversion (on entry)
+                        if (system != null && system.has(Vpn.class)) {
+                                handleVpnConversion(system, seedEntity, s);
+                                // seedEntity now has possibly new Seed component
+                                if (!seedEntity.has(Seed.class)) continue;
+                                s = seedEntity.get(Seed.class);
+                        }
+
+                        // Saboteur arrival effect: noise injection (only for non-PROTECTED)
+                        if (system != null && system.has(Saboteur.class)) {
+                                handleSaboteurArrival(system, s);
+                        }
+
+                        // Enqueue into device buffer (respect capacity)
+                        enqueueToDevice(system, seedEntity);
+                }
+        }
+
+        // ---------------------------
+        // Arrival sub-helpers
+        // ---------------------------
+
+        private void ensureSystemDisabled(Entity system, double seconds) {
+                if (system == null) return;
+                if (system.has(Disabled.class)) {
+                        system.get(Disabled.class).remaining = seconds;
+                } else {
+                        system.add(new Disabled(seconds));
+                }
+        }
+
+        private void bounceSeedBack(Seed s) {
+                s.returning = true;
+                s.progress = 0.0;
+        }
+
+        private void awardArrivalCoins(Seed s) {
+                int reward;
+                switch (s.type) {
+                        case SQUARE: reward = 2; break;
+                        case TRIANGLE: reward = 3; break;
+                        case INFINITE: reward = 1; break;
+                        case SECURE: reward = 3; break;
+                        case PROTECTED: reward = 5; break;
+                        default: reward = 0; break;
+                }
+                engine.incrementCoins(reward);
+        }
+
+        /**
+         * Spy system arrival semantics.
+         *  - SECURE seeds are destroyed (removed).
+         *  - PROTECTED seeds unaffected.
+         *  - Others are marked as having been in a spy system for later dispatch rules.
+         *
+         * @return true if the seed entity was destroyed / removed.
+         */
+        private boolean handleSpySystemArrival(Entity system, Entity seedEntity, Seed s) {
                 if (s.type == Seed.Type.SECURE) {
-                        entities.remove(seedE);
+                        entities.remove(seedEntity);
+                        engine.incrementLost();
+                        return true;
+                }
+                if (s.type == Seed.Type.PROTECTED) {
+                        return false;
+                }
+                s.hasBeenInSpySystem = true;
+                return false;
+        }
+
+        /**
+         * Convert eligible messenger seeds into PROTECTED seeds upon entering a VPN system.
+         * Conversion preserves noise and sets vpnConverter reference so potential reversion can happen.
+         *
+         * This method replaces the Seed component on the same entity when conversion occurs.
+         */
+        private void handleVpnConversion(Entity vpnSystem, Entity seedEntity, Seed s) {
+                if (s == null) return;
+
+                if (s.type == Seed.Type.SECURE) {
+                        Seed newSeed = new Seed(Seed.Type.SECURE_PROTECTED);
+                        newSeed.speed = s.speed;
+                        newSeed.arcPos = s.arcPos;
+                        newSeed.progress = s.progress;
+                        // Copy other relevant properties...
+
+                        seedEntity.remove(Seed.class);
+                        seedEntity.add(newSeed);
+                        return;
+                }
+
+                if (s.type != Seed.Type.SQUARE && s.type != Seed.Type.TRIANGLE && s.type != Seed.Type.INFINITE) {
+                        // SECURE and PROTECTED types pass through
+                        return;
+                }
+
+
+                Seed.Type originalBase = s.type;
+                Seed.Type emulate = pickRandomMessengerType();
+
+                Seed newSeed = new Seed(Seed.Type.PROTECTED);
+                newSeed.protectedBaseType = originalBase;
+                newSeed.emulateType = emulate;
+                newSeed.capacity = (originalBase == Seed.Type.TRIANGLE) ? 4 : 3;
+                newSeed.speed = 0.0;
+                newSeed.accel = 0.0;
+                newSeed.jerk = 0.0;
+                newSeed.noise = s.noise;
+                newSeed.impactEnergy = Math.max(s.impactEnergy, 0.25);
+                newSeed.vpnConverter = vpnSystem;
+
+                seedEntity.remove(Seed.class);
+                seedEntity.add(newSeed);
+        }
+
+        /**
+         * Saboteur arrival behavior:
+         *  - Does not affect PROTECTED seeds.
+         *  - If seed has 0 noise, inject 1.0 noise unit.
+         */
+        private void handleSaboteurArrival(Entity saboteurSystem, Seed s) {
+                if (s == null) return;
+                // do not affect PROTECTED-family packets
+                if (s.type == Seed.Type.PROTECTED || s.type == Seed.Type.SECURE_PROTECTED) return;
+
+                // existing noise injection
+                if (s.noise == 0.0) s.noise += 1.0;
+
+                // trojan tagging with probability (do not tag SECURE types or PROTECTED already handled)
+                // Use RNG field 'rng' already present in this class
+                if (!s.trojan) { // only if not already trojan
+                        if (rng.nextDouble() < GameBalance.SABOTEUR_TROJAN_PROB) {
+                                s.trojan = true;
+                        }
+                }
+        }
+
+        private void enqueueToDevice(Entity system, Entity seedEntity) {
+                if (system == null) {
+                        // If no target system (malformed), drop the seed to avoid leaks
+                        entities.remove(seedEntity);
                         engine.incrementLost();
                         return;
                 }
 
-                // Protected packets are unaffected
-                if (s.type == Seed.Type.PROTECTED) {
+                Deque<Entity> queue = deviceQueues.computeIfAbsent(system, k -> new ArrayDeque<>());
+                if (queue.size() >= GameBalance.DEVICE_CAPACITY) {
+                        // device full: drop packet
+                        entities.remove(seedEntity);
+                        engine.incrementLost();
                         return;
                 }
-
-                // Mark other packets as having been in a spy system
-                s.hasBeenInSpySystem = true;
+                queue.addLast(seedEntity);
         }
 
-        private void revertPacketsFromDisabledVpns() {
+        // ---------------------------
+        // Dispatch / flush logic
+        // ---------------------------
+
+        private void flushAllDeviceQueues() {
+                // iterate over a snapshot of keys to avoid CME if queues are modified
+                for (Entity system : new ArrayList<>(deviceQueues.keySet())) {
+                        Deque<Entity> queue = deviceQueues.get(system);
+                        if (queue == null || queue.isEmpty()) continue;
+                        flushSingleDeviceQueue(system, queue);
+                }
+        }
+
+        private void flushSingleDeviceQueue(Entity system, Deque<Entity> queue) {
+                List<Entity> freeSquareLinks = new ArrayList<>();
+                List<Entity> freeTriangleLinks = new ArrayList<>();
+
+                collectFreeOutboundLinks(system, freeSquareLinks, freeTriangleLinks);
+
+                // Check if head seed has been in spy system and add spy links
+                Entity head = queue.peekFirst();
+                if (head != null && head.has(Seed.class) && head.get(Seed.class).hasBeenInSpySystem) {
+                        collectFreeOutboundLinksFromSpySystems(freeSquareLinks, freeTriangleLinks);
+                }
+
+                boolean progress = true;
+                while (progress && !queue.isEmpty()) {
+                        progress = tryDispatchOneFromQueue(system, queue, freeSquareLinks, freeTriangleLinks);
+                }
+        }
+
+        /**
+         * Collects free outbound links from given system into provided lists partitioned by port shape.
+         */
+        private void collectFreeOutboundLinks(Entity system,
+                                              List<Entity> freeSquare,
+                                              List<Entity> freeTriangle) {
                 for (Entity e : entities) {
-                        if (e.has(Seed.class)) {
+                        if (!e.has(Link.class)) continue;
+                        Link l = e.get(Link.class);
+                        if (l.fromPort == null) continue;
+                        PortInfo pFrom = l.fromPort.get(PortInfo.class);
+                        if (pFrom == null || pFrom.parentSystem != system) continue;
+                        if (!isLinkFree(l)) continue;
+                        if (l.toPort == null || !l.toPort.has(PortInfo.class)) continue;
+                        PortInfo destPi = l.toPort.get(PortInfo.class);
+                        if (destPi != null && destPi.parentSystem != null && destPi.parentSystem.has(Disabled.class)) continue;
+
+                        if (pFrom.shape == PortInfo.Shape.SQUARE) freeSquare.add(e);
+                        else freeTriangle.add(e);
+                }
+        }
+
+        private void collectFreeOutboundLinksFromSpySystems(List<Entity> freeSquare, List<Entity> freeTriangle) {
+                for (Entity e : entities) {
+                        if (!e.has(Link.class)) continue;
+                        Link l = e.get(Link.class);
+                        if (l.fromPort == null) continue;
+                        if (!l.fromPort.has(PortInfo.class)) continue;
+                        PortInfo pFrom = l.fromPort.get(PortInfo.class);
+                        if (pFrom.parentSystem == null || !pFrom.parentSystem.has(Spy.class)) continue;
+                        if (!isLinkFree(l)) continue;
+                        if (l.toPort == null || !l.toPort.has(PortInfo.class)) continue;
+                        PortInfo destPi = l.toPort.get(PortInfo.class);
+                        Entity destSys = destPi.parentSystem;
+                        if (destSys != null && destSys.has(Disabled.class)) continue;
+
+                        // Avoid duplicates
+                        if (pFrom.shape == PortInfo.Shape.SQUARE) {
+                                if (!freeSquare.contains(e)) freeSquare.add(e);
+                        } else {
+                                if (!freeTriangle.contains(e)) freeTriangle.add(e);
+                        }
+                }
+        }
+
+        /**
+         * Attempt to dispatch the head of the queue according to the system rules.
+         * Returns true if a seed was dispatched (progressed).
+         */
+        private boolean tryDispatchOneFromQueue(Entity system,
+                                                Deque<Entity> queue,
+                                                List<Entity> freeSquareLinks,
+                                                List<Entity> freeTriangleLinks) {
+                Entity seedEntity = queue.peekFirst();
+                if (seedEntity == null || !seedEntity.has(Seed.class)) {
+                        queue.pollFirst();
+                        return false;
+                }
+                Seed s = seedEntity.get(Seed.class);
+
+                // Determine chosen link according to seed type and Saboteur rule
+                Entity chosenLinkEntity = selectOutboundLink(system, s, freeSquareLinks, freeTriangleLinks);
+
+                if (chosenLinkEntity == null) {
+                        // no available link to dispatch now
+                        return false;
+                }
+
+                // perform dispatch
+                queue.removeFirst();
+                Link chosenLink = chosenLinkEntity.get(Link.class);
+
+                // apply per-hop kinematics using outgoing port shape
+                PortInfo outPi = chosenLink.fromPort.get(PortInfo.class);
+                Kinematics.applyForHop(s, outPi.shape);
+
+                // position seed at the fromPort transform
+                Transform fromTransform = chosenLink.fromPort.get(Transform.class);
+                Transform st = seedEntity.get(Transform.class);
+                if (fromTransform != null && st != null) {
+                        st.x = fromTransform.x;
+                        st.y = fromTransform.y;
+                }
+
+                s.currentLink = chosenLink;
+                s.progress = 0.0;
+                s.returning = false;
+
+                return true;
+        }
+
+        /**
+         * Selection rules:
+         *  - Normal preference:
+         *      SQUARE/INFINITE => prefer square links
+         *      TRIANGLE => prefer triangle links
+         *      SECURE => random among available
+         *      PROTECTED => use emulateType to choose, otherwise random
+         *  - Saboteur system modification:
+         *      If the source system has Saboteur component, non-PROTECTED seeds should prefer INCOMPATIBLE links first.
+         *      Protected seeds are NOT affected by Saboteur selection (use normal rules).
+         *
+         * This method mutates the freeSquare/freeTriangle lists when it consumes a link.
+         */
+        private Entity selectOutboundLink(Entity sourceSystem,
+                                          Seed s,
+                                          List<Entity> freeSquare,
+                                          List<Entity> freeTriangle) {
+                boolean sourceIsSaboteur = sourceSystem != null && sourceSystem.has(Saboteur.class);
+
+                // If source is saboteur and seed is non-protected, attempt incompatible-first selection
+                if (sourceIsSaboteur && s.type != Seed.Type.PROTECTED) {
+                        Entity chosen = chooseIncompatibleFirst(s, freeSquare, freeTriangle);
+                        if (chosen != null) return chosen;
+                        // otherwise fall-through to normal selection
+                }
+
+                // Normal selection rules:
+                switch (s.type) {
+                        case SQUARE:
+                        case INFINITE:
+                                if (!freeSquare.isEmpty()) return freeSquare.remove(0);
+                                break;
+                        case TRIANGLE:
+                                if (!freeTriangle.isEmpty()) return freeTriangle.remove(0);
+                                break;
+                        case SECURE:
+                                return removeRandomFromLists(freeSquare, freeTriangle);
+                        case PROTECTED:
+                                // PROTECTED emulateType determines preference
+                                Seed.Type emu = (s.emulateType != null) ? s.emulateType : Seed.Type.SQUARE;
+                                if (emu == Seed.Type.TRIANGLE) {
+                                        if (!freeTriangle.isEmpty()) return freeTriangle.remove(0);
+                                } else {
+                                        if (!freeSquare.isEmpty()) return freeSquare.remove(0);
+                                }
+                                break;
+                        case SECURE_PROTECTED:
+                                if (!freeSquare.isEmpty() || !freeTriangle.isEmpty()) {
+                                        return removeRandomFromLists(freeSquare, freeTriangle);
+                                }
+                        default:
+                                break;
+                }
+
+                // fallback: pick any available link at random
+                return removeRandomFromLists(freeSquare, freeTriangle);
+        }
+
+        /**
+         * For SABOTEUR systems: pick an incompatible link first if present.
+         * - SQUARE/INFINITE seeds prefer TRIANGLE links first (incompatible), else square.
+         * - TRIANGLE seeds prefer SQUARE links first, else triangle.
+         */
+        private Entity chooseIncompatibleFirst(Seed s, List<Entity> freeSquare, List<Entity> freeTriangle) {
+                if (s.type == Seed.Type.SQUARE || s.type == Seed.Type.INFINITE) {
+                        if (!freeTriangle.isEmpty()) return freeTriangle.remove(0);
+                        if (!freeSquare.isEmpty()) return freeSquare.remove(0);
+                        return null;
+                } else if (s.type == Seed.Type.TRIANGLE) {
+                        if (!freeSquare.isEmpty()) return freeSquare.remove(0);
+                        if (!freeTriangle.isEmpty()) return freeTriangle.remove(0);
+                        return null;
+                }
+                // SECURE and PROTECTED handled elsewhere
+                return null;
+        }
+
+        /**
+         * Scan for active Antitrojan systems. If any trojan-tagged seed is within
+         * ANTITROJAN_RADIUS of the system, clear the seed.trojan flag and disable
+         * the system for ANTITROJAN_DISABLE_SECONDS. One successful cleanup per
+         * system per sweep (avoid multi-clean per frame).
+         */
+        private void runAntitrojanSweep() {
+                // iterate systems (use snapshot to be safe)
+                for (Entity system : new ArrayList<>(entities)) {
+                        if (!system.has(play.model.components.Antitrojan.class)) continue;
+                        // skip if currently disabled
+                        if (system.has(Disabled.class)) continue;
+
+                        // get system position
+                        Transform sysT = system.get(Transform.class);
+                        if (sysT == null) continue;
+
+                        // find nearest trojan seed within radius
+                        for (Entity e : new ArrayList<>(entities)) {
+                                if (!e.has(Seed.class) || !e.has(Transform.class)) continue;
                                 Seed s = e.get(Seed.class);
-                                // Check if this is a protected packet from a disabled VPN
-                                if (s.type == Seed.Type.PROTECTED &&
-                                        s.vpnConverter != null &&
-                                        s.vpnConverter.has(Disabled.class)) {
-
-                                        // Revert to original type
-                                        s.type = s.protectedBaseType;
-                                        s.protectedBaseType = null;
-                                        s.emulateType = null;
-                                        s.vpnConverter = null;
-
-                                        // Reset to appropriate capacity
-                                        s.capacity = (s.type == Seed.Type.TRIANGLE) ? 4 : 3;
+                                if (!s.trojan) continue;
+                                Transform st = e.get(Transform.class);
+                                double dx = st.x - sysT.x;
+                                double dy = st.y - sysT.y;
+                                double dist2 = dx * dx + dy * dy;
+                                if (dist2 <= GameBalance.ANTITROJAN_RADIUS * GameBalance.ANTITROJAN_RADIUS) {
+                                        // clean it
+                                        s.trojan = false;
+                                        // disable the antitrojan system for cooldown seconds
+                                        system.add(new Disabled(GameBalance.ANTITROJAN_DISABLE_SECONDS));
+                                        // optionally play a sfx or post event via engine.event bus (not required)
+                                        break; // only one cleanup per system this pass
                                 }
                         }
                 }
         }
 
-        private Seed.Type pickRandomMessengerType() {
-                int r = rng.nextInt(3);
-                return (r == 0) ? Seed.Type.SQUARE : (r == 1) ? Seed.Type.TRIANGLE : Seed.Type.INFINITE;
+
+        private Entity removeRandomFromLists(List<Entity> freeSquare, List<Entity> freeTriangle) {
+                int total = freeSquare.size() + freeTriangle.size();
+                if (total == 0) return null;
+                int idx = rng.nextInt(total);
+                if (idx < freeSquare.size()) {
+                        return freeSquare.remove(idx);
+                } else {
+                        return freeTriangle.remove(idx - freeSquare.size());
+                }
+        }
+
+        // ---------------------------
+        // Utility / maintenance helpers
+        // ---------------------------
+
+        /**
+         * If a PROTECTED seed was created from a VPN that later became disabled, revert it
+         * back to its original base type and clear VPN metadata.
+         */
+        private void revertPacketsFromDisabledVpns() {
+                for (Entity e : new ArrayList<>(entities)) {
+                        if (!e.has(Seed.class)) continue;
+                        Seed s = e.get(Seed.class);
+                        if (s.type != Seed.Type.PROTECTED) continue;
+                        if (s.vpnConverter == null) continue;
+                        if (!s.vpnConverter.has(Disabled.class)) continue;
+
+                        // revert
+                        Seed.Type original = s.protectedBaseType;
+                        s.type = (original != null) ? original : Seed.Type.SQUARE;
+                        s.protectedBaseType = null;
+                        s.emulateType = null;
+                        s.vpnConverter = null;
+                        s.capacity = (s.type == Seed.Type.TRIANGLE) ? 4 : 3;
+                }
         }
 
         private boolean isLinkFree(Link link) {
+                if (link == null) return false;
                 for (Entity e : entities) {
                         if (!e.has(Seed.class)) continue;
-                        if (e.get(Seed.class).currentLink == link) return false; // one seed per wire
+                        Seed s = e.get(Seed.class);
+                        if (s.currentLink == link) return false;
                 }
                 return true;
         }
 
+        private Seed.Type pickRandomMessengerType() {
+                int r = rng.nextInt(3);
+                if (r == 0) return Seed.Type.SQUARE;
+                if (r == 1) return Seed.Type.TRIANGLE;
+                return Seed.Type.INFINITE;
+        }
+
         private static double clamp01(double v) {
-                if (v < 0) return 0;
-                if (v > 1) return 1;
+                if (Double.isNaN(v)) return 0.0;
+                if (v < 0.0) return 0.0;
+                if (v > 1.0) return 1.0;
                 return v;
         }
 }
+
 
 
 ===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\systems\SeedMovementSystem.java =====
@@ -4140,6 +4436,11 @@ public class SeedMovementSystem implements System {
                 for (Entity e : entities) {
                         if (!e.has(Seed.class) || !e.has(Transform.class)) continue;
                         Seed s = e.get(Seed.class);
+
+                        if (s.type == Seed.Type.SECURE_PROTECTED) {
+                                handleSecureProtectedMovement(s, dt);
+                        }
+
                         if (s.currentLink == null) continue;
 
                         Link l = s.currentLink;
@@ -4187,6 +4488,39 @@ public class SeedMovementSystem implements System {
                 }
 
                 for (Entity e : toRemove) entities.remove(e);
+        }
+
+        private void handleSecureProtectedMovement(Seed s, double dt) {
+                final double DESIRED_DISTANCE = 300.0; // pixels
+                final double BASE_SPEED = 120.0; // same as secure packets
+
+                // Find all other packets on the same link
+                List<Seed> otherPackets = new ArrayList<>();
+                for (Entity e : entities) {
+                        if (e.has(Seed.class)) {
+                                Seed other = e.get(Seed.class);
+                                if (other != s && other.currentLink == s.currentLink) {
+                                        otherPackets.add(other);
+                                }
+                        }
+                }
+
+                // Calculate movement adjustment based on distances
+                double adjustment = 0;
+                for (Seed other : otherPackets) {
+                        double distance = Math.abs(s.arcPos - other.arcPos);
+                        if (distance < DESIRED_DISTANCE) {
+                                // Move away from other packets
+                                double direction = Math.signum(s.arcPos - other.arcPos);
+                                adjustment += direction * (DESIRED_DISTANCE - distance) / DESIRED_DISTANCE;
+                        }
+                }
+
+                // Apply adjustment to speed (both positive and negative for forward/backward movement)
+                s.speed = BASE_SPEED + (adjustment * BASE_SPEED);
+
+                // Ensure we don't move too fast in either direction
+                s.speed = Math.max(-BASE_SPEED * 2, Math.min(BASE_SPEED * 2, s.speed));
         }
 }
 
@@ -5098,6 +5432,7 @@ public final class PacketView {
         private static Image INFINITE_IMG;
         private static Image SECURE_IMG;
         private static Image PROTECTED_IMG;
+        private static Image SECURE_PROTECTED_IMG;
 
         /** Render a packet centered at (x,y). */
         public static void render(GraphicsContext g, Seed s, double x, double y) {
@@ -5114,6 +5449,10 @@ public final class PacketView {
                 }
                 if (s.type == Seed.Type.PROTECTED) {
                         renderSprite(g, s, x, y, VISUAL_SIZE, getProtectedImage(),1.30, 0.60, 0.10, 0.65, 0.18);
+                        return;
+                }
+                if (s.type == Seed.Type.SECURE_PROTECTED) {
+                        renderSprite(g, s, x, y, VISUAL_SIZE, getSecureProtectedImage(), 1.35, 0.62, 0.10, 0.70, 0.20);
                         return;
                 }
 
@@ -5141,6 +5480,17 @@ public final class PacketView {
 
                 if (noiseNorm > 0.01) {
                         drawShape(g, s, x, y, VISUAL_SIZE * 0.62, noiseColor);
+                }
+
+                if (s.trojan) {
+                        double badgeSize = Math.max(4.0, VISUAL_SIZE * 0.28);
+                        double ox = x + VISUAL_SIZE * 0.45 - badgeSize * 0.5;
+                        double oy = y - VISUAL_SIZE * 0.45 - badgeSize * 0.5;
+                        g.setFill(Color.RED);
+                        g.fillOval(ox, oy, badgeSize, badgeSize);
+                        // optional: small inner highlight
+                        g.setFill(Color.rgb(255,180,180));
+                        g.fillOval(ox + badgeSize*0.22, oy + badgeSize*0.22, badgeSize*0.56, badgeSize*0.56);
                 }
         }
 
@@ -5193,6 +5543,13 @@ public final class PacketView {
                         PROTECTED_IMG = new Image(PacketView.class.getResourceAsStream("/img/protected_packet.png"));
                 }
                 return PROTECTED_IMG;
+        }
+
+        private static Image getSecureProtectedImage() {
+                if (SECURE_PROTECTED_IMG == null) {
+                        SECURE_PROTECTED_IMG = new Image(PacketView.class.getResourceAsStream("/img/secure_protected_packet.png"));
+                }
+                return SECURE_PROTECTED_IMG;
         }
 
         // ---- Vector primitives ----
@@ -6151,17 +6508,17 @@ public final class UiConstants {
 
   "devices": [
     { "id": "SRC_A",   "x": 200, "y": 160,
-      "producer": { "interval": 0.70, "quota": { "square": 6, "infinite": 6 } } },
+      "producer": { "interval": 0.70, "quota": { "square": 6, "secure": 6 } } },
 
     { "id": "SRC_B",   "x": 200, "y": 300,
-      "producer": { "interval": 0.80, "quota": { "triangle": 8 } } },
+      "producer": { "interval": 0.80, "quota": { "triangle": 3, "secure": 6 } } },
 
     { "id": "SRC_SEC", "x": 200, "y": 440,
       "producer": { "interval": 0.75, "quota": { "secure": 6 } } },
 
     { "id": "VPN_1",   "x": 580, "y": 230, "vpn": true },
 
-    { "id": "MIX",     "x": 780, "y": 230 },
+    { "id": "MIX",     "x": 780, "y": 230, "vpn": true },
 
     { "id": "REF",     "x": 1040, "y": 230, "reference": true }
   ],
@@ -6225,19 +6582,19 @@ public final class UiConstants {
       "id": "vpn1",
       "x": 500,
       "y": 150,
-      "vpn": true
+      "saboteur": true
     },
     {
       "id": "spy1",
       "x": 200,
       "y": 350,
-      "spy": true
+      "saboteur": true
     },
     {
       "id": "spy2",
       "x": 400,
       "y": 400,
-      "spy": true
+      "antitrojan": true
     },
     {
       "id": "reference1",
@@ -6351,74 +6708,146 @@ public final class UiConstants {
 
 
 {
-  "totalWire": 3500,
   "timeLimitSeconds": 180,
+  "totalWire": 300000,
+
   "devices": [
     {
-      "id": "producer1",
-      "x": 100,
-      "y": 300,
+      "id": "producer_normal",
+      "x": 120,
+      "y": 120,
       "producer": {
-        "interval": 2.0,
-        "quota": {
-          "square": 10,
-          "triangle": 5
-        }
+        "interval": 0.9,
+        "quota": { "square": 12, "triangle": 12 }
       }
     },
+
     {
-      "id": "saboteur1",
-      "x": 400,
-      "y": 300,
+      "id": "producer_protected",
+      "x": 120,
+      "y": 260,
+      "producer": {
+        "interval": 1.2,
+        "quota": { "square": 8, "triangle": 8 }
+      }
+    },
+
+    {
+      "id": "producer_secure",
+      "x": 120,
+      "y": 400,
+      "producer": {
+        "interval": 1.6,
+        "quota": { "square": 6, "triangle": 6, "secure": 12 }
+      }
+    },
+
+    {
+      "id": "producer_infinite",
+      "x": 120,
+      "y": 540,
+      "producer": {
+        "interval": 0.8,
+        "quota": { "square": 0, "triangle": 0, "infinite": -1 }
+      }
+    },
+
+    {
+      "id": "saboteur_center",
+      "x": 420,
+      "y": 320,
       "saboteur": true
     },
+
     {
-      "id": "reference1",
-      "x": 700,
-      "y": 300,
-      "reference": true
+      "id": "antitrojan_center",
+      "x": 720,
+      "y": 220,
+      "antitrojan": true
+    },
+
+    {
+      "id": "vpn_center",
+      "x": 720,
+      "y": 420,
+      "vpn": true
+    },
+
+    {
+      "id": "spy_far",
+      "x": 960,
+      "y": 320,
+      "spy": true
+    },
+
+    {
+      "id": "consumer_a",
+      "x": 1100,
+      "y": 160
+    },
+
+    {
+      "id": "consumer_b",
+      "x": 1100,
+      "y": 280
+    },
+
+    {
+      "id": "consumer_c",
+      "x": 1100,
+      "y": 400
+    },
+
+    {
+      "id": "consumer_d",
+      "x": 1100,
+      "y": 520
     }
   ],
+
   "ports": [
-    {
-      "id": "producer1_out",
-      "device": "producer1",
-      "x": 150,
-      "y": 300,
-      "shape": "square",
-      "io": "out"
-    },
-    {
-      "id": "saboteur_in",
-      "device": "saboteur1",
-      "x": 350,
-      "y": 300,
-      "shape": "square",
-      "io": "in"
-    },
-    {
-      "id": "saboteur_out1",
-      "device": "saboteur1",
-      "x": 450,
-      "y": 280,
-      "shape": "triangle",
-      "io": "out"
-    },
-    {
-      "id": "saboteur_out2",
-      "device": "saboteur1",
-      "x": 450,
-      "y": 320,
-      "shape": "square",
-      "io": "out"
-    },
-    {
-      "id": "reference1_in",
-      "device": "reference1",
-      "x": 650,
-      "y": 300,
-      "shape": "square",
-      "io": "in"
-    }
-  ]
+    { "id": "p_prod_normal_sq_out",   "device": "producer_normal",   "x": 160, "y": 120, "shape": "square",   "io": "out" },
+    { "id": "p_prod_normal_tri_out",  "device": "producer_normal",   "x": 160, "y": 140, "shape": "triangle", "io": "out" },
+
+    { "id": "p_prod_prot_sq_out",     "device": "producer_protected","x": 160, "y": 260, "shape": "square",   "io": "out" },
+    { "id": "p_prod_prot_tri_out",    "device": "producer_protected","x": 160, "y": 280, "shape": "triangle", "io": "out" },
+
+    { "id": "p_prod_secure_sq_out",   "device": "producer_secure",   "x": 160, "y": 400, "shape": "square",   "io": "out" },
+    { "id": "p_prod_secure_tri_out",  "device": "producer_secure",   "x": 160, "y": 420, "shape": "triangle", "io": "out" },
+
+    { "id": "p_prod_inf_sq_out",      "device": "producer_infinite", "x": 160, "y": 540, "shape": "square",   "io": "out" },
+    { "id": "p_prod_inf_tri_out",     "device": "producer_infinite", "x": 160, "y": 560, "shape": "triangle", "io": "out" },
+
+    { "id": "p_sab_in",  "device": "saboteur_center", "x": 390, "y": 320, "shape": "triangle", "io": "in"  },
+    { "id": "p_sab_out", "device": "saboteur_center", "x": 450, "y": 320, "shape": "triangle", "io": "out" },
+
+    { "id": "p_ant_in",  "device": "antitrojan_center", "x": 690, "y": 220, "shape": "square", "io": "in"  },
+    { "id": "p_ant_out", "device": "antitrojan_center", "x": 750, "y": 220, "shape": "square", "io": "out" },
+
+    { "id": "p_vpn_in",  "device": "vpn_center", "x": 690, "y": 420, "shape": "triangle", "io": "in"  },
+    { "id": "p_vpn_out", "device": "vpn_center", "x": 750, "y": 420, "shape": "triangle", "io": "out" },
+
+    { "id": "p_spy_in",  "device": "spy_far", "x": 930, "y": 320, "shape": "triangle", "io": "in"  },
+    { "id": "p_spy_out", "device": "spy_far", "x": 990, "y": 320, "shape": "triangle", "io": "out" },
+
+    { "id": "p_cons_a_sq_in", "device": "consumer_a", "x": 1060, "y": 160, "shape": "square",   "io": "in" },
+    { "id": "p_cons_a_tri_in","device": "consumer_a", "x": 1060, "y": 180, "shape": "triangle", "io": "in" },
+
+    { "id": "p_cons_b_sq_in", "device": "consumer_b", "x": 1060, "y": 280, "shape": "square",   "io": "in" },
+    { "id": "p_cons_b_tri_in","device": "consumer_b", "x": 1060, "y": 300, "shape": "triangle", "io": "in" },
+
+    { "id": "p_cons_c_sq_in", "device": "consumer_c", "x": 1060, "y": 400, "shape": "square",   "io": "in" },
+    { "id": "p_cons_c_tri_in","device": "consumer_c", "x": 1060, "y": 420, "shape": "triangle", "io": "in" },
+
+    { "id": "p_cons_d_sq_in", "device": "consumer_d", "x": 1060, "y": 520, "shape": "square",   "io": "in" },
+    { "id": "p_cons_d_tri_in","device": "consumer_d", "x": 1060, "y": 540, "shape": "triangle", "io": "in" }
+  ],
+
+  "meta": {
+    "name": "Level 9 â€” Compact Trojan Testbed",
+    "author": "auto-generated",
+    "difficulty": "medium",
+    "notes": "This level has balanced square/triangle ports (total ins == outs per shape). Wire producers -> systems -> consumers to exercise trojan and antitrojan behaviors."
+  }
 }
+

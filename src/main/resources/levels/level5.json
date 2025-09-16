@@ -4,17 +4,17 @@
 
   "devices": [
     { "id": "SRC_A",   "x": 200, "y": 160,
-      "producer": { "interval": 0.70, "quota": { "square": 6, "infinite": 6 } } },
+      "producer": { "interval": 0.70, "quota": { "square": 6, "secure": 6 } } },
 
     { "id": "SRC_B",   "x": 200, "y": 300,
-      "producer": { "interval": 0.80, "quota": { "triangle": 8 } } },
+      "producer": { "interval": 0.80, "quota": { "triangle": 3, "secure": 6 } } },
 
     { "id": "SRC_SEC", "x": 200, "y": 440,
       "producer": { "interval": 0.75, "quota": { "secure": 6 } } },
 
     { "id": "VPN_1",   "x": 580, "y": 230, "vpn": true },
 
-    { "id": "MIX",     "x": 780, "y": 230 },
+    { "id": "MIX",     "x": 780, "y": 230, "vpn": true },
 
     { "id": "REF",     "x": 1040, "y": 230, "reference": true }
   ],

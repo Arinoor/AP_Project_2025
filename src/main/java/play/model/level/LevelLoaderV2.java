@@ -69,6 +69,11 @@ public final class LevelLoaderV2 {
                                         systemE.add(new BackgroundImage("/img/saboteur_system.png"));
                                 }
 
+                                if (d.path("antitrojan").asBoolean(false)) {
+                                        systemE.add(new Antitrojan());
+                                        systemE.add(new BackgroundImage("/img/antitrojan_packet.png"));
+                                }
+
                                 JsonNode prodNode = d.path("producer");
                                 if (!prodNode.isMissingNode() && !prodNode.isNull()) {
                                         double interval = prodNode.path("interval").asDouble(1.0);
@@ -149,3 +154,4 @@ public final class LevelLoaderV2 {
                 return out;
         }
 }
+

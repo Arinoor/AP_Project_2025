@@ -54,6 +54,11 @@ public class SeedMovementSystem implements System {
                 for (Entity e : entities) {
                         if (!e.has(Seed.class) || !e.has(Transform.class)) continue;
                         Seed s = e.get(Seed.class);
+
+                        if (s.type == Seed.Type.SECURE_PROTECTED) {
+                                handleSecureProtectedMovement(s, dt);
+                        }
+
                         if (s.currentLink == null) continue;
 
                         Link l = s.currentLink;
@@ -102,4 +107,38 @@ public class SeedMovementSystem implements System {
 
                 for (Entity e : toRemove) entities.remove(e);
         }
+
+        private void handleSecureProtectedMovement(Seed s, double dt) {
+                final double DESIRED_DISTANCE = 300.0; // pixels
+                final double BASE_SPEED = 120.0; // same as secure packets
+
+                // Find all other packets on the same link
+                List<Seed> otherPackets = new ArrayList<>();
+                for (Entity e : entities) {
+                        if (e.has(Seed.class)) {
+                                Seed other = e.get(Seed.class);
+                                if (other != s && other.currentLink == s.currentLink) {
+                                        otherPackets.add(other);
+                                }
+                        }
+                }
+
+                // Calculate movement adjustment based on distances
+                double adjustment = 0;
+                for (Seed other : otherPackets) {
+                        double distance = Math.abs(s.arcPos - other.arcPos);
+                        if (distance < DESIRED_DISTANCE) {
+                                // Move away from other packets
+                                double direction = Math.signum(s.arcPos - other.arcPos);
+                                adjustment += direction * (DESIRED_DISTANCE - distance) / DESIRED_DISTANCE;
+                        }
+                }
+
+                // Apply adjustment to speed (both positive and negative for forward/backward movement)
+                s.speed = BASE_SPEED + (adjustment * BASE_SPEED);
+
+                // Ensure we don't move too fast in either direction
+                s.speed = Math.max(-BASE_SPEED * 2, Math.min(BASE_SPEED * 2, s.speed));
+        }
 }
+

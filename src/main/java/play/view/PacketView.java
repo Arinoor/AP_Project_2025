@@ -1,3 +1,4 @@
+
 package play.view;
 
 import javafx.scene.canvas.GraphicsContext;
@@ -24,6 +25,7 @@ public final class PacketView {
         private static Image INFINITE_IMG;
         private static Image SECURE_IMG;
         private static Image PROTECTED_IMG;
+        private static Image SECURE_PROTECTED_IMG;
 
         /** Render a packet centered at (x,y). */
         public static void render(GraphicsContext g, Seed s, double x, double y) {
@@ -40,6 +42,10 @@ public final class PacketView {
                 }
                 if (s.type == Seed.Type.PROTECTED) {
                         renderSprite(g, s, x, y, VISUAL_SIZE, getProtectedImage(),1.30, 0.60, 0.10, 0.65, 0.18);
+                        return;
+                }
+                if (s.type == Seed.Type.SECURE_PROTECTED) {
+                        renderSprite(g, s, x, y, VISUAL_SIZE, getSecureProtectedImage(), 1.35, 0.62, 0.10, 0.70, 0.20);
                         return;
                 }
 
@@ -67,6 +73,17 @@ public final class PacketView {
 
                 if (noiseNorm > 0.01) {
                         drawShape(g, s, x, y, VISUAL_SIZE * 0.62, noiseColor);
+                }
+
+                if (s.trojan) {
+                        double badgeSize = Math.max(4.0, VISUAL_SIZE * 0.28);
+                        double ox = x + VISUAL_SIZE * 0.45 - badgeSize * 0.5;
+                        double oy = y - VISUAL_SIZE * 0.45 - badgeSize * 0.5;
+                        g.setFill(Color.RED);
+                        g.fillOval(ox, oy, badgeSize, badgeSize);
+                        // optional: small inner highlight
+                        g.setFill(Color.rgb(255,180,180));
+                        g.fillOval(ox + badgeSize*0.22, oy + badgeSize*0.22, badgeSize*0.56, badgeSize*0.56);
                 }
         }
 
@@ -121,6 +138,13 @@ public final class PacketView {
                 return PROTECTED_IMG;
         }
 
+        private static Image getSecureProtectedImage() {
+                if (SECURE_PROTECTED_IMG == null) {
+                        SECURE_PROTECTED_IMG = new Image(PacketView.class.getResourceAsStream("/img/secure_protected_packet.png"));
+                }
+                return SECURE_PROTECTED_IMG;
+        }
+
         // ---- Vector primitives ----
 
         private static void drawShape(GraphicsContext g, Seed s, double x, double y, double size, Color fill) {
@@ -140,3 +164,4 @@ public final class PacketView {
                 return (v < 0) ? 0 : (v > 1) ? 1 : v;
         }
 }
+

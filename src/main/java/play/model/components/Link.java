@@ -25,6 +25,8 @@ public class Link {
 
         private double length = 1.0;
 
+        public int heavyPasses = 0;
+
         /** Cached polyline points (start + bends + end) computed at last updateGeometry(). */
         private final List<Vec2> poly = new ArrayList<>();
 

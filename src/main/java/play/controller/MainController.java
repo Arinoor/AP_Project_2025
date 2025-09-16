@@ -217,7 +217,7 @@ public class MainController {
                         () -> timeRemaining
                 );
 
-                // Bend tool (attach to canvas) — use three functional params
+                // Bend tool (attach to canvas) â€” use three functional params
                 bendTool = new BendTool(
                         engine,
                         engine.entities(),

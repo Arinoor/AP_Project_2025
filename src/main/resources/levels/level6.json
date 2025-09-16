@@ -25,19 +25,19 @@
       "id": "vpn1",
       "x": 500,
       "y": 150,
-      "vpn": true
+      "saboteur": true
     },
     {
       "id": "spy1",
       "x": 200,
       "y": 350,
-      "spy": true
+      "saboteur": true
     },
     {
       "id": "spy2",
       "x": 400,
       "y": 400,
-      "spy": true
+      "antitrojan": true
     },
     {
       "id": "reference1",

@@ -5,7 +5,7 @@ import play.model.core.Entity;
 
 /** Packet (seed) travelling in the network. */
 public class Seed {
-        public enum Type { SQUARE, TRIANGLE, INFINITE, SECURE, PROTECTED, HEAVY, BITPACKET }
+        public enum Type { SQUARE, TRIANGLE, INFINITE, SECURE, PROTECTED, SECURE_PROTECTED }
 
         public Type type;
 
@@ -52,6 +52,7 @@ public class Seed {
 
         public boolean hasBeenInSpySystem = false;
 
+        public boolean trojan = false;
 
 
         public Seed(Type type) {
@@ -74,6 +75,7 @@ public class Seed {
                         case PROTECTED:
                                 double base = baseSizeUnitsFor(protectedBaseType);
                                 return base * 2.0;
+                        case SECURE_PROTECTED:  return 6.0;
                         default:
                                 return 2.0;
                 }
@@ -87,3 +89,4 @@ public class Seed {
                 return 2.0;
         }
 }
+
