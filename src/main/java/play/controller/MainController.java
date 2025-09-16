@@ -17,6 +17,7 @@ import javafx.stage.Stage;
 import play.infrastructure.audio.Audio;
 import play.model.audio.AudioAssets;
 import play.model.components.*;
+import play.model.constants.GameBalance;
 import play.model.core.Entity;
 import play.model.engine.GameEngine;
 import play.model.level.LevelLoaderV2;
@@ -72,6 +73,7 @@ public class MainController {
         // Game state
         private boolean running = false;
         private boolean hasStarted = false;
+        private boolean wasRunningBeforeShop = false;
         private boolean timeUpHandled = false;
         private boolean gameEnded = false;
         private boolean resultDialogQueued = false;
@@ -96,6 +98,12 @@ public class MainController {
         private long prevNanos = 0L;
         private double elapsed = 0.0;
 
+
+        // Aergia item
+        public boolean aergiaSelectionMode = false;
+        private Link selectedLinkForAergia = null;
+        private double selectedPositionForAergia = 0.0;
+
         // ---------- Lifecycle ----------
 
         @FXML
@@ -116,6 +124,13 @@ public class MainController {
                                         if (c == KeyCode.LEFT)  backwardPressed = true;
                                         if (!running && !hasStarted && c == KeyCode.W) wiringMode = true;
                                         if (c == KeyCode.S) openShop();
+
+                                        // Add this block to handle cancellation
+                                        if (c == KeyCode.ESCAPE && aergiaSelectionMode) {
+                                                aergiaSelectionMode = false;
+                                                running = wasRunningBeforeShop; // Resume the game
+                                                Audio.get().playSfx(AudioAssets.CLICK); // Optional: play a cancel sound
+                                        }
                                 });
                                 gameCanvas.getScene().setOnKeyReleased(e -> {
                                         KeyCode c = e.getCode();
@@ -148,6 +163,8 @@ public class MainController {
                 gameCanvas.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_PRESSED, this::onMousePressed);
                 gameCanvas.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_DRAGGED, this::onMouseDragged);
                 gameCanvas.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_RELEASED, this::onMouseReleased);
+                gameCanvas.addEventHandler(MouseEvent.MOUSE_CLICKED, this::onMouseClicked);
+
 
                 updateStartButtonLabel();
                 updateStartButtonStyle();
@@ -286,8 +303,9 @@ public class MainController {
 
         // ---------- UI actions (unchanged) ----------
 
+
         private void openShop() {
-                boolean wasRunning = running;
+                wasRunningBeforeShop = running;
                 running = false;
 
                 Stage owner = (Stage) gameCanvas.getScene().getWindow();
@@ -295,7 +313,7 @@ public class MainController {
                         FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/Shop.fxml"));
                         Parent root = loader.load();
                         ShopController ctrl = loader.getController();
-                        ctrl.init(engine, shopSystem);
+                        ctrl.init(this, engine, shopSystem); // Pass this MainController
 
                         Stage stage = new Stage();
                         Scene scene = new Scene(root);
@@ -316,7 +334,9 @@ public class MainController {
                                 stage.initModality(Modality.APPLICATION_MODAL);
                         }
                         stage.setOnHidden(ev -> {
-                                running = wasRunning;
+                                if (!aergiaSelectionMode) { // Don’t resume if waiting for Aergia placement
+                                        running = wasRunningBeforeShop;
+                                }
                                 gameCanvas.requestFocus();
                                 updateStartButtonLabel();
                                 updateStartButtonStyle();
@@ -324,9 +344,10 @@ public class MainController {
                         stage.show();
                 } catch (Exception ex) {
                         ex.printStackTrace();
-                        running = wasRunning;
+                        running = wasRunningBeforeShop;
                 }
         }
+
 
         private void toggleRun() {
                 if (gameEnded) return;
@@ -500,6 +521,58 @@ public class MainController {
                 dragStartPort = null;
                 if (renderSystem != null) renderSystem.updateWiringPreview(null, 0, 0, false);
                 Audio.get().playSfx(ok ? AudioAssets.WIRE_CONNECT : AudioAssets.ERROR);
+        }
+
+
+        private void onMouseClicked(MouseEvent e) {
+                if (!aergiaSelectionMode) return;
+
+                aergiaSelectionMode = false;
+                shopSystem.getState().aergiaSelectionActive = false;
+
+                // Find nearest link segment
+                WiringUtils.SegmentHit hit = WiringUtils.findNearestSegment(
+                        engine.entities(), e.getX(), e.getY(), 10.0);
+
+                if (hit != null) {
+                        // Calculate normalized position along the link
+                        double totalLength = WiringUtils.pathLength(hit.link);
+                        List<WiringUtils.Pt> path = WiringUtils.path(hit.link);
+
+                        // Calculate length up to the hit segment
+                        double lengthToSegment = 0.0;
+                        for (int i = 0; i < hit.segmentIndex; i++) {
+                                WiringUtils.Pt a = path.get(i);
+                                WiringUtils.Pt b = path.get(i+1);
+                                lengthToSegment += Math.hypot(b.x - a.x, b.y - a.y);
+                        }
+
+                        // Calculate length within the segment
+                        WiringUtils.Pt segStart = path.get(hit.segmentIndex);
+                        WiringUtils.Pt segEnd = path.get(hit.segmentIndex+1);
+                        double segmentLength = Math.hypot(segEnd.x - segStart.x, segEnd.y - segStart.y);
+                        double hitDistance = Math.hypot(hit.hitX - segStart.x, hit.hitY - segStart.y);
+
+                        double normalizedPosition = (lengthToSegment + hitDistance) / totalLength;
+
+                        // Create Aergia effect entity with correct position
+                        Entity effect = new Entity().add(new AergiaEffect(
+                                hit.link,
+                                normalizedPosition,
+                                GameBalance.AERGIA_DURATION
+                        ));
+                        engine.entities().add(effect);
+
+                        // Deduct coins and set cooldown
+                        engine.incrementCoins(-GameBalance.COST_AERGIA);
+                        shopSystem.getState().aergiaCooldown = GameBalance.AERGIA_COOLDOWN;
+
+                        Audio.get().playSfx(AudioAssets.PURCHASE);
+                } else {
+                        Audio.get().playSfx(AudioAssets.ERROR);
+                }
+
+                running = wasRunningBeforeShop;
         }
 
         private boolean tryCreateLink(Entity fromPort, Entity toPort) {

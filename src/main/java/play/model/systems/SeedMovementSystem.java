@@ -50,7 +50,25 @@ public class SeedMovementSystem implements System {
                         }
                 }
 
+                List<AergiaEffect> activeEffects = new ArrayList<>();
                 List<Entity> toRemove = new ArrayList<>();
+
+                for (Entity e : entities) {
+                        if (e.has(AergiaEffect.class)) {
+                                AergiaEffect effect = e.get(AergiaEffect.class);
+                                effect.remainingTime -= dt;
+                                if (effect.remainingTime <= 0) {
+                                        toRemove.add(e);
+                                } else {
+                                        activeEffects.add(effect);
+                                }
+                        }
+                }
+
+                for (Entity e : toRemove) entities.remove(e);
+
+
+                toRemove.clear();
 
                 for (Entity e : entities) {
                         if (!e.has(Seed.class) || !e.has(Transform.class)) continue;
@@ -70,6 +88,19 @@ public class SeedMovementSystem implements System {
                         if (s.type == Seed.Type.HEAVY) {
                                 boolean hasBends = !WiringUtils.bends(l).isEmpty();
                                 s.accel = hasBends ? GameBalance.HEAVY_CURVE_ACCEL : 0.0;
+                        }
+
+                        if (s.currentLink != null) {
+                                for (AergiaEffect effect : activeEffects) {
+                                        if (effect.link == s.currentLink) {
+                                                double distance = Math.abs(s.progress - effect.position);
+                                                if (distance < 0.05) { // within 5% of the link
+                                                        s.accel = 0;
+                                                        s.jerk = 0;
+                                                        break;
+                                                }
+                                        }
+                                }
                         }
 
                         // Integrate velocity and distance

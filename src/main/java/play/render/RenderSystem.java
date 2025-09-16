@@ -109,6 +109,19 @@ public class RenderSystem implements System {
                         bendTool.renderHover(g);
                 }
 
+                for (Entity e : entities) {
+                        if (e.has(AergiaEffect.class)) {
+                                AergiaEffect effect = e.get(AergiaEffect.class);
+                                WiringUtils.Pt pos = WiringUtils.pointAlongNormalized(
+                                        effect.link, effect.position);
+
+                                // Draw purple circle for Aergia effect
+                                g.setFill(Color.PURPLE);
+                                double r = UiConstants.BEND_DOT_RADIUS;
+                                g.fillOval(pos.x - r, pos.y - r, 2 * r, 2 * r);
+                        }
+                }
+
                 // systems (either background image OR default rectangle) + reference ring + disabled overlay
                 final double SYSTEM_SIZE = UiConstants.SYSTEM_SIZE;
                 for (Entity e : entities) {

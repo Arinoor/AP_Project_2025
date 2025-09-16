@@ -16,6 +16,10 @@
         <Button fx:id="btnAnahita" text="Anahita - 5 coins (Reset noise)" onAction="#onAnahita"/>
         <Label fx:id="lblAnaMsg" text=""/>
     </HBox>
+    <HBox spacing="8" styleClass="shop-row">
+        <Button fx:id="btnAergia" text="Scroll of Aergia - 10 coins (Zero accel point 20s)" onAction="#onAergia"/>
+        <Label fx:id="lblAergiaMsg" text=""/>
+    </HBox>
     <HBox spacing="8">
         <Label fx:id="coinsInfo" text="Your coins: 0"/>
         <Region HBox.hgrow="ALWAYS"/>

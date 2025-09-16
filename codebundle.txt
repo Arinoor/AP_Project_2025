@@ -227,31 +227,15 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="cc202a8e-4f0b-4a78-9065-4a606d51ea93" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/src/main/java/play/model/components/BitPacket.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/play/model/components/Merge.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/play/model/components/AergiaEffect.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/codebundle.txt" beforeDir="false" afterPath="$PROJECT_DIR$/codebundle.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/components/Distribute.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/components/Distribute.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/components/DistributorSystem.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/components/HeavyPacket.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/components/HeavyPacket.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/components/Link.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/components/Link.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/components/PortInfo.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/components/PortInfo.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/components/Producer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/components/Producer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/components/Seed.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/components/Seed.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/play/controller/MainController.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/controller/MainController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/play/controller/ShopController.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/controller/ShopController.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/play/model/constants/GameBalance.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/constants/GameBalance.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/engine/GameEngine.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/engine/GameEngine.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/level/LevelDto.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/level/LevelFactory.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/level/LevelLoaderV2.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/level/LevelLoaderV2.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/level/LevelParser.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/services/GameService.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/services/LevelRepository.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/systems/HeavyPacketSystem.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/systems/ProductionSystem.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/systems/ProductionSystem.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/systems/QueueSystem.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/systems/QueueSystem.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/play/model/systems/SeedMovementSystem.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/systems/SeedMovementSystem.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/view/PacketView.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/view/PacketView.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/levels/level5.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/levels/level5.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/levels/level7.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/levels/level7.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/systems/ShopSystem.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/systems/ShopSystem.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/play/render/RenderSystem.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/render/RenderSystem.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/fxml/Shop.fxml" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/fxml/Shop.fxml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -797,6 +781,7 @@ import javafx.stage.Stage;
 import play.infrastructure.audio.Audio;
 import play.model.audio.AudioAssets;
 import play.model.components.*;
+import play.model.constants.GameBalance;
 import play.model.core.Entity;
 import play.model.engine.GameEngine;
 import play.model.level.LevelLoaderV2;
@@ -852,6 +837,7 @@ public class MainController {
         // Game state
         private boolean running = false;
         private boolean hasStarted = false;
+        private boolean wasRunningBeforeShop = false;
         private boolean timeUpHandled = false;
         private boolean gameEnded = false;
         private boolean resultDialogQueued = false;
@@ -876,6 +862,12 @@ public class MainController {
         private long prevNanos = 0L;
         private double elapsed = 0.0;
 
+
+        // Aergia item
+        public boolean aergiaSelectionMode = false;
+        private Link selectedLinkForAergia = null;
+        private double selectedPositionForAergia = 0.0;
+
         // ---------- Lifecycle ----------
 
         @FXML
@@ -896,6 +888,13 @@ public class MainController {
                                         if (c == KeyCode.LEFT)  backwardPressed = true;
                                         if (!running && !hasStarted && c == KeyCode.W) wiringMode = true;
                                         if (c == KeyCode.S) openShop();
+
+                                        // Add this block to handle cancellation
+                                        if (c == KeyCode.ESCAPE && aergiaSelectionMode) {
+                                                aergiaSelectionMode = false;
+                                                running = wasRunningBeforeShop; // Resume the game
+                                                Audio.get().playSfx(AudioAssets.CLICK); // Optional: play a cancel sound
+                                        }
                                 });
                                 gameCanvas.getScene().setOnKeyReleased(e -> {
                                         KeyCode c = e.getCode();
@@ -928,6 +927,8 @@ public class MainController {
                 gameCanvas.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_PRESSED, this::onMousePressed);
                 gameCanvas.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_DRAGGED, this::onMouseDragged);
                 gameCanvas.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_RELEASED, this::onMouseReleased);
+                gameCanvas.addEventHandler(MouseEvent.MOUSE_CLICKED, this::onMouseClicked);
+
 
                 updateStartButtonLabel();
                 updateStartButtonStyle();
@@ -1066,8 +1067,9 @@ public class MainController {
 
         // ---------- UI actions (unchanged) ----------
 
+
         private void openShop() {
-                boolean wasRunning = running;
+                wasRunningBeforeShop = running;
                 running = false;
 
                 Stage owner = (Stage) gameCanvas.getScene().getWindow();
@@ -1075,7 +1077,7 @@ public class MainController {
                         FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/Shop.fxml"));
                         Parent root = loader.load();
                         ShopController ctrl = loader.getController();
-                        ctrl.init(engine, shopSystem);
+                        ctrl.init(this, engine, shopSystem); // Pass this MainController
 
                         Stage stage = new Stage();
                         Scene scene = new Scene(root);
@@ -1096,7 +1098,9 @@ public class MainController {
                                 stage.initModality(Modality.APPLICATION_MODAL);
                         }
                         stage.setOnHidden(ev -> {
-                                running = wasRunning;
+                                if (!aergiaSelectionMode) { // Donâ€™t resume if waiting for Aergia placement
+                                        running = wasRunningBeforeShop;
+                                }
                                 gameCanvas.requestFocus();
                                 updateStartButtonLabel();
                                 updateStartButtonStyle();
@@ -1104,9 +1108,10 @@ public class MainController {
                         stage.show();
                 } catch (Exception ex) {
                         ex.printStackTrace();
-                        running = wasRunning;
+                        running = wasRunningBeforeShop;
                 }
         }
+
 
         private void toggleRun() {
                 if (gameEnded) return;
@@ -1282,6 +1287,58 @@ public class MainController {
                 Audio.get().playSfx(ok ? AudioAssets.WIRE_CONNECT : AudioAssets.ERROR);
         }
 
+
+        private void onMouseClicked(MouseEvent e) {
+                if (!aergiaSelectionMode) return;
+
+                aergiaSelectionMode = false;
+                shopSystem.getState().aergiaSelectionActive = false;
+
+                // Find nearest link segment
+                WiringUtils.SegmentHit hit = WiringUtils.findNearestSegment(
+                        engine.entities(), e.getX(), e.getY(), 10.0);
+
+                if (hit != null) {
+                        // Calculate normalized position along the link
+                        double totalLength = WiringUtils.pathLength(hit.link);
+                        List<WiringUtils.Pt> path = WiringUtils.path(hit.link);
+
+                        // Calculate length up to the hit segment
+                        double lengthToSegment = 0.0;
+                        for (int i = 0; i < hit.segmentIndex; i++) {
+                                WiringUtils.Pt a = path.get(i);
+                                WiringUtils.Pt b = path.get(i+1);
+                                lengthToSegment += Math.hypot(b.x - a.x, b.y - a.y);
+                        }
+
+                        // Calculate length within the segment
+                        WiringUtils.Pt segStart = path.get(hit.segmentIndex);
+                        WiringUtils.Pt segEnd = path.get(hit.segmentIndex+1);
+                        double segmentLength = Math.hypot(segEnd.x - segStart.x, segEnd.y - segStart.y);
+                        double hitDistance = Math.hypot(hit.hitX - segStart.x, hit.hitY - segStart.y);
+
+                        double normalizedPosition = (lengthToSegment + hitDistance) / totalLength;
+
+                        // Create Aergia effect entity with correct position
+                        Entity effect = new Entity().add(new AergiaEffect(
+                                hit.link,
+                                normalizedPosition,
+                                GameBalance.AERGIA_DURATION
+                        ));
+                        engine.entities().add(effect);
+
+                        // Deduct coins and set cooldown
+                        engine.incrementCoins(-GameBalance.COST_AERGIA);
+                        shopSystem.getState().aergiaCooldown = GameBalance.AERGIA_COOLDOWN;
+
+                        Audio.get().playSfx(AudioAssets.PURCHASE);
+                } else {
+                        Audio.get().playSfx(AudioAssets.ERROR);
+                }
+
+                running = wasRunningBeforeShop;
+        }
+
         private boolean tryCreateLink(Entity fromPort, Entity toPort) {
                 WiringService.WiringComputation comp = WiringService.compute(engine.entities(), fromPort, toPort);
                 if (!comp.valid) return false;
@@ -1393,21 +1450,28 @@ public class ShopController {
         @FXML private Button btnAtar;
         @FXML private Button btnAiryaman;
         @FXML private Button btnAnahita;
+        @FXML private Button btnAergia;
         @FXML private Button closeBtn;
         @FXML private Label  lblAtarMsg;
         @FXML private Label  lblAiryMsg;
         @FXML private Label  lblAnaMsg;
+        @FXML private Label lblAergiaMsg;
         @FXML private Label  coinsInfo;
+
+        private MainController mainController;
+
 
         private GameEngine engine;
         private ShopSystem shop;
 
-        public void init(GameEngine engine, ShopSystem shop) {
+        public void init(MainController mainController, GameEngine engine, ShopSystem shop) {
+                this.mainController = mainController;
                 this.engine = engine;
                 this.shop = shop;
                 refreshCoins();
                 clearStatus();
         }
+
 
         @FXML private void onAtar() {
                 if (shop.buyAtar()) {
@@ -1445,6 +1509,25 @@ public class ShopController {
                 }
                 refreshCoins();
         }
+
+        @FXML
+        private void onAergia() {
+                if (shop.buyAergia()) {
+                        lblAergiaMsg.setText("Select a point on a wire to apply effect.");
+                        Audio.get().playSfx(AudioAssets.PURCHASE);
+
+                        // Start selection mode in MainController
+                        mainController.aergiaSelectionMode = true;
+
+                        // Close the shop immediately
+                        btnAergia.getScene().getWindow().hide();
+                } else {
+                        lblAergiaMsg.setText("Not enough coins (need 10) or on cooldown.");
+                        Audio.get().playSfx(AudioAssets.ERROR);
+                }
+                refreshCoins();
+        }
+
 
         @FXML private void onClose() {
                 clearStatus();
@@ -1907,6 +1990,27 @@ public final class GlobalAudio {
         }
 }
 
+
+
+===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\components\AergiaEffect.java =====
+
+
+// New file: AergiaEffect.java
+package play.model.components;
+
+import play.model.core.Entity;
+
+public class AergiaEffect {
+        public final Link link;
+        public final double position; // normalized position along the link [0-1]
+        public double remainingTime;
+
+        public AergiaEffect(Link link, double position, double duration) {
+                this.link = link;
+                this.position = position;
+                this.remainingTime = duration;
+        }
+}
 
 
 ===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\components\Antitrojan.java =====
@@ -2531,6 +2635,10 @@ public final class GameBalance {
         public static final int COST_ATAR     = 3; // disable impact waves 10s
         public static final int COST_AIRYAMAN = 4; // disable collisions 5s
         public static final int COST_ANAHITA  = 5; // reset packet noise now
+        public static final int COST_AERGIA = 10;
+
+        public static final double AERGIA_DURATION = 20.0; // 20 seconds
+        public static final double AERGIA_COOLDOWN = 30.0; // 30 seconds cooldown
 
         // Phase 2: Bend cost & caps
         public static final int  COST_BEND_PER_LINK_CREATE = 1; // pay once per new bend
@@ -4491,9 +4599,32 @@ public class SeedMovementSystem implements System {
                         // Polyline length (up-to-date with bends)
                         double length = Math.max(MIN_LINK_LEN, WiringUtils.pathLength(l));
 
+                        if (s.type == Seed.Type.HEAVY) {
+                                boolean hasBends = !WiringUtils.bends(l).isEmpty();
+                                s.accel = hasBends ? GameBalance.HEAVY_CURVE_ACCEL : 0.0;
+                        }
+
+                        if (e.has(AergiaEffect.class)) {
+                                AergiaEffect effect = e.get(AergiaEffect.class);
+                                effect.remainingTime -= dt;
+                                if (effect.remainingTime <= 0) {
+                                        entities.remove(e);
+                                        continue;
+                                }
+
+                                if (s.currentLink == effect.link &&
+                                        Math.abs(s.progress - effect.position) < 1) {
+                                        s.accel = 0;
+                                        s.jerk = 0;
+                                        s.speed = 1;
+                                        java.lang.System.out.println("sdfsdf");
+                                }
+                        }
+
                         // Integrate velocity and distance
                         s.speed += s.accel * dt;
                         if (s.speed < 0) s.speed = 0;
+
                         double ds = s.speed * dt + 0.5 * s.accel * dt * dt;
 
                         // Convert to normalized progress on [0..1] via arc-length
@@ -4527,7 +4658,6 @@ public class SeedMovementSystem implements System {
                         st.x = pos.x;
                         st.y = pos.y;
 
-                        // TODO: if you have handoff logic on reaching end of link, keep it here when s.progress == 1.0
                 }
 
                 for (Entity e : toRemove) entities.remove(e);
@@ -4585,10 +4715,12 @@ public class ShopSystem implements System {
                 public boolean disableImpactWaves = false;
                 public boolean disableCollisions  = false;
                 public boolean disableLateral     = false;
+                public boolean aergiaSelectionActive = false;
 
                 double impactOffUntil = 0.0;
                 double collOffUntil   = 0.0;
                 double latOffUntil    = 0.0;
+                public double aergiaCooldown = 0.0;
         }
 
         private final GameEngine engine;
@@ -4607,6 +4739,10 @@ public class ShopSystem implements System {
                 if (state.disableImpactWaves && time >= state.impactOffUntil) state.disableImpactWaves = false;
                 if (state.disableCollisions  && time >= state.collOffUntil)   state.disableCollisions  = false;
                 if (state.disableLateral     && time >= state.latOffUntil)    state.disableLateral     = false;
+
+                if (state.aergiaCooldown > 0) {
+                        state.aergiaCooldown -= dt;
+                }
         }
 
         public boolean buyAtar() {
@@ -4638,6 +4774,15 @@ public class ShopSystem implements System {
                 }
                 return true;
         }
+
+        public boolean buyAergia() {
+                if (engine.getCoins() < GameBalance.COST_AERGIA || state.aergiaCooldown > 0) {
+                        return false;
+                }
+                state.aergiaSelectionActive = true;
+                return true;
+        }
+
 }
 
 
@@ -4859,6 +5004,19 @@ public class RenderSystem implements System {
                 // draw bend hover highlight (if any)
                 if (bendTool != null) {
                         bendTool.renderHover(g);
+                }
+
+                for (Entity e : entities) {
+                        if (e.has(AergiaEffect.class)) {
+                                AergiaEffect effect = e.get(AergiaEffect.class);
+                                WiringUtils.Pt pos = WiringUtils.pointAlongNormalized(
+                                        effect.link, effect.position);
+
+                                // Draw purple circle for Aergia effect
+                                g.setFill(Color.PURPLE);
+                                double r = UiConstants.BEND_DOT_RADIUS;
+                                g.fillOval(pos.x - r, pos.y - r, 2 * r, 2 * r);
+                        }
                 }
 
                 // systems (either background image OR default rectangle) + reference ring + disabled overlay
@@ -6390,6 +6548,10 @@ public final class UiConstants {
     <HBox spacing="8" styleClass="shop-row">
         <Button fx:id="btnAnahita" text="Anahita - 5 coins (Reset noise)" onAction="#onAnahita"/>
         <Label fx:id="lblAnaMsg" text=""/>
+    </HBox>
+    <HBox spacing="8" styleClass="shop-row">
+        <Button fx:id="btnAergia" text="Scroll of Aergia - 10 coins (Zero accel point 20s)" onAction="#onAergia"/>
+        <Label fx:id="lblAergiaMsg" text=""/>
     </HBox>
     <HBox spacing="8">
         <Label fx:id="coinsInfo" text="Your coins: 0"/>

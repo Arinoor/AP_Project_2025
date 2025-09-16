@@ -14,21 +14,28 @@ public class ShopController {
         @FXML private Button btnAtar;
         @FXML private Button btnAiryaman;
         @FXML private Button btnAnahita;
+        @FXML private Button btnAergia;
         @FXML private Button closeBtn;
         @FXML private Label  lblAtarMsg;
         @FXML private Label  lblAiryMsg;
         @FXML private Label  lblAnaMsg;
+        @FXML private Label lblAergiaMsg;
         @FXML private Label  coinsInfo;
+
+        private MainController mainController;
+
 
         private GameEngine engine;
         private ShopSystem shop;
 
-        public void init(GameEngine engine, ShopSystem shop) {
+        public void init(MainController mainController, GameEngine engine, ShopSystem shop) {
+                this.mainController = mainController;
                 this.engine = engine;
                 this.shop = shop;
                 refreshCoins();
                 clearStatus();
         }
+
 
         @FXML private void onAtar() {
                 if (shop.buyAtar()) {
@@ -66,6 +73,25 @@ public class ShopController {
                 }
                 refreshCoins();
         }
+
+        @FXML
+        private void onAergia() {
+                if (shop.buyAergia()) {
+                        lblAergiaMsg.setText("Select a point on a wire to apply effect.");
+                        Audio.get().playSfx(AudioAssets.PURCHASE);
+
+                        // Start selection mode in MainController
+                        mainController.aergiaSelectionMode = true;
+
+                        // Close the shop immediately
+                        btnAergia.getScene().getWindow().hide();
+                } else {
+                        lblAergiaMsg.setText("Not enough coins (need 10) or on cooldown.");
+                        Audio.get().playSfx(AudioAssets.ERROR);
+                }
+                refreshCoins();
+        }
+
 
         @FXML private void onClose() {
                 clearStatus();

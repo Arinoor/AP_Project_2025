@@ -10,10 +10,12 @@ public class ShopSystem implements System {
                 public boolean disableImpactWaves = false;
                 public boolean disableCollisions  = false;
                 public boolean disableLateral     = false;
+                public boolean aergiaSelectionActive = false;
 
                 double impactOffUntil = 0.0;
                 double collOffUntil   = 0.0;
                 double latOffUntil    = 0.0;
+                public double aergiaCooldown = 0.0;
         }
 
         private final GameEngine engine;
@@ -32,6 +34,10 @@ public class ShopSystem implements System {
                 if (state.disableImpactWaves && time >= state.impactOffUntil) state.disableImpactWaves = false;
                 if (state.disableCollisions  && time >= state.collOffUntil)   state.disableCollisions  = false;
                 if (state.disableLateral     && time >= state.latOffUntil)    state.disableLateral     = false;
+
+                if (state.aergiaCooldown > 0) {
+                        state.aergiaCooldown -= dt;
+                }
         }
 
         public boolean buyAtar() {
@@ -63,4 +69,13 @@ public class ShopSystem implements System {
                 }
                 return true;
         }
+
+        public boolean buyAergia() {
+                if (engine.getCoins() < GameBalance.COST_AERGIA || state.aergiaCooldown > 0) {
+                        return false;
+                }
+                state.aergiaSelectionActive = true;
+                return true;
+        }
+
 }

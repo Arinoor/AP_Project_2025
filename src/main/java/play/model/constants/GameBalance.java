@@ -14,6 +14,10 @@ public final class GameBalance {
         public static final int COST_ATAR     = 3; // disable impact waves 10s
         public static final int COST_AIRYAMAN = 4; // disable collisions 5s
         public static final int COST_ANAHITA  = 5; // reset packet noise now
+        public static final int COST_AERGIA = 10;
+
+        public static final double AERGIA_DURATION = 20.0; // 20 seconds
+        public static final double AERGIA_COOLDOWN = 30.0; // 30 seconds cooldown
 
         // Phase 2: Bend cost & caps
         public static final int  COST_BEND_PER_LINK_CREATE = 1; // pay once per new bend
