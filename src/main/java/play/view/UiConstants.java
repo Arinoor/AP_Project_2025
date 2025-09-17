@@ -17,4 +17,7 @@ public final class UiConstants {
         public static final double BEND_DOT_RADIUS     = 4.5;    // px (visual)
         public static final double BEND_HIT_RADIUS     = 10.0;   // px (mouse hit-test)
         public static final double BEND_DRAG_MAX_RADIUS= 120.0;  // px from creation point
+
+        public static final double SISYPHUS_MAX_RADIUS = 100.0;
+
 }

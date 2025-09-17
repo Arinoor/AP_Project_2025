@@ -227,14 +227,13 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="cc202a8e-4f0b-4a78-9065-4a606d51ea93" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/src/main/java/play/model/components/AergiaEffect.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/codebundle.txt" beforeDir="false" afterPath="$PROJECT_DIR$/codebundle.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/play/controller/MainController.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/controller/MainController.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/play/controller/ShopController.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/controller/ShopController.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/play/model/constants/GameBalance.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/constants/GameBalance.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/systems/SeedMovementSystem.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/systems/SeedMovementSystem.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/systems/QueueSystem.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/systems/QueueSystem.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/play/model/systems/ShopSystem.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/systems/ShopSystem.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/render/RenderSystem.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/render/RenderSystem.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/play/view/UiConstants.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/view/UiConstants.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/fxml/Shop.fxml" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/fxml/Shop.fxml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -796,7 +795,9 @@ import play.utils.WiringUtils;
 import play.view.UiConstants;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class MainController {
 
@@ -852,7 +853,7 @@ public class MainController {
         // Wiring (phase 1)
         private boolean wiringMode = false;
         private Entity dragStartPort = null;
-        private double dragX, dragY;
+        private double dragX, dragY, dragStartX, dragStartY;
 
         // Bend tool (phase 2)
         private BendTool bendTool;
@@ -867,6 +868,12 @@ public class MainController {
         public boolean aergiaSelectionMode = false;
         private Link selectedLinkForAergia = null;
         private double selectedPositionForAergia = 0.0;
+
+        // Sisyphus item
+        private boolean sisyphusSelectionMode = false;
+        private Entity selectedSystemForSisyphus = null;
+        private double originalSystemX, originalSystemY;
+        private Map<Entity, double[]> originalPortPositions = new HashMap<>();
 
         // ---------- Lifecycle ----------
 
@@ -890,10 +897,11 @@ public class MainController {
                                         if (c == KeyCode.S) openShop();
 
                                         // Add this block to handle cancellation
-                                        if (c == KeyCode.ESCAPE && aergiaSelectionMode) {
+                                        if (c == KeyCode.ESCAPE && (aergiaSelectionMode || sisyphusSelectionMode)) {
                                                 aergiaSelectionMode = false;
-                                                running = wasRunningBeforeShop; // Resume the game
-                                                Audio.get().playSfx(AudioAssets.CLICK); // Optional: play a cancel sound
+                                                sisyphusSelectionMode = false;
+                                                running = wasRunningBeforeShop;
+                                                Audio.get().playSfx(AudioAssets.CLICK);
                                         }
                                 });
                                 gameCanvas.getScene().setOnKeyReleased(e -> {
@@ -1098,7 +1106,7 @@ public class MainController {
                                 stage.initModality(Modality.APPLICATION_MODAL);
                         }
                         stage.setOnHidden(ev -> {
-                                if (!aergiaSelectionMode) { // Donâ€™t resume if waiting for Aergia placement
+                                if (!aergiaSelectionMode && !sisyphusSelectionMode) {
                                         running = wasRunningBeforeShop;
                                 }
                                 gameCanvas.requestFocus();
@@ -1250,6 +1258,31 @@ public class MainController {
                 // BendTool owns SHIFT interactions
                 if (e.isShiftDown()) return;
 
+                if (sisyphusSelectionMode) {
+                        Entity system = findSystemAt(e.getX(), e.getY());
+                        if (system != null && !system.has(Reference.class)) {
+                                selectedSystemForSisyphus = system;
+                                dragStartX = e.getX();
+                                dragStartY = e.getY();
+                                Transform t = system.get(Transform.class);
+                                originalSystemX = t.x;
+                                originalSystemY = t.y;
+
+                                // Store original port positions
+                                originalPortPositions.clear();
+                                for (Entity entity : engine.entities()) {
+                                        if (entity.has(PortInfo.class)) {
+                                                PortInfo portInfo = entity.get(PortInfo.class);
+                                                if (portInfo.parentSystem == system) {
+                                                        Transform portTransform = entity.get(Transform.class);
+                                                        originalPortPositions.put(entity, new double[]{portTransform.x, portTransform.y});
+                                                }
+                                        }
+                                }
+                        }
+                        return;
+                }
+
                 // Phase 1 wiring: only when W is held and run hasn't started yet
                 if (!wiringMode || hasStarted) return;
                 Entity port = findPortAt(e.getX(), e.getY());
@@ -1264,6 +1297,36 @@ public class MainController {
 
         private void onMouseDragged(MouseEvent e) {
                 if (running) return;
+
+
+                if (sisyphusSelectionMode && selectedSystemForSisyphus != null) {
+                        double dx = e.getX() - dragStartX;
+                        double dy = e.getY() - dragStartY;
+                        double distance = Math.sqrt(dx * dx + dy * dy);
+                        if (distance > UiConstants.SISYPHUS_MAX_RADIUS) {
+                                dx = dx * UiConstants.SISYPHUS_MAX_RADIUS / distance;
+                                dy = dy * UiConstants.SISYPHUS_MAX_RADIUS / distance;
+                        }
+                        Transform systemTransform = selectedSystemForSisyphus.get(Transform.class);
+                        systemTransform.x = originalSystemX + dx;
+                        systemTransform.y = originalSystemY + dy;
+
+                        // Move all ports of this system by the same displacement
+                        for (Entity port : originalPortPositions.keySet()) {
+                                double[] orig = originalPortPositions.get(port);
+                                Transform portTransform = port.get(Transform.class);
+                                portTransform.x = orig[0] + dx;
+                                portTransform.y = orig[1] + dy;
+                        }
+
+                        // Update queued packets to match their port positions
+                        queueSystem.updateSystemPosition(selectedSystemForSisyphus, systemTransform.x, systemTransform.y);
+
+                        // Update seed positions on affected links
+                        updateSeedPositionsForMovedSystem(selectedSystemForSisyphus, dx, dy);
+                        return;
+                }
+
                 if (!wiringMode || hasStarted || dragStartPort == null) return;
 
                 dragX = e.getX(); dragY = e.getY();
@@ -1272,6 +1335,38 @@ public class MainController {
 
         private void onMouseReleased(MouseEvent e) {
                 if (running) return;
+
+                if (sisyphusSelectionMode && selectedSystemForSisyphus != null) {
+                        boolean valid = validateSystemMove(selectedSystemForSisyphus);
+                        if (valid) {
+                                usedWire = WiringUtils.totalWireLength(engine.entities());
+                                // Final update to ensure all positions are correct
+                                queueSystem.updateSystemPosition(selectedSystemForSisyphus,
+                                        selectedSystemForSisyphus.get(Transform.class).x,
+                                        selectedSystemForSisyphus.get(Transform.class).y);
+                                // Deduct coins only after successful move
+                                engine.incrementCoins(-GameBalance.COST_SISYPHUS);
+                                shopSystem.getState().sisyphusCooldown = 1.0;
+                        } else {
+                                // Revert system and ports to original positions
+                                Transform systemTransform = selectedSystemForSisyphus.get(Transform.class);
+                                systemTransform.x = originalSystemX;
+                                systemTransform.y = originalSystemY;
+                                for (Entity port : originalPortPositions.keySet()) {
+                                        double[] orig = originalPortPositions.get(port);
+                                        Transform portTransform = port.get(Transform.class);
+                                        portTransform.x = orig[0];
+                                        portTransform.y = orig[1];
+                                }
+                                // Also revert queued packets
+                                queueSystem.updateSystemPosition(selectedSystemForSisyphus, originalSystemX, originalSystemY);
+                                Audio.get().playSfx(AudioAssets.ERROR);
+                        }
+                        selectedSystemForSisyphus = null;
+                        originalPortPositions.clear();
+                        sisyphusSelectionMode = false;
+                        running = wasRunningBeforeShop;
+                }
 
                 // BendTool owns SHIFT interactions
                 if (e.isShiftDown()) return;
@@ -1387,6 +1482,68 @@ public class MainController {
                 startButton.getStyleClass().remove("resume");
                 if (!running && hasStarted) startButton.getStyleClass().add("resume");
         }
+
+        private Entity findSystemAt(double x, double y) {
+                final double halfSize = UiConstants.SYSTEM_SIZE / 2.0;
+                for (Entity e : engine.entities()) {
+                        if (isSystemEntity(e) && e.has(Transform.class)) {
+                                Transform t = e.get(Transform.class);
+                                if (Math.abs(x - t.x) <= halfSize && Math.abs(y - t.y) <= halfSize) {
+                                        return e;
+                                }
+                        }
+                }
+                return null;
+        }
+
+        private void updateSeedPositionsForMovedSystem(Entity movedSystem, double dx, double dy) {
+                for (Entity entity : engine.entities()) {
+                        if (entity.has(Link.class)) {
+                                Link link = entity.get(Link.class);
+                                Entity fromSystem = link.fromPort.get(PortInfo.class).parentSystem;
+                                Entity toSystem = link.toPort.get(PortInfo.class).parentSystem;
+
+                                if (fromSystem == movedSystem || toSystem == movedSystem) {
+                                        for (Entity seedEntity : engine.entities()) {
+                                                if (seedEntity.has(Seed.class)) {
+                                                        Seed seed = seedEntity.get(Seed.class);
+                                                        if (seed.currentLink == link && seedEntity.has(Transform.class)) {
+                                                                // Recalculate position based on link geometry
+                                                                WiringUtils.Pt pos = WiringUtils.pointAlongNormalized(
+                                                                        link,
+                                                                        seed.progress
+                                                                );
+                                                                Transform seedTransform = seedEntity.get(Transform.class);
+                                                                seedTransform.x = pos.x;
+                                                                seedTransform.y = pos.y;
+                                                        }
+                                                }
+                                        }
+                                }
+                        }
+                }
+        }
+
+
+        private boolean validateSystemMove(Entity movedSystem) {
+                double newWireLength = WiringUtils.totalWireLength(engine.entities());
+                if (newWireLength > totalWire) {
+                        return false;
+                }
+                if (WiringUtils.hasAnySystemCrossing(engine.entities(), UiConstants.SYSTEM_SIZE)) {
+                        return false;
+                }
+                return true;
+        }
+
+
+        private boolean isSystemEntity(Entity e) {
+                return e.has(Transform.class) && !e.has(PortInfo.class) && !e.has(Seed.class) && !e.has(Link.class);
+        }
+
+        public void setSisyphusSelectionMode(boolean mode) {
+                this.sisyphusSelectionMode = mode;
+        }
 }
 
 
@@ -1441,6 +1598,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import play.infrastructure.audio.Audio;
 import play.model.audio.AudioAssets;
+import play.model.constants.GameBalance;
 import play.model.core.Entity;
 import play.model.components.Seed;
 import play.model.engine.GameEngine;
@@ -1452,11 +1610,13 @@ public class ShopController {
         @FXML private Button btnAnahita;
         @FXML private Button btnAergia;
         @FXML private Button closeBtn;
+        @FXML private Button btnSisyphus;
         @FXML private Label  lblAtarMsg;
         @FXML private Label  lblAiryMsg;
         @FXML private Label  lblAnaMsg;
         @FXML private Label lblAergiaMsg;
         @FXML private Label  coinsInfo;
+        @FXML private Label lblSisyphusMsg;
 
         private MainController mainController;
 
@@ -1478,7 +1638,7 @@ public class ShopController {
                         lblAtarMsg.setText("Impact waves disabled for 10s.");
                         Audio.get().playSfx(AudioAssets.PURCHASE);
                 } else {
-                        lblAtarMsg.setText("Not enough coins (need 3).");
+                        lblAtarMsg.setText("Need 3 coins");
                         Audio.get().playSfx(AudioAssets.ERROR);
                 }
                 refreshCoins();
@@ -1489,7 +1649,7 @@ public class ShopController {
                         lblAiryMsg.setText("Collisions disabled for 5s.");
                         Audio.get().playSfx(AudioAssets.PURCHASE);
                 } else {
-                        lblAiryMsg.setText("Not enough coins (need 4).");
+                        lblAiryMsg.setText("Need 4 coins");
                         Audio.get().playSfx(AudioAssets.ERROR);
                 }
                 refreshCoins();
@@ -1524,6 +1684,23 @@ public class ShopController {
                 } else {
                         lblAergiaMsg.setText("Not enough coins (need 10) or on cooldown.");
                         Audio.get().playSfx(AudioAssets.ERROR);
+                }
+                refreshCoins();
+        }
+
+        @FXML
+        private void onSisyphus() {
+                if (shop.getState().sisyphusCooldown > 0) {
+                        lblSisyphusMsg.setText("Wait " + (int)shop.getState().sisyphusCooldown + "s");
+                        Audio.get().playSfx(AudioAssets.ERROR);
+                } else if (engine.getCoins() < GameBalance.COST_SISYPHUS) {
+                        lblSisyphusMsg.setText("Not enough coins (need 15).");
+                        Audio.get().playSfx(AudioAssets.ERROR);
+                } else {
+                        lblSisyphusMsg.setText("Select a system to move.");
+                        Audio.get().playSfx(AudioAssets.PURCHASE);
+                        mainController.setSisyphusSelectionMode(true);
+                        btnSisyphus.getScene().getWindow().hide();
                 }
                 refreshCoins();
         }
@@ -2636,6 +2813,8 @@ public final class GameBalance {
         public static final int COST_AIRYAMAN = 4; // disable collisions 5s
         public static final int COST_ANAHITA  = 5; // reset packet noise now
         public static final int COST_AERGIA = 10;
+        public static final int COST_SISYPHUS = 15;
+
 
         public static final double AERGIA_DURATION = 20.0; // 20 seconds
         public static final double AERGIA_COOLDOWN = 30.0; // 30 seconds cooldown
@@ -4105,7 +4284,7 @@ public final class QueueSystem implements System {
         private void awardArrivalCoins(Seed s) {
                 int reward;
                 switch (s.type) {
-                        case SQUARE: reward = 2; break;
+                        case SQUARE: reward = 200; break;
                         case TRIANGLE: reward = 3; break;
                         case INFINITE: reward = 1; break;
                         case SECURE: reward = 3; break;
@@ -4461,6 +4640,37 @@ public final class QueueSystem implements System {
                 }
         }
 
+        public void updateSystemPosition(Entity system, double newX, double newY) {
+                Deque<Entity> queue = deviceQueues.get(system);
+                if (queue != null) {
+                        for (Entity packet : queue) {
+                                if (packet.has(Transform.class)) {
+                                        Transform t = packet.get(Transform.class);
+                                        // Find which port this packet is associated with
+                                        Entity port = findAssociatedPort(system, packet);
+                                        if (port != null && port.has(Transform.class)) {
+                                                Transform portTransform = port.get(Transform.class);
+                                                t.x = portTransform.x;
+                                                t.y = portTransform.y;
+                                        }
+                                }
+                        }
+                }
+        }
+
+        private Entity findAssociatedPort(Entity system, Entity packet) {
+                // This is a simplified approach - you might need to adjust based on your actual data structure
+                for (Entity entity : entities) {
+                        if (entity.has(PortInfo.class)) {
+                                PortInfo portInfo = entity.get(PortInfo.class);
+                                if (portInfo.parentSystem == system) {
+                                        return entity;
+                                }
+                        }
+                }
+                return null;
+        }
+
 
         private Entity removeRandomFromLists(List<Entity> freeSquare, List<Entity> freeTriangle) {
                 int total = freeSquare.size() + freeTriangle.size();
@@ -4521,7 +4731,12 @@ public final class QueueSystem implements System {
                 if (v < 0.0) return 0.0;
                 if (v > 1.0) return 1.0;
                 return v;
+
+
+
         }
+
+
 }
 
 
@@ -4582,7 +4797,25 @@ public class SeedMovementSystem implements System {
                         }
                 }
 
+                List<AergiaEffect> activeEffects = new ArrayList<>();
                 List<Entity> toRemove = new ArrayList<>();
+
+                for (Entity e : entities) {
+                        if (e.has(AergiaEffect.class)) {
+                                AergiaEffect effect = e.get(AergiaEffect.class);
+                                effect.remainingTime -= dt;
+                                if (effect.remainingTime <= 0) {
+                                        toRemove.add(e);
+                                } else {
+                                        activeEffects.add(effect);
+                                }
+                        }
+                }
+
+                for (Entity e : toRemove) entities.remove(e);
+
+
+                toRemove.clear();
 
                 for (Entity e : entities) {
                         if (!e.has(Seed.class) || !e.has(Transform.class)) continue;
@@ -4604,20 +4837,16 @@ public class SeedMovementSystem implements System {
                                 s.accel = hasBends ? GameBalance.HEAVY_CURVE_ACCEL : 0.0;
                         }
 
-                        if (e.has(AergiaEffect.class)) {
-                                AergiaEffect effect = e.get(AergiaEffect.class);
-                                effect.remainingTime -= dt;
-                                if (effect.remainingTime <= 0) {
-                                        entities.remove(e);
-                                        continue;
-                                }
-
-                                if (s.currentLink == effect.link &&
-                                        Math.abs(s.progress - effect.position) < 1) {
-                                        s.accel = 0;
-                                        s.jerk = 0;
-                                        s.speed = 1;
-                                        java.lang.System.out.println("sdfsdf");
+                        if (s.currentLink != null) {
+                                for (AergiaEffect effect : activeEffects) {
+                                        if (effect.link == s.currentLink) {
+                                                double distance = Math.abs(s.progress - effect.position);
+                                                if (distance < 0.05) { // within 5% of the link
+                                                        s.accel = 0;
+                                                        s.jerk = 0;
+                                                        break;
+                                                }
+                                        }
                                 }
                         }
 
@@ -4716,11 +4945,13 @@ public class ShopSystem implements System {
                 public boolean disableCollisions  = false;
                 public boolean disableLateral     = false;
                 public boolean aergiaSelectionActive = false;
+                public boolean sisyphusSelectionActive = false;
 
                 double impactOffUntil = 0.0;
                 double collOffUntil   = 0.0;
                 double latOffUntil    = 0.0;
                 public double aergiaCooldown = 0.0;
+                public double sisyphusCooldown = 0.0;
         }
 
         private final GameEngine engine;
@@ -4742,6 +4973,9 @@ public class ShopSystem implements System {
 
                 if (state.aergiaCooldown > 0) {
                         state.aergiaCooldown -= dt;
+                }
+                if (state.sisyphusCooldown > 0) {
+                        state.sisyphusCooldown -= dt;
                 }
         }
 
@@ -4780,6 +5014,16 @@ public class ShopSystem implements System {
                         return false;
                 }
                 state.aergiaSelectionActive = true;
+                return true;
+        }
+
+        public boolean buySisyphus() {
+                if (engine.getCoins() < GameBalance.COST_SISYPHUS || state.sisyphusCooldown > 0) {
+                        return false;
+                }
+                state.sisyphusSelectionActive = true;
+                engine.incrementCoins(-GameBalance.COST_SISYPHUS);
+                state.sisyphusCooldown = 1.0; // 30 seconds cooldown
                 return true;
         }
 
@@ -6183,6 +6427,9 @@ public final class UiConstants {
         public static final double BEND_DOT_RADIUS     = 4.5;    // px (visual)
         public static final double BEND_HIT_RADIUS     = 10.0;   // px (mouse hit-test)
         public static final double BEND_DRAG_MAX_RADIUS= 120.0;  // px from creation point
+
+        public static final double SISYPHUS_MAX_RADIUS = 100.0;
+
 }
 
 
@@ -6552,6 +6799,10 @@ public final class UiConstants {
     <HBox spacing="8" styleClass="shop-row">
         <Button fx:id="btnAergia" text="Scroll of Aergia - 10 coins (Zero accel point 20s)" onAction="#onAergia"/>
         <Label fx:id="lblAergiaMsg" text=""/>
+    </HBox>
+    <HBox spacing="8" styleClass="shop-row">
+        <Button fx:id="btnSisyphus" text="Scroll of Sisyphus - 15 coins (move non-reference system)" onAction="#onSisyphus"/>
+        <Label fx:id="lblSisyphusMsg" text=""/>
     </HBox>
     <HBox spacing="8">
         <Label fx:id="coinsInfo" text="Your coins: 0"/>

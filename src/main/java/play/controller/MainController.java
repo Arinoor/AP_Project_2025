@@ -32,7 +32,9 @@ import play.utils.WiringUtils;
 import play.view.UiConstants;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class MainController {
 
@@ -88,7 +90,7 @@ public class MainController {
         // Wiring (phase 1)
         private boolean wiringMode = false;
         private Entity dragStartPort = null;
-        private double dragX, dragY;
+        private double dragX, dragY, dragStartX, dragStartY;
 
         // Bend tool (phase 2)
         private BendTool bendTool;
@@ -103,6 +105,12 @@ public class MainController {
         public boolean aergiaSelectionMode = false;
         private Link selectedLinkForAergia = null;
         private double selectedPositionForAergia = 0.0;
+
+        // Sisyphus item
+        private boolean sisyphusSelectionMode = false;
+        private Entity selectedSystemForSisyphus = null;
+        private double originalSystemX, originalSystemY;
+        private Map<Entity, double[]> originalPortPositions = new HashMap<>();
 
         // ---------- Lifecycle ----------
 
@@ -126,10 +134,11 @@ public class MainController {
                                         if (c == KeyCode.S) openShop();
 
                                         // Add this block to handle cancellation
-                                        if (c == KeyCode.ESCAPE && aergiaSelectionMode) {
+                                        if (c == KeyCode.ESCAPE && (aergiaSelectionMode || sisyphusSelectionMode)) {
                                                 aergiaSelectionMode = false;
-                                                running = wasRunningBeforeShop; // Resume the game
-                                                Audio.get().playSfx(AudioAssets.CLICK); // Optional: play a cancel sound
+                                                sisyphusSelectionMode = false;
+                                                running = wasRunningBeforeShop;
+                                                Audio.get().playSfx(AudioAssets.CLICK);
                                         }
                                 });
                                 gameCanvas.getScene().setOnKeyReleased(e -> {
@@ -334,7 +343,7 @@ public class MainController {
                                 stage.initModality(Modality.APPLICATION_MODAL);
                         }
                         stage.setOnHidden(ev -> {
-                                if (!aergiaSelectionMode) { // Don’t resume if waiting for Aergia placement
+                                if (!aergiaSelectionMode && !sisyphusSelectionMode) {
                                         running = wasRunningBeforeShop;
                                 }
                                 gameCanvas.requestFocus();
@@ -486,6 +495,31 @@ public class MainController {
                 // BendTool owns SHIFT interactions
                 if (e.isShiftDown()) return;
 
+                if (sisyphusSelectionMode) {
+                        Entity system = findSystemAt(e.getX(), e.getY());
+                        if (system != null && !system.has(Reference.class)) {
+                                selectedSystemForSisyphus = system;
+                                dragStartX = e.getX();
+                                dragStartY = e.getY();
+                                Transform t = system.get(Transform.class);
+                                originalSystemX = t.x;
+                                originalSystemY = t.y;
+
+                                // Store original port positions
+                                originalPortPositions.clear();
+                                for (Entity entity : engine.entities()) {
+                                        if (entity.has(PortInfo.class)) {
+                                                PortInfo portInfo = entity.get(PortInfo.class);
+                                                if (portInfo.parentSystem == system) {
+                                                        Transform portTransform = entity.get(Transform.class);
+                                                        originalPortPositions.put(entity, new double[]{portTransform.x, portTransform.y});
+                                                }
+                                        }
+                                }
+                        }
+                        return;
+                }
+
                 // Phase 1 wiring: only when W is held and run hasn't started yet
                 if (!wiringMode || hasStarted) return;
                 Entity port = findPortAt(e.getX(), e.getY());
@@ -500,6 +534,36 @@ public class MainController {
 
         private void onMouseDragged(MouseEvent e) {
                 if (running) return;
+
+
+                if (sisyphusSelectionMode && selectedSystemForSisyphus != null) {
+                        double dx = e.getX() - dragStartX;
+                        double dy = e.getY() - dragStartY;
+                        double distance = Math.sqrt(dx * dx + dy * dy);
+                        if (distance > UiConstants.SISYPHUS_MAX_RADIUS) {
+                                dx = dx * UiConstants.SISYPHUS_MAX_RADIUS / distance;
+                                dy = dy * UiConstants.SISYPHUS_MAX_RADIUS / distance;
+                        }
+                        Transform systemTransform = selectedSystemForSisyphus.get(Transform.class);
+                        systemTransform.x = originalSystemX + dx;
+                        systemTransform.y = originalSystemY + dy;
+
+                        // Move all ports of this system by the same displacement
+                        for (Entity port : originalPortPositions.keySet()) {
+                                double[] orig = originalPortPositions.get(port);
+                                Transform portTransform = port.get(Transform.class);
+                                portTransform.x = orig[0] + dx;
+                                portTransform.y = orig[1] + dy;
+                        }
+
+                        // Update queued packets to match their port positions
+                        queueSystem.updateSystemPosition(selectedSystemForSisyphus, systemTransform.x, systemTransform.y);
+
+                        // Update seed positions on affected links
+                        updateSeedPositionsForMovedSystem(selectedSystemForSisyphus, dx, dy);
+                        return;
+                }
+
                 if (!wiringMode || hasStarted || dragStartPort == null) return;
 
                 dragX = e.getX(); dragY = e.getY();
@@ -508,6 +572,38 @@ public class MainController {
 
         private void onMouseReleased(MouseEvent e) {
                 if (running) return;
+
+                if (sisyphusSelectionMode && selectedSystemForSisyphus != null) {
+                        boolean valid = validateSystemMove(selectedSystemForSisyphus);
+                        if (valid) {
+                                usedWire = WiringUtils.totalWireLength(engine.entities());
+                                // Final update to ensure all positions are correct
+                                queueSystem.updateSystemPosition(selectedSystemForSisyphus,
+                                        selectedSystemForSisyphus.get(Transform.class).x,
+                                        selectedSystemForSisyphus.get(Transform.class).y);
+                                // Deduct coins only after successful move
+                                engine.incrementCoins(-GameBalance.COST_SISYPHUS);
+                                shopSystem.getState().sisyphusCooldown = 1.0;
+                        } else {
+                                // Revert system and ports to original positions
+                                Transform systemTransform = selectedSystemForSisyphus.get(Transform.class);
+                                systemTransform.x = originalSystemX;
+                                systemTransform.y = originalSystemY;
+                                for (Entity port : originalPortPositions.keySet()) {
+                                        double[] orig = originalPortPositions.get(port);
+                                        Transform portTransform = port.get(Transform.class);
+                                        portTransform.x = orig[0];
+                                        portTransform.y = orig[1];
+                                }
+                                // Also revert queued packets
+                                queueSystem.updateSystemPosition(selectedSystemForSisyphus, originalSystemX, originalSystemY);
+                                Audio.get().playSfx(AudioAssets.ERROR);
+                        }
+                        selectedSystemForSisyphus = null;
+                        originalPortPositions.clear();
+                        sisyphusSelectionMode = false;
+                        running = wasRunningBeforeShop;
+                }
 
                 // BendTool owns SHIFT interactions
                 if (e.isShiftDown()) return;
@@ -622,5 +718,67 @@ public class MainController {
                 if (!startButton.getStyleClass().contains("primary")) startButton.getStyleClass().add("primary");
                 startButton.getStyleClass().remove("resume");
                 if (!running && hasStarted) startButton.getStyleClass().add("resume");
+        }
+
+        private Entity findSystemAt(double x, double y) {
+                final double halfSize = UiConstants.SYSTEM_SIZE / 2.0;
+                for (Entity e : engine.entities()) {
+                        if (isSystemEntity(e) && e.has(Transform.class)) {
+                                Transform t = e.get(Transform.class);
+                                if (Math.abs(x - t.x) <= halfSize && Math.abs(y - t.y) <= halfSize) {
+                                        return e;
+                                }
+                        }
+                }
+                return null;
+        }
+
+        private void updateSeedPositionsForMovedSystem(Entity movedSystem, double dx, double dy) {
+                for (Entity entity : engine.entities()) {
+                        if (entity.has(Link.class)) {
+                                Link link = entity.get(Link.class);
+                                Entity fromSystem = link.fromPort.get(PortInfo.class).parentSystem;
+                                Entity toSystem = link.toPort.get(PortInfo.class).parentSystem;
+
+                                if (fromSystem == movedSystem || toSystem == movedSystem) {
+                                        for (Entity seedEntity : engine.entities()) {
+                                                if (seedEntity.has(Seed.class)) {
+                                                        Seed seed = seedEntity.get(Seed.class);
+                                                        if (seed.currentLink == link && seedEntity.has(Transform.class)) {
+                                                                // Recalculate position based on link geometry
+                                                                WiringUtils.Pt pos = WiringUtils.pointAlongNormalized(
+                                                                        link,
+                                                                        seed.returning ? 1 - seed.progress : seed.progress
+                                                                );
+                                                                Transform seedTransform = seedEntity.get(Transform.class);
+                                                                seedTransform.x = pos.x;
+                                                                seedTransform.y = pos.y;
+                                                        }
+                                                }
+                                        }
+                                }
+                        }
+                }
+        }
+
+
+        private boolean validateSystemMove(Entity movedSystem) {
+                double newWireLength = WiringUtils.totalWireLength(engine.entities());
+                if (newWireLength > totalWire) {
+                        return false;
+                }
+                if (WiringUtils.hasAnySystemCrossing(engine.entities(), UiConstants.SYSTEM_SIZE)) {
+                        return false;
+                }
+                return true;
+        }
+
+
+        private boolean isSystemEntity(Entity e) {
+                return e.has(Transform.class) && !e.has(PortInfo.class) && !e.has(Seed.class) && !e.has(Link.class);
+        }
+
+        public void setSisyphusSelectionMode(boolean mode) {
+                this.sisyphusSelectionMode = mode;
         }
 }

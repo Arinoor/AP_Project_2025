@@ -429,7 +429,7 @@ public final class QueueSystem implements System {
         private void awardArrivalCoins(Seed s) {
                 int reward;
                 switch (s.type) {
-                        case SQUARE: reward = 2; break;
+                        case SQUARE: reward = 200; break;
                         case TRIANGLE: reward = 3; break;
                         case INFINITE: reward = 1; break;
                         case SECURE: reward = 3; break;
@@ -785,6 +785,79 @@ public final class QueueSystem implements System {
                 }
         }
 
+        public void updateSystemPosition(Entity system, double newX, double newY) {
+                Deque<Entity> queue = deviceQueues.get(system);
+                if (queue != null) {
+                        for (Entity packet : queue) {
+                                if (packet.has(Transform.class)) {
+                                        Transform t = packet.get(Transform.class);
+                                        // Find which port this packet is associated with
+                                        Entity port = findAssociatedPort(system, packet);
+                                        if (port != null && port.has(Transform.class)) {
+                                                Transform portTransform = port.get(Transform.class);
+                                                t.x = portTransform.x;
+                                                t.y = portTransform.y;
+                                        }
+                                }
+                        }
+                }
+        }
+
+        private Entity findAssociatedPort(Entity system, Entity packet) {
+                if (packet.has(Seed.class)) {
+                        Seed seed = packet.get(Seed.class);
+
+                        // Check if seed has a current link
+                        if (seed.currentLink != null) {
+                                // For packets in transit, find which end of the link they're closest to
+                                Link link = seed.currentLink;
+                                Transform seedTransform = packet.get(Transform.class);
+
+                                // Calculate distance to both ends of the link
+                                Transform fromTransform = link.fromPort.get(Transform.class);
+                                Transform toTransform = link.toPort.get(Transform.class);
+
+                                double distToFrom = Math.hypot(
+                                        seedTransform.x - fromTransform.x,
+                                        seedTransform.y - fromTransform.y
+                                );
+
+                                double distToTo = Math.hypot(
+                                        seedTransform.x - toTransform.x,
+                                        seedTransform.y - toTransform.y
+                                );
+
+                                // Return the closer port that belongs to this system
+                                if (distToFrom < distToTo) {
+                                        PortInfo portInfo = link.fromPort.get(PortInfo.class);
+                                        if (portInfo.parentSystem == system) {
+                                                return link.fromPort;
+                                        }
+                                } else {
+                                        PortInfo portInfo = link.toPort.get(PortInfo.class);
+                                        if (portInfo.parentSystem == system) {
+                                                return link.toPort;
+                                        }
+                                }
+                        }
+
+                        // For queued packets, find the port with matching position
+                        Transform packetTransform = packet.get(Transform.class);
+                        for (Entity entity : entities) {
+                                if (entity.has(PortInfo.class) && entity.has(Transform.class)) {
+                                        PortInfo portInfo = entity.get(PortInfo.class);
+                                        Transform portTransform = entity.get(Transform.class);
+
+                                        if (portInfo.parentSystem == system &&
+                                                Math.abs(portTransform.x - packetTransform.x) < 20 &&
+                                                Math.abs(portTransform.y - packetTransform.y) < 20) {
+                                                return entity;
+                                        }
+                                }
+                        }
+                }
+                return null;
+        }
 
         private Entity removeRandomFromLists(List<Entity> freeSquare, List<Entity> freeTriangle) {
                 int total = freeSquare.size() + freeTriangle.size();
@@ -845,6 +918,11 @@ public final class QueueSystem implements System {
                 if (v < 0.0) return 0.0;
                 if (v > 1.0) return 1.0;
                 return v;
+
+
+
         }
+
+
 }
 
