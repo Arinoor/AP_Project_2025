@@ -18,12 +18,14 @@ public class ShopController {
         @FXML private Button btnAergia;
         @FXML private Button closeBtn;
         @FXML private Button btnSisyphus;
+        @FXML private Button btnEliphas;
         @FXML private Label  lblAtarMsg;
         @FXML private Label  lblAiryMsg;
         @FXML private Label  lblAnaMsg;
         @FXML private Label lblAergiaMsg;
         @FXML private Label  coinsInfo;
         @FXML private Label lblSisyphusMsg;
+        @FXML private Label lblEliphasMsg;
 
         private MainController mainController;
 
@@ -108,6 +110,19 @@ public class ShopController {
                         Audio.get().playSfx(AudioAssets.PURCHASE);
                         mainController.setSisyphusSelectionMode(true);
                         btnSisyphus.getScene().getWindow().hide();
+                }
+                refreshCoins();
+        }
+
+        @FXML
+        private void onEliphas() {
+                if (shop.buyEliphas()) {
+                        Audio.get().playSfx(AudioAssets.PURCHASE);
+                        mainController.eliphasSelectionMode = true;
+                        btnEliphas.getScene().getWindow().hide();
+                } else {
+                        lblEliphasMsg.setText("Not enough coins (need 20) or on cooldown.");
+                        Audio.get().playSfx(AudioAssets.ERROR);
                 }
                 refreshCoins();
         }

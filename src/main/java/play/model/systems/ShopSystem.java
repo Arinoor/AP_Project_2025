@@ -12,12 +12,14 @@ public class ShopSystem implements System {
                 public boolean disableLateral     = false;
                 public boolean aergiaSelectionActive = false;
                 public boolean sisyphusSelectionActive = false;
+                public boolean eliphasSelectionActive = false;
 
                 double impactOffUntil = 0.0;
                 double collOffUntil   = 0.0;
                 double latOffUntil    = 0.0;
                 public double aergiaCooldown = 0.0;
                 public double sisyphusCooldown = 0.0;
+                public double eliphasCooldown = 0.0;
         }
 
         private final GameEngine engine;
@@ -42,6 +44,9 @@ public class ShopSystem implements System {
                 }
                 if (state.sisyphusCooldown > 0) {
                         state.sisyphusCooldown -= dt;
+                }
+                if (state.eliphasCooldown > 0) {
+                        state.eliphasCooldown -= dt;
                 }
         }
 
@@ -90,6 +95,14 @@ public class ShopSystem implements System {
                 state.sisyphusSelectionActive = true;
                 engine.incrementCoins(-GameBalance.COST_SISYPHUS);
                 state.sisyphusCooldown = 1.0; // 30 seconds cooldown
+                return true;
+        }
+
+        public boolean buyEliphas() {
+                if (engine.getCoins() < GameBalance.COST_ELIPHAS || state.eliphasCooldown > 0) {
+                        return false;
+                }
+                state.eliphasSelectionActive = true;
                 return true;
         }
 

@@ -322,7 +322,7 @@ public final class QueueSystem implements System {
                         // -------------------
                         // HEAVY specific effects
                         // -------------------
-                        if (s.type == Seed.Type.HEAVY) {
+                        if (s.type == Seed.Type.HEAVY || s.type == Seed.Type.HEAVY2) {
                                 // 1) destroy queued packets in this deviceQueues entry (if any)
                                 Deque<Entity> q = deviceQueues.get(system);
                                 if (q != null && !q.isEmpty()) {
@@ -436,6 +436,7 @@ public final class QueueSystem implements System {
                         case PROTECTED: reward = 5; break;
                         case HEAVY: reward = Math.max(1, s.heavySize); break;
                         case BITPACKET: reward = 1; break;
+                        case HEAVY2: reward = 10; break;
                         default: reward = 0; break;
                 }
                 engine.incrementCoins(reward);

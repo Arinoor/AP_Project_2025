@@ -391,4 +391,40 @@ public final class WiringUtils {
                         Math.min(ay, by) - 1e-9 <= py && py <= Math.max(ay, by) + 1e-9 &&
                         Math.abs(direction(ax, ay, bx, by, px, py)) <= 1e-9;
         }
+
+        public static Vec2 tangentAtNormalized(Link l, double t) {
+                List<Pt> pts = curvePoints(l);
+                if (pts.size() < 2) return new Vec2(1, 0);
+
+                double totalLength = pathLength(l);
+                double target = t * totalLength;
+
+                // Find which segment we're on
+                double accumulated = 0;
+                for (int i = 0; i < pts.size() - 1; i++) {
+                        Pt a = pts.get(i);
+                        Pt b = pts.get(i + 1);
+                        double segLen = Math.hypot(b.x - a.x, b.y - a.y);
+
+                        if (accumulated + segLen >= target) {
+                                // Return the direction of this segment
+                                double dx = b.x - a.x;
+                                double dy = b.y - a.y;
+                                double len = Math.hypot(dx, dy);
+                                if (len < 1e-9) return new Vec2(1, 0);
+                                return new Vec2(dx/len, dy/len);
+                        }
+                        accumulated += segLen;
+                }
+
+                // Default to last segment direction
+                Pt a = pts.get(pts.size() - 2);
+                Pt b = pts.get(pts.size() - 1);
+                double dx = b.x - a.x;
+                double dy = b.y - a.y;
+                double len = Math.hypot(dx, dy);
+                if (len < 1e-9) return new Vec2(1, 0);
+                return new Vec2(dx/len, dy/len);
+        }
+
 }

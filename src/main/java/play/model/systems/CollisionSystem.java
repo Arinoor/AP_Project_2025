@@ -30,7 +30,7 @@ public class CollisionSystem implements System {
         /** Impact wave radius in pixels. */
         private final double IMPACT_RADIUS;
 
-        private static final double OFFSET_FACTOR = 0.12;
+        private static final double OFFSET_FACTOR = 3.5;
         private static final double PAIR_COOLDOWN_SEC = 0.75;
 
         /** Noise added (in UNITS) to each seed per collision. */
@@ -62,7 +62,7 @@ public class CollisionSystem implements System {
                 // Keep your original semantics: unit is the pixel scale used for thresholds.
                 this.unit = Math.max(4.0, packetSize);
                 // Reasonable default for AoE radius based on visual size.
-                this.IMPACT_RADIUS = Math.max(24.0, this.unit * 8.0);
+                this.IMPACT_RADIUS = Math.max(100.0, this.unit * 8.0);
                 this.audio = audioService;
         }
 
@@ -136,7 +136,9 @@ public class CollisionSystem implements System {
                                 scheduleReset(sb);
 
                                 // Separate along links so they don't re-hit immediately (polyline-aware)
-                                separateAlongLinks(sa, ea, sb, eb, rSum, Math.sqrt(Math.max(1e-12, d2)));
+                                //separateAlongLinks(sa, ea, sb, eb, rSum, Math.sqrt(Math.max(1e-12, d2)));
+                                applyCollisionLateral(sa, sb, rSum - Math.sqrt(d2));
+
 
                                 // Pairwise cooldown
                                 pairCooldowns.put(key, PAIR_COOLDOWN_SEC);
@@ -232,6 +234,14 @@ public class CollisionSystem implements System {
                 }
         }
 
+        private void applyCollisionLateral(Seed sa, Seed sb, double overlap) {
+                // Add lateral impulse to colliding packets with more force
+                double impulse = overlap * 1.5; // Increased from 0.5
+
+                // Apply in opposite directions to create separation
+                sa.lateral += impulse;
+                sb.lateral -= impulse; // Opposite direction
+        }
         /**
          * Approximate tangent (dx,dy) on a polyline link at normalized t by sampling
          * two nearby points (arc-length parameterization).

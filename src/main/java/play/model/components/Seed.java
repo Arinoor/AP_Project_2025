@@ -5,7 +5,9 @@ import play.model.core.Entity;
 
 /** Packet (seed) travelling in the network. */
 public class Seed {
-        public enum Type { SQUARE, TRIANGLE, INFINITE, SECURE, PROTECTED, SECURE_PROTECTED, HEAVY, BITPACKET }
+        public enum Type {
+                SQUARE, TRIANGLE, INFINITE, SECURE, PROTECTED, SECURE_PROTECTED, HEAVY, BITPACKET, HEAVY2
+        }
 
         public Type type;
 
@@ -63,6 +65,8 @@ public class Seed {
 
         public boolean trojan = false;
 
+        public double heavy2DeviationAccumulator = 0;
+
 
         public Seed(Type type) {
                 this.type = type;
@@ -73,6 +77,11 @@ public class Seed {
                 if (type == Type.HEAVY) {
                         this.heavySize = 8;
                         this.capacity = 3;
+                }
+                if (type == Type.HEAVY2) {
+                        this.heavySize = 10; // Base unit size
+                        this.capacity = 3;
+                        this.speed = 80.0; // Constant speed like HEAVY
                 }
                 // BITPACKET: size units 1, capacity small
                 if (type == Type.BITPACKET) {
@@ -99,6 +108,7 @@ public class Seed {
                                 return base * 2.0;
                         case SECURE_PROTECTED:  return 6.0;
                         case HEAVY:              return (double)Math.max(1, heavySize);
+                        case HEAVY2: return 10.0;
                         case BITPACKET:          return 1.0;
                         default:
                                 return 2.0;

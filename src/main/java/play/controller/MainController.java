@@ -20,7 +20,7 @@ import play.model.components.*;
 import play.model.constants.GameBalance;
 import play.model.core.Entity;
 import play.model.engine.GameEngine;
-import play.model.level.LevelLoaderV2;
+import play.model.level.LevelLoader;
 import play.model.systems.CollisionSystem;
 import play.model.systems.ProductionSystem;
 import play.model.systems.QueueSystem;
@@ -103,6 +103,7 @@ public class MainController {
 
         // Aergia item
         public boolean aergiaSelectionMode = false;
+        public boolean eliphasSelectionMode = false;
         private Link selectedLinkForAergia = null;
         private double selectedPositionForAergia = 0.0;
 
@@ -134,8 +135,9 @@ public class MainController {
                                         if (c == KeyCode.S) openShop();
 
                                         // Add this block to handle cancellation
-                                        if (c == KeyCode.ESCAPE && (aergiaSelectionMode || sisyphusSelectionMode)) {
+                                        if (c == KeyCode.ESCAPE && (aergiaSelectionMode || sisyphusSelectionMode || eliphasSelectionMode)) {
                                                 aergiaSelectionMode = false;
+                                                eliphasSelectionMode = false;
                                                 sisyphusSelectionMode = false;
                                                 running = wasRunningBeforeShop;
                                                 Audio.get().playSfx(AudioAssets.CLICK);
@@ -194,7 +196,7 @@ public class MainController {
                 engine = new GameEngine();
 
                 // Load entities (systems + ports) from JSON
-                LevelLoaderV2.Loaded loaded = LevelLoaderV2.loadFromResource(engine, currentLevelPath);
+                LevelLoader.Loaded loaded = LevelLoader.loadFromResource(engine, currentLevelPath);
                 totalWire = loaded.totalWire;
                 timeLimitSeconds = loaded.timeLimitSeconds;
                 timeRemaining = timeLimitSeconds;
@@ -343,7 +345,7 @@ public class MainController {
                                 stage.initModality(Modality.APPLICATION_MODAL);
                         }
                         stage.setOnHidden(ev -> {
-                                if (!aergiaSelectionMode && !sisyphusSelectionMode) {
+                                if (!aergiaSelectionMode && !sisyphusSelectionMode && !eliphasSelectionMode) {
                                         running = wasRunningBeforeShop;
                                 }
                                 gameCanvas.requestFocus();
@@ -621,6 +623,50 @@ public class MainController {
 
 
         private void onMouseClicked(MouseEvent e) {
+                if (eliphasSelectionMode) {
+                        eliphasSelectionMode = false;
+                        shopSystem.getState().eliphasSelectionActive = false;
+
+                        WiringUtils.SegmentHit hit = WiringUtils.findNearestSegment(
+                                engine.entities(), e.getX(), e.getY(), 10.0);
+
+                        if (hit != null) {
+                                double totalLength = WiringUtils.pathLength(hit.link);
+                                List<WiringUtils.Pt> path = WiringUtils.path(hit.link);
+
+                                double lengthToSegment = 0.0;
+                                for (int i = 0; i < hit.segmentIndex; i++) {
+                                        WiringUtils.Pt a = path.get(i);
+                                        WiringUtils.Pt b = path.get(i+1);
+                                        lengthToSegment += Math.hypot(b.x - a.x, b.y - a.y);
+                                }
+
+                                WiringUtils.Pt segStart = path.get(hit.segmentIndex);
+                                WiringUtils.Pt segEnd = path.get(hit.segmentIndex+1);
+                                double segmentLength = Math.hypot(segEnd.x - segStart.x, segEnd.y - segStart.y);
+                                double hitDistance = Math.hypot(hit.hitX - segStart.x, hit.hitY - segStart.y);
+
+                                double normalizedPosition = (lengthToSegment + hitDistance) / totalLength;
+
+                                Entity effect = new Entity().add(new EliphasEffect(
+                                        hit.link,
+                                        normalizedPosition,
+                                        GameBalance.ELIPHAS_DURATION
+                                ));
+                                engine.entities().add(effect);
+
+                                engine.incrementCoins(-GameBalance.COST_ELIPHAS);
+                                shopSystem.getState().eliphasCooldown = GameBalance.ELIPHAS_COOLDOWN;
+
+                                Audio.get().playSfx(AudioAssets.PURCHASE);
+                        } else {
+                                Audio.get().playSfx(AudioAssets.ERROR);
+                        }
+
+                        running = wasRunningBeforeShop;
+                }
+
+
                 if (!aergiaSelectionMode) return;
 
                 aergiaSelectionMode = false;

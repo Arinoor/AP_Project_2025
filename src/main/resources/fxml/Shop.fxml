@@ -24,6 +24,10 @@
         <Button fx:id="btnSisyphus" text="Scroll of Sisyphus - 15 coins (move non-reference system)" onAction="#onSisyphus"/>
         <Label fx:id="lblSisyphusMsg" text=""/>
     </HBox>
+    <HBox spacing="8" styleClass="shop-row">
+        <Button fx:id="btnEliphas" text="Scroll of Eliphas - 20 coins (Zero lateral point 30s)" onAction="#onEliphas"/>
+        <Label fx:id="lblEliphasMsg" text=""/>
+    </HBox>
     <HBox spacing="8">
         <Label fx:id="coinsInfo" text="Your coins: 0"/>
         <Region HBox.hgrow="ALWAYS"/>
