@@ -4,7 +4,7 @@
 
   "devices": [
     { "id": "P_HEAVY",  "x": 120, "y": 140,
-      "producer": { "interval": 4.0, "quota": { "heavy2": 5 }}},
+      "producer": { "interval": 4.0, "quota": { "heavy": 5 }}},
 
     { "id": "DIST_A",   "x": 380, "y": 140, "distribute": true },
 

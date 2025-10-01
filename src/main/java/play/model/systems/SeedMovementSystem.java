@@ -4,7 +4,6 @@ package play.model.systems;
 import play.model.core.Entity;
 import play.model.components.*;
 import play.model.engine.GameEngine;
-import play.utils.Vec2;
 import play.utils.WiringUtils;
 import play.model.components.Disabled;
 import play.model.constants.GameBalance;
@@ -51,9 +50,9 @@ public class SeedMovementSystem implements System {
                         }
                 }
 
+                List<AergiaEffect> activeEffects = new ArrayList<>();
                 List<Entity> toRemove = new ArrayList<>();
 
-                List<AergiaEffect> activeEffects = new ArrayList<>();
                 for (Entity e : entities) {
                         if (e.has(AergiaEffect.class)) {
                                 AergiaEffect effect = e.get(AergiaEffect.class);
@@ -66,24 +65,10 @@ public class SeedMovementSystem implements System {
                         }
                 }
 
-                List<EliphasEffect> activeEliphasEffects = new ArrayList<>();
-                for (Entity e : entities) {
-                        if (e.has(EliphasEffect.class)) {
-                                EliphasEffect effect = e.get(EliphasEffect.class);
-                                effect.remainingTime -= dt;
-                                if (effect.remainingTime <= 0) {
-                                        toRemove.add(e);
-                                } else {
-                                        activeEliphasEffects.add(effect);
-                                }
-                        }
-                }
-
                 for (Entity e : toRemove) entities.remove(e);
 
 
                 toRemove.clear();
-
 
                 for (Entity e : entities) {
                         if (!e.has(Seed.class) || !e.has(Transform.class)) continue;
@@ -116,19 +101,6 @@ public class SeedMovementSystem implements System {
                                                 }
                                         }
                                 }
-                                // Apply Eliphas effects to seeds
-                                for (EliphasEffect effect : activeEliphasEffects) {
-                                        if (s.currentLink == effect.link) {
-                                                double distance = Math.abs(s.progress - effect.position);
-                                                if (distance < 0.05) { // within 5% of the effect point
-                                                        s.lateral = 0;
-                                                }
-                                        }
-                                }
-                        }
-
-                        if (s.type == Seed.Type.HEAVY2) {
-                                handleHeavy2Movement(s, dt);
                         }
 
                         // Integrate velocity and distance
@@ -150,7 +122,7 @@ public class SeedMovementSystem implements System {
                         s.lateral *= LATERAL_DAMP;
 
                         // Loss thresholds
-                        double lateralThreshold = 10000; //s.sizeUnits() * pixelsPerUnit;
+                        double lateralThreshold = s.sizeUnits() * pixelsPerUnit;
                         if (Math.abs(s.lateral) > lateralThreshold
                                 || s.collisions >= s.capacity
                                 || s.noise > s.sizeUnits()) {
@@ -164,35 +136,13 @@ public class SeedMovementSystem implements System {
                         WiringUtils.Pt pos = s.returning
                                 ? WiringUtils.pointAlongNormalized(l, 1.0 - s.progress)
                                 : WiringUtils.pointAlongNormalized(l, s.progress);
-
-                        // Calculate tangent and normal vectors
-                        Vec2 tangent = WiringUtils.tangentAtNormalized(s.currentLink, s.progress);
-                        Vec2 normal = new Vec2(-tangent.y, tangent.x); // perpendicular to tangent
-
-                        // Apply lateral offset with proper scaling
-                        double visualLateralScale = 2.5; // Increased for better visibility
                         Transform st = e.get(Transform.class);
-                        st.x = pos.x + normal.x * s.lateral * visualLateralScale;
-                        st.y = pos.y + normal.y * s.lateral * visualLateralScale;
+                        st.x = pos.x;
+                        st.y = pos.y;
 
                 }
 
                 for (Entity e : toRemove) entities.remove(e);
-        }
-
-        private void handleHeavy2Movement(Seed s, double dt) {
-                final double DEVIATION_INTERVAL = 100.0; // Distance between deviations
-                final double DEVIATION_STRENGTH = 15.0; // Strength of deviation
-
-                // Accumulate distance traveled
-                s.heavy2DeviationAccumulator += s.speed * dt;
-
-                // Apply deviation at intervals
-                if (s.heavy2DeviationAccumulator >= DEVIATION_INTERVAL) {
-                        s.heavy2DeviationAccumulator = 0;
-                        // Add random lateral deviation (both positive and negative)
-                        s.lateral += (Math.random() - 0.5) * 2 * DEVIATION_STRENGTH;
-                }
         }
 
         private void handleSecureProtectedMovement(Seed s, double dt) {

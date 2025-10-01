@@ -227,23 +227,14 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="cc202a8e-4f0b-4a78-9065-4a606d51ea93" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/src/main/java/play/model/components/EliphasEffect.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/codebundle.txt" beforeDir="false" afterPath="$PROJECT_DIR$/codebundle.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/play/controller/MainController.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/controller/MainController.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/play/controller/ShopController.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/controller/ShopController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/components/Producer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/components/Producer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/components/Seed.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/components/Seed.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/play/model/constants/GameBalance.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/constants/GameBalance.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/level/LevelLoaderV2.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/level/LevelLoader.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/systems/CollisionSystem.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/systems/CollisionSystem.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/systems/ProductionSystem.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/systems/ProductionSystem.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/play/model/systems/QueueSystem.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/systems/QueueSystem.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/model/systems/SeedMovementSystem.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/systems/SeedMovementSystem.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/play/model/systems/ShopSystem.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/model/systems/ShopSystem.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/utils/WiringUtils.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/utils/WiringUtils.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/play/view/PacketView.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/view/PacketView.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/play/view/UiConstants.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/play/view/UiConstants.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/fxml/Shop.fxml" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/fxml/Shop.fxml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/levels/level7.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/levels/level7.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -792,7 +783,7 @@ import play.model.components.*;
 import play.model.constants.GameBalance;
 import play.model.core.Entity;
 import play.model.engine.GameEngine;
-import play.model.level.LevelLoader;
+import play.model.level.LevelLoaderV2;
 import play.model.systems.CollisionSystem;
 import play.model.systems.ProductionSystem;
 import play.model.systems.QueueSystem;
@@ -875,7 +866,6 @@ public class MainController {
 
         // Aergia item
         public boolean aergiaSelectionMode = false;
-        public boolean eliphasSelectionMode = false;
         private Link selectedLinkForAergia = null;
         private double selectedPositionForAergia = 0.0;
 
@@ -907,9 +897,8 @@ public class MainController {
                                         if (c == KeyCode.S) openShop();
 
                                         // Add this block to handle cancellation
-                                        if (c == KeyCode.ESCAPE && (aergiaSelectionMode || sisyphusSelectionMode || eliphasSelectionMode)) {
+                                        if (c == KeyCode.ESCAPE && (aergiaSelectionMode || sisyphusSelectionMode)) {
                                                 aergiaSelectionMode = false;
-                                                eliphasSelectionMode = false;
                                                 sisyphusSelectionMode = false;
                                                 running = wasRunningBeforeShop;
                                                 Audio.get().playSfx(AudioAssets.CLICK);
@@ -968,7 +957,7 @@ public class MainController {
                 engine = new GameEngine();
 
                 // Load entities (systems + ports) from JSON
-                LevelLoader.Loaded loaded = LevelLoader.loadFromResource(engine, currentLevelPath);
+                LevelLoaderV2.Loaded loaded = LevelLoaderV2.loadFromResource(engine, currentLevelPath);
                 totalWire = loaded.totalWire;
                 timeLimitSeconds = loaded.timeLimitSeconds;
                 timeRemaining = timeLimitSeconds;
@@ -1117,7 +1106,7 @@ public class MainController {
                                 stage.initModality(Modality.APPLICATION_MODAL);
                         }
                         stage.setOnHidden(ev -> {
-                                if (!aergiaSelectionMode && !sisyphusSelectionMode && !eliphasSelectionMode) {
+                                if (!aergiaSelectionMode && !sisyphusSelectionMode) {
                                         running = wasRunningBeforeShop;
                                 }
                                 gameCanvas.requestFocus();
@@ -1395,50 +1384,6 @@ public class MainController {
 
 
         private void onMouseClicked(MouseEvent e) {
-                if (eliphasSelectionMode) {
-                        eliphasSelectionMode = false;
-                        shopSystem.getState().eliphasSelectionActive = false;
-
-                        WiringUtils.SegmentHit hit = WiringUtils.findNearestSegment(
-                                engine.entities(), e.getX(), e.getY(), 10.0);
-
-                        if (hit != null) {
-                                double totalLength = WiringUtils.pathLength(hit.link);
-                                List<WiringUtils.Pt> path = WiringUtils.path(hit.link);
-
-                                double lengthToSegment = 0.0;
-                                for (int i = 0; i < hit.segmentIndex; i++) {
-                                        WiringUtils.Pt a = path.get(i);
-                                        WiringUtils.Pt b = path.get(i+1);
-                                        lengthToSegment += Math.hypot(b.x - a.x, b.y - a.y);
-                                }
-
-                                WiringUtils.Pt segStart = path.get(hit.segmentIndex);
-                                WiringUtils.Pt segEnd = path.get(hit.segmentIndex+1);
-                                double segmentLength = Math.hypot(segEnd.x - segStart.x, segEnd.y - segStart.y);
-                                double hitDistance = Math.hypot(hit.hitX - segStart.x, hit.hitY - segStart.y);
-
-                                double normalizedPosition = (lengthToSegment + hitDistance) / totalLength;
-
-                                Entity effect = new Entity().add(new EliphasEffect(
-                                        hit.link,
-                                        normalizedPosition,
-                                        GameBalance.ELIPHAS_DURATION
-                                ));
-                                engine.entities().add(effect);
-
-                                engine.incrementCoins(-GameBalance.COST_ELIPHAS);
-                                shopSystem.getState().eliphasCooldown = GameBalance.ELIPHAS_COOLDOWN;
-
-                                Audio.get().playSfx(AudioAssets.PURCHASE);
-                        } else {
-                                Audio.get().playSfx(AudioAssets.ERROR);
-                        }
-
-                        running = wasRunningBeforeShop;
-                }
-
-
                 if (!aergiaSelectionMode) return;
 
                 aergiaSelectionMode = false;
@@ -1566,7 +1511,7 @@ public class MainController {
                                                                 // Recalculate position based on link geometry
                                                                 WiringUtils.Pt pos = WiringUtils.pointAlongNormalized(
                                                                         link,
-                                                                        seed.returning ? 1 - seed.progress : seed.progress
+                                                                        seed.progress
                                                                 );
                                                                 Transform seedTransform = seedEntity.get(Transform.class);
                                                                 seedTransform.x = pos.x;
@@ -1666,14 +1611,12 @@ public class ShopController {
         @FXML private Button btnAergia;
         @FXML private Button closeBtn;
         @FXML private Button btnSisyphus;
-        @FXML private Button btnEliphas;
         @FXML private Label  lblAtarMsg;
         @FXML private Label  lblAiryMsg;
         @FXML private Label  lblAnaMsg;
         @FXML private Label lblAergiaMsg;
         @FXML private Label  coinsInfo;
         @FXML private Label lblSisyphusMsg;
-        @FXML private Label lblEliphasMsg;
 
         private MainController mainController;
 
@@ -1758,19 +1701,6 @@ public class ShopController {
                         Audio.get().playSfx(AudioAssets.PURCHASE);
                         mainController.setSisyphusSelectionMode(true);
                         btnSisyphus.getScene().getWindow().hide();
-                }
-                refreshCoins();
-        }
-
-        @FXML
-        private void onEliphas() {
-                if (shop.buyEliphas()) {
-                        Audio.get().playSfx(AudioAssets.PURCHASE);
-                        mainController.eliphasSelectionMode = true;
-                        btnEliphas.getScene().getWindow().hide();
-                } else {
-                        lblEliphasMsg.setText("Not enough coins (need 20) or on cooldown.");
-                        Audio.get().playSfx(AudioAssets.ERROR);
                 }
                 refreshCoins();
         }
@@ -2337,24 +2267,6 @@ public class Distribute { }
 
 
 
-===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\components\EliphasEffect.java =====
-
-
-package play.model.components;
-
-public class EliphasEffect {
-        public final Link link;
-        public final double position; // normalized position along the link [0-1]
-        public double remainingTime;
-
-        public EliphasEffect(Link link, double position, double duration) {
-                this.link = link;
-                this.position = position;
-                this.remainingTime = duration;
-        }
-}
-
-
 ===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\components\HeavyPacket.java =====
 
 
@@ -2642,27 +2554,24 @@ public class Producer {
         public int remainingInfinite = 0;
         public int remainingSecure   = 0;
         public int remainingHeavy   = 0;
-        public int remainingHeavy2  = 0;
-
 
         public Producer(double interval) {
                 this.interval = interval;
         }
 
         /** Full ctor with all packet types. */
-        public Producer(double interval, int squareQuota, int triangleQuota, int infiniteQuota, int secureQuota, int heavyQuota, int heavy2Quota) {
+        public Producer(double interval, int squareQuota, int triangleQuota, int infiniteQuota, int secureQuota, int heavyQuota) {
                 this.interval = interval;
                 this.remainingSquare = squareQuota;
                 this.remainingTriangle = triangleQuota;
                 this.remainingInfinite = infiniteQuota;
                 this.remainingSecure   = secureQuota;
                 this.remainingHeavy = heavyQuota;
-                this.remainingHeavy2 = heavy2Quota;
         }
 
         /** Returns true if at least one type still has quota or quotas are unlimited. */
         public boolean hasAnyQuota() {
-                return (remainingSquare != 0) || (remainingTriangle != 0) || (remainingInfinite != 0) || (remainingSecure != 0) || (remainingHeavy != 0) || (remainingHeavy2 != 0);
+                return (remainingSquare != 0) || (remainingTriangle != 0) || (remainingInfinite != 0) || (remainingSecure != 0) || (remainingHeavy != 0);
         }
 }
 
@@ -2732,9 +2641,7 @@ import play.model.core.Entity;
 
 /** Packet (seed) travelling in the network. */
 public class Seed {
-        public enum Type {
-                SQUARE, TRIANGLE, INFINITE, SECURE, PROTECTED, SECURE_PROTECTED, HEAVY, BITPACKET, HEAVY2
-        }
+        public enum Type { SQUARE, TRIANGLE, INFINITE, SECURE, PROTECTED, SECURE_PROTECTED, HEAVY, BITPACKET }
 
         public Type type;
 
@@ -2792,8 +2699,6 @@ public class Seed {
 
         public boolean trojan = false;
 
-        public double heavy2DeviationAccumulator = 0;
-
 
         public Seed(Type type) {
                 this.type = type;
@@ -2804,11 +2709,6 @@ public class Seed {
                 if (type == Type.HEAVY) {
                         this.heavySize = 8;
                         this.capacity = 3;
-                }
-                if (type == Type.HEAVY2) {
-                        this.heavySize = 10; // Base unit size
-                        this.capacity = 3;
-                        this.speed = 80.0; // Constant speed like HEAVY
                 }
                 // BITPACKET: size units 1, capacity small
                 if (type == Type.BITPACKET) {
@@ -2835,7 +2735,6 @@ public class Seed {
                                 return base * 2.0;
                         case SECURE_PROTECTED:  return 6.0;
                         case HEAVY:              return (double)Math.max(1, heavySize);
-                        case HEAVY2: return 10.0;
                         case BITPACKET:          return 1.0;
                         default:
                                 return 2.0;
@@ -2915,9 +2814,6 @@ public final class GameBalance {
         public static final int COST_ANAHITA  = 5; // reset packet noise now
         public static final int COST_AERGIA = 10;
         public static final int COST_SISYPHUS = 15;
-        public static final int COST_ELIPHAS = 20;
-        public static final double ELIPHAS_DURATION = 30.0;
-        public static final double ELIPHAS_COOLDOWN = 45.0;
 
 
         public static final double AERGIA_DURATION = 20.0; // 20 seconds
@@ -3187,7 +3083,7 @@ public record SeedLostEvent(int lostDelta, int lostTotal) {}
 
 
 
-===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\level\LevelLoader.java =====
+===== FILE: C:\Users\ASUS\AP_Project1\src\main\java\play\model\level\LevelLoaderV2.java =====
 
 
 package play.model.level;
@@ -3195,6 +3091,7 @@ package play.model.level;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import play.model.components.*;
+import play.model.constants.GameBalance;
 import play.model.core.Entity;
 import play.model.engine.GameEngine;
 
@@ -3202,7 +3099,16 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 
-public final class LevelLoader {
+/**
+ * Loads ONLY systems and ports from JSON. No links are created here.
+ *
+ * Quotas supported:
+ *  - devices[].producer.quota.{square,triangle,infinite,secure}
+ * Device flags:
+ *  - devices[].reference: true  -> adds Reference component
+ *  - devices[].vpn: true        -> adds Vpn component (+ BackgroundImage("/img/vpn_system.png"))
+ */
+public final class LevelLoaderV2 {
 
         public static final class Loaded {
                 public double totalWire = 3000;
@@ -3214,18 +3120,18 @@ public final class LevelLoader {
 
         private static final ObjectMapper M = new ObjectMapper();
 
-        private LevelLoader() {}
+        private LevelLoaderV2() {}
 
         public static Loaded loadFromResource(GameEngine engine, String path) {
                 Loaded out = new Loaded();
-                try (InputStream in = LevelLoader.class.getResourceAsStream(path)) {
+                try (InputStream in = LevelLoaderV2.class.getResourceAsStream(path)) {
                         if (in == null) throw new IllegalArgumentException("Missing level resource: " + path);
                         JsonNode root = M.readTree(in);
 
                         out.totalWire = root.path("totalWire").asDouble(3000.0);
                         out.timeLimitSeconds = root.path("timeLimitSeconds").asInt(120);
 
-                        // 1) Systems
+                        // 1) Devices (systems)
                         for (JsonNode d : root.path("devices")) {
                                 String id = d.path("id").asText();
                                 double x  = d.path("x").asDouble(0);
@@ -3271,7 +3177,7 @@ public final class LevelLoader {
                                 if (!prodNode.isMissingNode() && !prodNode.isNull()) {
                                         double interval = prodNode.path("interval").asDouble(1.0);
 
-                                        int qS = -1, qT = -1, qI = 0, qC = 0, qH = 0, qH2 = 0; // default new types to 0 unless provided
+                                        int qS = -1, qT = -1, qI = 0, qC = 0, qH = 0; // default new types to 0 unless provided
                                         JsonNode quota = prodNode.path("quota");
                                         if (!quota.isMissingNode() && !quota.isNull()) {
                                                 if (quota.has("square"))   qS = quota.path("square").asInt(0);
@@ -3279,21 +3185,23 @@ public final class LevelLoader {
                                                 if (quota.has("infinite")) qI = quota.path("infinite").asInt(0);
                                                 if (quota.has("secure"))   qC = quota.path("secure").asInt(0);
                                                 if(quota.has("heavy")) qH = quota.path("heavy").asInt(0);
-                                                if(quota.has("heavy2")) qH2 = quota.path("heavy2").asInt(0);
 
+                                                // Sum only finite quotas into planned total
                                                 if (qS > 0) out.plannedSeeds += qS;
                                                 if (qT > 0) out.plannedSeeds += qT;
                                                 if (qI > 0) out.plannedSeeds += qI;
                                                 if (qC > 0) out.plannedSeeds += qC;
                                                 if (qH > 0) out.plannedSeeds += qH;
-                                                if (qH2 > 0) out.plannedSeeds += qH2;
 
                                                 System.out.println(qH);
 
-                                                systemE.add(new Producer(interval, qS, qT, qI, qC, qH, qH2));
+                                                systemE.add(new Producer(interval, qS, qT, qI, qC, qH));
 
                                         } else {
+                                                // Defaults: new types infinite/secure = 0 so they don't spawn unless declared
                                                 Producer p = new Producer(interval);
+                                                p.remainingInfinite = 0;
+                                                p.remainingSecure   = 0;
                                                 systemE.add(p);
                                         }
                                 }
@@ -3313,7 +3221,7 @@ public final class LevelLoader {
 
                                 Entity parentSystem = out.systemsById.get(devId);
                                 if (parentSystem == null) {
-                                        System.err.println("[LevelLoader] Unknown system for port " + id + ": " + devId);
+                                        System.err.println("[LevelLoaderV2] Unknown device for port " + id + ": " + devId);
                                         continue;
                                 }
 
@@ -3326,7 +3234,7 @@ public final class LevelLoader {
                                 portE.add(new PortInfo(io, shape, parentSystem));
                                 portE.add(new Transform(x, y));
                                 if (io == PortInfo.IO.IN) {
-                                        portE.add(new Queue(5));
+                                        portE.add(new Queue(5)); // capacity for this phase
                                 }
 
                                 if (p.path("reference").asBoolean(false) && !parentSystem.has(Reference.class)) {
@@ -3337,6 +3245,7 @@ public final class LevelLoader {
                                 out.portsById.put(id, portE);
                         }
 
+                        // 3) Links: ignored on load (player wires them)
                 } catch (Exception e) {
                         throw new RuntimeException("Failed to load level from " + path, e);
                 }
@@ -3540,7 +3449,7 @@ public class CollisionSystem implements System {
         /** Impact wave radius in pixels. */
         private final double IMPACT_RADIUS;
 
-        private static final double OFFSET_FACTOR = 3.5;
+        private static final double OFFSET_FACTOR = 0.12;
         private static final double PAIR_COOLDOWN_SEC = 0.75;
 
         /** Noise added (in UNITS) to each seed per collision. */
@@ -3572,7 +3481,7 @@ public class CollisionSystem implements System {
                 // Keep your original semantics: unit is the pixel scale used for thresholds.
                 this.unit = Math.max(4.0, packetSize);
                 // Reasonable default for AoE radius based on visual size.
-                this.IMPACT_RADIUS = Math.max(100.0, this.unit * 8.0);
+                this.IMPACT_RADIUS = Math.max(24.0, this.unit * 8.0);
                 this.audio = audioService;
         }
 
@@ -3646,9 +3555,7 @@ public class CollisionSystem implements System {
                                 scheduleReset(sb);
 
                                 // Separate along links so they don't re-hit immediately (polyline-aware)
-                                //separateAlongLinks(sa, ea, sb, eb, rSum, Math.sqrt(Math.max(1e-12, d2)));
-                                applyCollisionLateral(sa, sb, rSum - Math.sqrt(d2));
-
+                                separateAlongLinks(sa, ea, sb, eb, rSum, Math.sqrt(Math.max(1e-12, d2)));
 
                                 // Pairwise cooldown
                                 pairCooldowns.put(key, PAIR_COOLDOWN_SEC);
@@ -3744,14 +3651,6 @@ public class CollisionSystem implements System {
                 }
         }
 
-        private void applyCollisionLateral(Seed sa, Seed sb, double overlap) {
-                // Add lateral impulse to colliding packets with more force
-                double impulse = overlap * 1.5; // Increased from 0.5
-
-                // Apply in opposite directions to create separation
-                sa.lateral += impulse;
-                sb.lateral -= impulse; // Opposite direction
-        }
         /**
          * Approximate tangent (dx,dy) on a polyline link at normalized t by sampling
          * two nearby points (arc-length parameterization).
@@ -3856,11 +3755,9 @@ public class ProductionSystem implements System {
                                 // Determine allowed seed types for this OUT port
                                 Seed.Type[] allowed;
                                 if (pinfo.shape == PortInfo.Shape.SQUARE) {
-                                        allowed = new Seed.Type[]{ Seed.Type.SQUARE, Seed.Type.INFINITE,
-                                                Seed.Type.SECURE, Seed.Type.HEAVY, Seed.Type.HEAVY2 };
+                                        allowed = new Seed.Type[]{ Seed.Type.SQUARE, Seed.Type.INFINITE, Seed.Type.SECURE, Seed.Type.HEAVY };
                                 } else { // TRIANGLE
-                                        allowed = new Seed.Type[]{ Seed.Type.TRIANGLE, Seed.Type.SECURE,
-                                                Seed.Type.HEAVY, Seed.Type.HEAVY2 };
+                                        allowed = new Seed.Type[]{ Seed.Type.TRIANGLE, Seed.Type.SECURE, Seed.Type.HEAVY };
                                 }
 
                                 // Filter allowed by available quota
@@ -3909,7 +3806,6 @@ public class ProductionSystem implements System {
                         case INFINITE: return p.remainingInfinite != 0;
                         case SECURE:   return p.remainingSecure   != 0;
                         case HEAVY:   return p.remainingHeavy   != 0;
-                        case HEAVY2:   return p.remainingHeavy2   != 0;
                 }
                 return false;
         }
@@ -3921,7 +3817,6 @@ public class ProductionSystem implements System {
                         case INFINITE: if (p.remainingInfinite > 0) p.remainingInfinite--; break;
                         case SECURE:   if (p.remainingSecure   > 0) p.remainingSecure--;   break;
                         case HEAVY:   if (p.remainingHeavy   > 0) p.remainingHeavy--;   break;
-                        case HEAVY2:   if (p.remainingHeavy2   > 0) p.remainingHeavy2--;   break;
                 }
         }
 
@@ -4282,7 +4177,7 @@ public final class QueueSystem implements System {
                         // -------------------
                         // HEAVY specific effects
                         // -------------------
-                        if (s.type == Seed.Type.HEAVY || s.type == Seed.Type.HEAVY2) {
+                        if (s.type == Seed.Type.HEAVY) {
                                 // 1) destroy queued packets in this deviceQueues entry (if any)
                                 Deque<Entity> q = deviceQueues.get(system);
                                 if (q != null && !q.isEmpty()) {
@@ -4396,7 +4291,6 @@ public final class QueueSystem implements System {
                         case PROTECTED: reward = 5; break;
                         case HEAVY: reward = Math.max(1, s.heavySize); break;
                         case BITPACKET: reward = 1; break;
-                        case HEAVY2: reward = 10; break;
                         default: reward = 0; break;
                 }
                 engine.incrementCoins(reward);
@@ -4765,60 +4659,18 @@ public final class QueueSystem implements System {
         }
 
         private Entity findAssociatedPort(Entity system, Entity packet) {
-                if (packet.has(Seed.class)) {
-                        Seed seed = packet.get(Seed.class);
-
-                        // Check if seed has a current link
-                        if (seed.currentLink != null) {
-                                // For packets in transit, find which end of the link they're closest to
-                                Link link = seed.currentLink;
-                                Transform seedTransform = packet.get(Transform.class);
-
-                                // Calculate distance to both ends of the link
-                                Transform fromTransform = link.fromPort.get(Transform.class);
-                                Transform toTransform = link.toPort.get(Transform.class);
-
-                                double distToFrom = Math.hypot(
-                                        seedTransform.x - fromTransform.x,
-                                        seedTransform.y - fromTransform.y
-                                );
-
-                                double distToTo = Math.hypot(
-                                        seedTransform.x - toTransform.x,
-                                        seedTransform.y - toTransform.y
-                                );
-
-                                // Return the closer port that belongs to this system
-                                if (distToFrom < distToTo) {
-                                        PortInfo portInfo = link.fromPort.get(PortInfo.class);
-                                        if (portInfo.parentSystem == system) {
-                                                return link.fromPort;
-                                        }
-                                } else {
-                                        PortInfo portInfo = link.toPort.get(PortInfo.class);
-                                        if (portInfo.parentSystem == system) {
-                                                return link.toPort;
-                                        }
-                                }
-                        }
-
-                        // For queued packets, find the port with matching position
-                        Transform packetTransform = packet.get(Transform.class);
-                        for (Entity entity : entities) {
-                                if (entity.has(PortInfo.class) && entity.has(Transform.class)) {
-                                        PortInfo portInfo = entity.get(PortInfo.class);
-                                        Transform portTransform = entity.get(Transform.class);
-
-                                        if (portInfo.parentSystem == system &&
-                                                Math.abs(portTransform.x - packetTransform.x) < 20 &&
-                                                Math.abs(portTransform.y - packetTransform.y) < 20) {
-                                                return entity;
-                                        }
+                // This is a simplified approach - you might need to adjust based on your actual data structure
+                for (Entity entity : entities) {
+                        if (entity.has(PortInfo.class)) {
+                                PortInfo portInfo = entity.get(PortInfo.class);
+                                if (portInfo.parentSystem == system) {
+                                        return entity;
                                 }
                         }
                 }
                 return null;
         }
+
 
         private Entity removeRandomFromLists(List<Entity> freeSquare, List<Entity> freeTriangle) {
                 int total = freeSquare.size() + freeTriangle.size();
@@ -4899,7 +4751,6 @@ package play.model.systems;
 import play.model.core.Entity;
 import play.model.components.*;
 import play.model.engine.GameEngine;
-import play.utils.Vec2;
 import play.utils.WiringUtils;
 import play.model.components.Disabled;
 import play.model.constants.GameBalance;
@@ -4946,9 +4797,9 @@ public class SeedMovementSystem implements System {
                         }
                 }
 
+                List<AergiaEffect> activeEffects = new ArrayList<>();
                 List<Entity> toRemove = new ArrayList<>();
 
-                List<AergiaEffect> activeEffects = new ArrayList<>();
                 for (Entity e : entities) {
                         if (e.has(AergiaEffect.class)) {
                                 AergiaEffect effect = e.get(AergiaEffect.class);
@@ -4961,24 +4812,10 @@ public class SeedMovementSystem implements System {
                         }
                 }
 
-                List<EliphasEffect> activeEliphasEffects = new ArrayList<>();
-                for (Entity e : entities) {
-                        if (e.has(EliphasEffect.class)) {
-                                EliphasEffect effect = e.get(EliphasEffect.class);
-                                effect.remainingTime -= dt;
-                                if (effect.remainingTime <= 0) {
-                                        toRemove.add(e);
-                                } else {
-                                        activeEliphasEffects.add(effect);
-                                }
-                        }
-                }
-
                 for (Entity e : toRemove) entities.remove(e);
 
 
                 toRemove.clear();
-
 
                 for (Entity e : entities) {
                         if (!e.has(Seed.class) || !e.has(Transform.class)) continue;
@@ -5011,20 +4848,6 @@ public class SeedMovementSystem implements System {
                                                 }
                                         }
                                 }
-                                // Apply Eliphas effects to seeds
-                                for (EliphasEffect effect : activeEliphasEffects) {
-                                        if (s.currentLink == effect.link) {
-                                                double distance = Math.abs(s.progress - effect.position);
-                                                if (distance < 0.05) { // within 5% of the effect point
-                                                        // Gradually reduce lateral movement to zero
-                                                        s.lateral *= 0.1; // Adjust this factor as needed
-                                                }
-                                        }
-                                }
-                        }
-
-                        if (s.type == Seed.Type.HEAVY2) {
-                                handleHeavy2Movement(s, dt);
                         }
 
                         // Integrate velocity and distance
@@ -5046,7 +4869,7 @@ public class SeedMovementSystem implements System {
                         s.lateral *= LATERAL_DAMP;
 
                         // Loss thresholds
-                        double lateralThreshold = 10000; //s.sizeUnits() * pixelsPerUnit;
+                        double lateralThreshold = s.sizeUnits() * pixelsPerUnit;
                         if (Math.abs(s.lateral) > lateralThreshold
                                 || s.collisions >= s.capacity
                                 || s.noise > s.sizeUnits()) {
@@ -5060,35 +4883,13 @@ public class SeedMovementSystem implements System {
                         WiringUtils.Pt pos = s.returning
                                 ? WiringUtils.pointAlongNormalized(l, 1.0 - s.progress)
                                 : WiringUtils.pointAlongNormalized(l, s.progress);
-
-                        // Calculate tangent and normal vectors
-                        Vec2 tangent = WiringUtils.tangentAtNormalized(s.currentLink, s.progress);
-                        Vec2 normal = new Vec2(-tangent.y, tangent.x); // perpendicular to tangent
-
-                        // Apply lateral offset with proper scaling
-                        double visualLateralScale = 2.5; // Increased for better visibility
                         Transform st = e.get(Transform.class);
-                        st.x = pos.x + normal.x * s.lateral * visualLateralScale;
-                        st.y = pos.y + normal.y * s.lateral * visualLateralScale;
+                        st.x = pos.x;
+                        st.y = pos.y;
 
                 }
 
                 for (Entity e : toRemove) entities.remove(e);
-        }
-
-        private void handleHeavy2Movement(Seed s, double dt) {
-                final double DEVIATION_INTERVAL = 100.0; // Distance between deviations
-                final double DEVIATION_STRENGTH = 15.0; // Strength of deviation
-
-                // Accumulate distance traveled
-                s.heavy2DeviationAccumulator += s.speed * dt;
-
-                // Apply deviation at intervals
-                if (s.heavy2DeviationAccumulator >= DEVIATION_INTERVAL) {
-                        s.heavy2DeviationAccumulator = 0;
-                        // Add random lateral deviation (both positive and negative)
-                        s.lateral += (Math.random() - 0.5) * 2 * DEVIATION_STRENGTH;
-                }
         }
 
         private void handleSecureProtectedMovement(Seed s, double dt) {
@@ -5145,14 +4946,12 @@ public class ShopSystem implements System {
                 public boolean disableLateral     = false;
                 public boolean aergiaSelectionActive = false;
                 public boolean sisyphusSelectionActive = false;
-                public boolean eliphasSelectionActive = false;
 
                 double impactOffUntil = 0.0;
                 double collOffUntil   = 0.0;
                 double latOffUntil    = 0.0;
                 public double aergiaCooldown = 0.0;
                 public double sisyphusCooldown = 0.0;
-                public double eliphasCooldown = 0.0;
         }
 
         private final GameEngine engine;
@@ -5177,9 +4976,6 @@ public class ShopSystem implements System {
                 }
                 if (state.sisyphusCooldown > 0) {
                         state.sisyphusCooldown -= dt;
-                }
-                if (state.eliphasCooldown > 0) {
-                        state.eliphasCooldown -= dt;
                 }
         }
 
@@ -5228,14 +5024,6 @@ public class ShopSystem implements System {
                 state.sisyphusSelectionActive = true;
                 engine.incrementCoins(-GameBalance.COST_SISYPHUS);
                 state.sisyphusCooldown = 1.0; // 30 seconds cooldown
-                return true;
-        }
-
-        public boolean buyEliphas() {
-                if (engine.getCoins() < GameBalance.COST_ELIPHAS || state.eliphasCooldown > 0) {
-                        return false;
-                }
-                state.eliphasSelectionActive = true;
                 return true;
         }
 
@@ -5470,16 +5258,6 @@ public class RenderSystem implements System {
 
                                 // Draw purple circle for Aergia effect
                                 g.setFill(Color.PURPLE);
-                                double r = UiConstants.BEND_DOT_RADIUS;
-                                g.fillOval(pos.x - r, pos.y - r, 2 * r, 2 * r);
-                        }
-                        if (e.has(EliphasEffect.class)) {
-                                EliphasEffect effect = e.get(EliphasEffect.class);
-                                WiringUtils.Pt pos = WiringUtils.pointAlongNormalized(
-                                        effect.link, effect.position);
-
-                                // Draw orange circle for Aergia effect
-                                g.setFill(Color.ORANGE);
                                 double r = UiConstants.BEND_DOT_RADIUS;
                                 g.fillOval(pos.x - r, pos.y - r, 2 * r, 2 * r);
                         }
@@ -6067,42 +5845,6 @@ public final class WiringUtils {
                         Math.min(ay, by) - 1e-9 <= py && py <= Math.max(ay, by) + 1e-9 &&
                         Math.abs(direction(ax, ay, bx, by, px, py)) <= 1e-9;
         }
-
-        public static Vec2 tangentAtNormalized(Link l, double t) {
-                List<Pt> pts = curvePoints(l);
-                if (pts.size() < 2) return new Vec2(1, 0);
-
-                double totalLength = pathLength(l);
-                double target = t * totalLength;
-
-                // Find which segment we're on
-                double accumulated = 0;
-                for (int i = 0; i < pts.size() - 1; i++) {
-                        Pt a = pts.get(i);
-                        Pt b = pts.get(i + 1);
-                        double segLen = Math.hypot(b.x - a.x, b.y - a.y);
-
-                        if (accumulated + segLen >= target) {
-                                // Return the direction of this segment
-                                double dx = b.x - a.x;
-                                double dy = b.y - a.y;
-                                double len = Math.hypot(dx, dy);
-                                if (len < 1e-9) return new Vec2(1, 0);
-                                return new Vec2(dx/len, dy/len);
-                        }
-                        accumulated += segLen;
-                }
-
-                // Default to last segment direction
-                Pt a = pts.get(pts.size() - 2);
-                Pt b = pts.get(pts.size() - 1);
-                double dx = b.x - a.x;
-                double dy = b.y - a.y;
-                double len = Math.hypot(dx, dy);
-                if (len < 1e-9) return new Vec2(1, 0);
-                return new Vec2(dx/len, dy/len);
-        }
-
 }
 
 
@@ -6119,6 +5861,7 @@ import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import play.model.components.BitPacket;
+import play.model.components.HeavyPacket;
 import play.model.components.Seed;
 import play.model.core.Entity;
 
@@ -6143,7 +5886,6 @@ public final class PacketView {
         private static Image PROTECTED_IMG;
         private static Image SECURE_PROTECTED_IMG;
         private static Image HEAVY_IMG;
-        private static Image HEAVY2_IMG;
 
 
         /** Render a packet centered at (x,y). */
@@ -6170,10 +5912,6 @@ public final class PacketView {
 
                 if (s.type == Seed.Type.HEAVY) {
                         renderSprite(g, s, x, y, VISUAL_SIZE, getHeavyImage(), 1.25, 0.58, 0.08, 0.60, 0.15);
-                        return;
-                }
-                if (s.type == Seed.Type.HEAVY2) {
-                        renderSprite(g, s, x, y, VISUAL_SIZE, getHeavy2Image(), 1.25, 0.58, 0.08, 0.60, 0.15);
                         return;
                 }
                 if (s.type == Seed.Type.BITPACKET) {
@@ -6297,13 +6035,6 @@ public final class PacketView {
                         HEAVY_IMG = new Image(PacketView.class.getResourceAsStream("/img/heavy_packet.png"));
                 }
                 return HEAVY_IMG;
-        }
-
-        private static Image getHeavy2Image() {
-                if (HEAVY2_IMG == null) {
-                        HEAVY2_IMG = new Image(PacketView.class.getResourceAsStream("/img/heavy_packet2.png"));
-                }
-                return HEAVY2_IMG;
         }
 
         // ---- Vector primitives ----
@@ -7073,10 +6804,6 @@ public final class UiConstants {
         <Button fx:id="btnSisyphus" text="Scroll of Sisyphus - 15 coins (move non-reference system)" onAction="#onSisyphus"/>
         <Label fx:id="lblSisyphusMsg" text=""/>
     </HBox>
-    <HBox spacing="8" styleClass="shop-row">
-        <Button fx:id="btnEliphas" text="Scroll of Eliphas - 20 coins (Zero lateral point 30s)" onAction="#onEliphas"/>
-        <Label fx:id="lblEliphasMsg" text=""/>
-    </HBox>
     <HBox spacing="8">
         <Label fx:id="coinsInfo" text="Your coins: 0"/>
         <Region HBox.hgrow="ALWAYS"/>
@@ -7483,7 +7210,7 @@ public final class UiConstants {
 
   "devices": [
     { "id": "P_HEAVY",  "x": 120, "y": 140,
-      "producer": { "interval": 4.0, "quota": { "heavy2": 5 }}},
+      "producer": { "interval": 4.0, "quota": { "heavy": 5 }}},
 
     { "id": "DIST_A",   "x": 380, "y": 140, "distribute": true },
 

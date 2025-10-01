@@ -16,9 +16,6 @@ public final class GameBalance {
         public static final int COST_ANAHITA  = 5; // reset packet noise now
         public static final int COST_AERGIA = 10;
         public static final int COST_SISYPHUS = 15;
-        public static final int COST_ELIPHAS = 20;
-        public static final double ELIPHAS_DURATION = 30.0;
-        public static final double ELIPHAS_COOLDOWN = 45.0;
 
 
         public static final double AERGIA_DURATION = 20.0; // 20 seconds

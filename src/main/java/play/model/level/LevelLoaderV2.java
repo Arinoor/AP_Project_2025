@@ -3,6 +3,7 @@ package play.model.level;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import play.model.components.*;
+import play.model.constants.GameBalance;
 import play.model.core.Entity;
 import play.model.engine.GameEngine;
 
@@ -10,7 +11,16 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 
-public final class LevelLoader {
+/**
+ * Loads ONLY systems and ports from JSON. No links are created here.
+ *
+ * Quotas supported:
+ *  - devices[].producer.quota.{square,triangle,infinite,secure}
+ * Device flags:
+ *  - devices[].reference: true  -> adds Reference component
+ *  - devices[].vpn: true        -> adds Vpn component (+ BackgroundImage("/img/vpn_system.png"))
+ */
+public final class LevelLoaderV2 {
 
         public static final class Loaded {
                 public double totalWire = 3000;
@@ -22,18 +32,18 @@ public final class LevelLoader {
 
         private static final ObjectMapper M = new ObjectMapper();
 
-        private LevelLoader() {}
+        private LevelLoaderV2() {}
 
         public static Loaded loadFromResource(GameEngine engine, String path) {
                 Loaded out = new Loaded();
-                try (InputStream in = LevelLoader.class.getResourceAsStream(path)) {
+                try (InputStream in = LevelLoaderV2.class.getResourceAsStream(path)) {
                         if (in == null) throw new IllegalArgumentException("Missing level resource: " + path);
                         JsonNode root = M.readTree(in);
 
                         out.totalWire = root.path("totalWire").asDouble(3000.0);
                         out.timeLimitSeconds = root.path("timeLimitSeconds").asInt(120);
 
-                        // 1) Systems
+                        // 1) Devices (systems)
                         for (JsonNode d : root.path("devices")) {
                                 String id = d.path("id").asText();
                                 double x  = d.path("x").asDouble(0);
@@ -79,7 +89,7 @@ public final class LevelLoader {
                                 if (!prodNode.isMissingNode() && !prodNode.isNull()) {
                                         double interval = prodNode.path("interval").asDouble(1.0);
 
-                                        int qS = -1, qT = -1, qI = 0, qC = 0, qH = 0, qH2 = 0; // default new types to 0 unless provided
+                                        int qS = -1, qT = -1, qI = 0, qC = 0, qH = 0; // default new types to 0 unless provided
                                         JsonNode quota = prodNode.path("quota");
                                         if (!quota.isMissingNode() && !quota.isNull()) {
                                                 if (quota.has("square"))   qS = quota.path("square").asInt(0);
@@ -87,21 +97,23 @@ public final class LevelLoader {
                                                 if (quota.has("infinite")) qI = quota.path("infinite").asInt(0);
                                                 if (quota.has("secure"))   qC = quota.path("secure").asInt(0);
                                                 if(quota.has("heavy")) qH = quota.path("heavy").asInt(0);
-                                                if(quota.has("heavy2")) qH2 = quota.path("heavy2").asInt(0);
 
+                                                // Sum only finite quotas into planned total
                                                 if (qS > 0) out.plannedSeeds += qS;
                                                 if (qT > 0) out.plannedSeeds += qT;
                                                 if (qI > 0) out.plannedSeeds += qI;
                                                 if (qC > 0) out.plannedSeeds += qC;
                                                 if (qH > 0) out.plannedSeeds += qH;
-                                                if (qH2 > 0) out.plannedSeeds += qH2;
 
                                                 System.out.println(qH);
 
-                                                systemE.add(new Producer(interval, qS, qT, qI, qC, qH, qH2));
+                                                systemE.add(new Producer(interval, qS, qT, qI, qC, qH));
 
                                         } else {
+                                                // Defaults: new types infinite/secure = 0 so they don't spawn unless declared
                                                 Producer p = new Producer(interval);
+                                                p.remainingInfinite = 0;
+                                                p.remainingSecure   = 0;
                                                 systemE.add(p);
                                         }
                                 }
@@ -121,7 +133,7 @@ public final class LevelLoader {
 
                                 Entity parentSystem = out.systemsById.get(devId);
                                 if (parentSystem == null) {
-                                        System.err.println("[LevelLoader] Unknown system for port " + id + ": " + devId);
+                                        System.err.println("[LevelLoaderV2] Unknown device for port " + id + ": " + devId);
                                         continue;
                                 }
 
@@ -134,7 +146,7 @@ public final class LevelLoader {
                                 portE.add(new PortInfo(io, shape, parentSystem));
                                 portE.add(new Transform(x, y));
                                 if (io == PortInfo.IO.IN) {
-                                        portE.add(new Queue(5));
+                                        portE.add(new Queue(5)); // capacity for this phase
                                 }
 
                                 if (p.path("reference").asBoolean(false) && !parentSystem.has(Reference.class)) {
@@ -145,6 +157,7 @@ public final class LevelLoader {
                                 out.portsById.put(id, portE);
                         }
 
+                        // 3) Links: ignored on load (player wires them)
                 } catch (Exception e) {
                         throw new RuntimeException("Failed to load level from " + path, e);
                 }

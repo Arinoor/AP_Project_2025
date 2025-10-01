@@ -120,16 +120,6 @@ public class RenderSystem implements System {
                                 double r = UiConstants.BEND_DOT_RADIUS;
                                 g.fillOval(pos.x - r, pos.y - r, 2 * r, 2 * r);
                         }
-                        if (e.has(EliphasEffect.class)) {
-                                EliphasEffect effect = e.get(EliphasEffect.class);
-                                WiringUtils.Pt pos = WiringUtils.pointAlongNormalized(
-                                        effect.link, effect.position);
-
-                                // Draw orange circle for Aergia effect
-                                g.setFill(Color.ORANGE);
-                                double r = UiConstants.BEND_DOT_RADIUS;
-                                g.fillOval(pos.x - r, pos.y - r, 2 * r, 2 * r);
-                        }
                 }
 
                 // systems (either background image OR default rectangle) + reference ring + disabled overlay

@@ -7,6 +7,7 @@ import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import play.model.components.BitPacket;
+import play.model.components.HeavyPacket;
 import play.model.components.Seed;
 import play.model.core.Entity;
 
@@ -31,7 +32,6 @@ public final class PacketView {
         private static Image PROTECTED_IMG;
         private static Image SECURE_PROTECTED_IMG;
         private static Image HEAVY_IMG;
-        private static Image HEAVY2_IMG;
 
 
         /** Render a packet centered at (x,y). */
@@ -58,10 +58,6 @@ public final class PacketView {
 
                 if (s.type == Seed.Type.HEAVY) {
                         renderSprite(g, s, x, y, VISUAL_SIZE, getHeavyImage(), 1.25, 0.58, 0.08, 0.60, 0.15);
-                        return;
-                }
-                if (s.type == Seed.Type.HEAVY2) {
-                        renderSprite(g, s, x, y, VISUAL_SIZE, getHeavy2Image(), 1.25, 0.58, 0.08, 0.60, 0.15);
                         return;
                 }
                 if (s.type == Seed.Type.BITPACKET) {
@@ -185,13 +181,6 @@ public final class PacketView {
                         HEAVY_IMG = new Image(PacketView.class.getResourceAsStream("/img/heavy_packet.png"));
                 }
                 return HEAVY_IMG;
-        }
-
-        private static Image getHeavy2Image() {
-                if (HEAVY2_IMG == null) {
-                        HEAVY2_IMG = new Image(PacketView.class.getResourceAsStream("/img/heavy_packet2.png"));
-                }
-                return HEAVY2_IMG;
         }
 
         // ---- Vector primitives ----

@@ -14,27 +14,24 @@ public class Producer {
         public int remainingInfinite = 0;
         public int remainingSecure   = 0;
         public int remainingHeavy   = 0;
-        public int remainingHeavy2  = 0;
-
 
         public Producer(double interval) {
                 this.interval = interval;
         }
 
         /** Full ctor with all packet types. */
-        public Producer(double interval, int squareQuota, int triangleQuota, int infiniteQuota, int secureQuota, int heavyQuota, int heavy2Quota) {
+        public Producer(double interval, int squareQuota, int triangleQuota, int infiniteQuota, int secureQuota, int heavyQuota) {
                 this.interval = interval;
                 this.remainingSquare = squareQuota;
                 this.remainingTriangle = triangleQuota;
                 this.remainingInfinite = infiniteQuota;
                 this.remainingSecure   = secureQuota;
                 this.remainingHeavy = heavyQuota;
-                this.remainingHeavy2 = heavy2Quota;
         }
 
         /** Returns true if at least one type still has quota or quotas are unlimited. */
         public boolean hasAnyQuota() {
-                return (remainingSquare != 0) || (remainingTriangle != 0) || (remainingInfinite != 0) || (remainingSecure != 0) || (remainingHeavy != 0) || (remainingHeavy2 != 0);
+                return (remainingSquare != 0) || (remainingTriangle != 0) || (remainingInfinite != 0) || (remainingSecure != 0) || (remainingHeavy != 0);
         }
 }
 
